@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe — Mapa de Dados BigQuery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Paleta Vibe */
+    --vibe-blue: #665FFF;
+    --vibe-outline: #292562;
+    --vibe-light: #B9B6F7;
+    --vibe-cloud: #EFEEFF;
+    --vibe-white: #FFFFFF;
+    /* Apoio */
+    --vibe-pink: #FF2B7C;
+    --vibe-cyan: #00EDFF;
+    --vibe-yellow: #FEFB00;
+    --vibe-green: #92FF42;
+    --vibe-orange: #FF8700;
+    --vibe-red: #FF4347;
+    --vibe-purple: #942EF2;
+    /* Tokens */
+    --radius-sm: 8px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+    --radius-pill: 999px;
+    --shadow-sm: 0 2px 8px rgba(41, 37, 98, 0.06);
+    --shadow-md: 0 8px 24px rgba(41, 37, 98, 0.08);
+    --font-main: "Neue Plak", "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--font-main);
+    color: var(--vibe-outline);
+    background: var(--vibe-cloud);
+    line-height: 1.55;
+    font-weight: 400;
+  }
+
+  /* === HEADER === */
+  .hero {
+    background: linear-gradient(135deg, var(--vibe-blue) 0%, var(--vibe-purple) 100%);
+    color: var(--vibe-white);
+    padding: 64px 48px 88px;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    right: -120px;
+    top: -120px;
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
+    border-radius: 50%;
+  }
+  .hero-inner { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
+  .brand {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.14);
+    border-radius: var(--radius-pill);
+    font-weight: 600; font-size: 14px;
+    letter-spacing: 0.5px;
+    backdrop-filter: blur(8px);
+  }
+  .brand .v-icon {
+    width: 22px; height: 22px;
+    background: var(--vibe-white); color: var(--vibe-blue);
+    border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 14px;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin: 24px 0 8px;
+    line-height: 1.1;
+  }
+  .hero p.subtitle {
+    font-size: 18px; opacity: 0.92; max-width: 720px;
+    font-weight: 300;
+  }
+  .hero .meta {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    margin-top: 32px;
+  }
+  .hero .meta .pill {
+    background: rgba(255,255,255,0.16);
+    padding: 8px 16px; border-radius: var(--radius-pill);
+    font-size: 13px; font-weight: 500;
+    backdrop-filter: blur(8px);
+  }
+  .hero .meta .pill code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(0,0,0,0.18);
+    padding: 2px 8px; border-radius: 4px;
+  }
+
+  /* === LAYOUT === */
+  main {
+    max-width: 1200px;
+    margin: -48px auto 0;
+    padding: 0 24px 80px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .toc {
+    background: var(--vibe-white);
+    border-radius: var(--radius-md);
+    padding: 24px 32px;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 48px;
+  }
+  .toc h2 {
+    margin: 0 0 16px;
+    font-size: 14px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--vibe-blue);
+    font-weight: 600;
+  }
+  .toc ol {
+    margin: 0; padding-left: 0; list-style: none;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 8px 24px;
+    counter-reset: toc;
+  }
+  .toc ol li { counter-increment: toc; }
+  .toc ol li a {
+    display: block;
+    color: var(--vibe-outline); text-decoration: none;
+    font-weight: 500; font-size: 15px;
+    padding: 6px 0;
+    border-left: 3px solid transparent;
+    padding-left: 12px;
+    transition: all 0.2s;
+  }
+  .toc ol li a::before {
+    content: counter(toc, decimal-leading-zero) ". ";
+    color: var(--vibe-light); font-weight: 600;
+    margin-right: 6px;
+  }
+  .toc ol li a:hover {
+    border-left-color: var(--vibe-blue);
+    color: var(--vibe-blue);
+  }
+
+  section.card {
+    background: var(--vibe-white);
+    border-radius: var(--radius-md);
+    padding: 40px 48px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow-sm);
+  }
+  section.card > h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--vibe-outline);
+    margin: 0 0 8px;
+    letter-spacing: -0.5px;
+  }
+  section.card > h2 .num {
+    display: inline-block;
+    background: var(--vibe-cloud); color: var(--vibe-blue);
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    text-align: center; line-height: 36px;
+    font-size: 16px; font-weight: 700;
+    margin-right: 12px; vertical-align: middle;
+  }
+  section.card > .lead {
+    color: rgba(41, 37, 98, 0.7);
+    font-size: 16px;
+    margin: 0 0 28px;
+    max-width: 800px;
+  }
+  section.card h3 {
+    font-size: 18px; font-weight: 600;
+    color: var(--vibe-outline);
+    margin: 32px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--vibe-cloud);
+  }
+
+  /* === KPI CARDS === */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--vibe-cloud);
+    padding: 20px 24px;
+    border-radius: var(--radius-sm);
+    border-left: 4px solid var(--vibe-blue);
+  }
+  .kpi .label {
+    font-size: 12px; text-transform: uppercase;
+    letter-spacing: 1px; font-weight: 600;
+    color: var(--vibe-blue);
+  }
+  .kpi .value {
+    font-size: 28px; font-weight: 700;
+    color: var(--vibe-outline);
+    margin-top: 6px;
+    letter-spacing: -0.5px;
+  }
+  .kpi .desc {
+    font-size: 12px; color: rgba(41, 37, 98, 0.6); margin-top: 2px;
+  }
+
+  /* === TABELAS === */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  table thead th {
+    background: var(--vibe-outline);
+    color: var(--vibe-white);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  table thead th:first-child { border-top-left-radius: var(--radius-sm); }
+  table thead th:last-child { border-top-right-radius: var(--radius-sm); }
+  table tbody tr { background: var(--vibe-white); }
+  table tbody tr:nth-child(even) { background: var(--vibe-cloud); }
+  table tbody td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--vibe-cloud);
+    vertical-align: top;
+  }
+  table tbody td.num {
+    font-family: var(--font-mono);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  table tbody td code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--vibe-cloud);
+    color: var(--vibe-blue);
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  table.compact tbody td { padding: 6px 12px; font-size: 13px; }
+
+  /* === BADGES === */
+  .tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.6;
+  }
+  .tag-vibe { background: var(--vibe-blue); color: var(--vibe-white); }
+  .tag-ga4 { background: var(--vibe-light); color: var(--vibe-outline); }
+  .tag-firebase { background: #FFC107; color: var(--vibe-outline); }
+  .tag-string { background: var(--vibe-cyan); color: var(--vibe-outline); }
+  .tag-int { background: var(--vibe-green); color: var(--vibe-outline); }
+  .tag-float { background: var(--vibe-orange); color: var(--vibe-outline); }
+  .tag-double { background: var(--vibe-pink); color: var(--vibe-white); }
+  .tag-deprecated { background: rgba(41,37,98,0.2); color: var(--vibe-outline); }
+  .tag-warn { background: var(--vibe-red); color: var(--vibe-white); }
+
+  /* === CALLOUTS === */
+  .callout {
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    margin: 20px 0;
+    display: flex; gap: 12px;
+    border-left: 4px solid;
+  }
+  .callout-info { background: var(--vibe-cloud); border-color: var(--vibe-blue); }
+  .callout-warn { background: #FFF4E6; border-color: var(--vibe-orange); }
+  .callout-danger { background: #FFEBEC; border-color: var(--vibe-red); }
+  .callout-success { background: #EFFFD9; border-color: var(--vibe-green); }
+  .callout .icon {
+    font-weight: 900; font-size: 18px;
+    flex-shrink: 0; line-height: 1.4;
+  }
+  .callout .content { flex: 1; }
+  .callout strong { display: block; margin-bottom: 4px; font-size: 14px; }
+  .callout p { margin: 4px 0; font-size: 14px; }
+
+  /* === CODE BLOCKS === */
+  pre {
+    background: var(--vibe-outline);
+    color: #E8E6FF;
+    padding: 20px 24px;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 16px 0;
+  }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+  p code, li code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--vibe-cloud);
+    color: var(--vibe-blue);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* === BAR CHART === */
+  .bar-row {
+    display: grid;
+    grid-template-columns: 1fr 80px;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 13px;
+  }
+  .bar-row .label { display: flex; align-items: center; gap: 8px; }
+  .bar-row .label code { font-size: 12px; }
+  .bar-row .bar-wrap {
+    height: 8px; background: var(--vibe-cloud);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+  }
+  .bar-row .bar {
+    height: 100%; background: linear-gradient(90deg, var(--vibe-blue), var(--vibe-purple));
+    border-radius: var(--radius-pill);
+  }
+  .bar-row .num {
+    font-family: var(--font-mono);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: rgba(41,37,98,0.7);
+  }
+
+  /* === GROUPS === */
+  .group {
+    border: 1px solid var(--vibe-cloud);
+    border-radius: var(--radius-sm);
+    margin: 16px 0;
+    overflow: hidden;
+  }
+  .group-header {
+    background: var(--vibe-cloud);
+    padding: 12px 20px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--vibe-outline);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .group-body { padding: 0; }
+  .group-body table { margin: 0; }
+  .group-body table thead { display: none; }
+  .group-body table tbody tr:first-child td { border-top: none; }
+
+  /* === FOOTER === */
+  footer {
+    text-align: center;
+    color: rgba(41,37,98,0.5);
+    font-size: 13px;
+    padding: 32px 24px 0;
+  }
+  footer .v-mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px;
+    background: var(--vibe-blue);
+    color: var(--vibe-white);
+    border-radius: 8px;
+    font-weight: 900;
+    margin-bottom: 12px;
+  }
+  footer a { color: var(--vibe-blue); text-decoration: none; }
+
+  /* === SCROLLBAR === */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--vibe-cloud); }
+  ::-webkit-scrollbar-thumb { background: var(--vibe-light); border-radius: var(--radius-pill); }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 720px) {
+    .hero { padding: 40px 24px 64px; }
+    section.card { padding: 28px 24px; }
+    .toc { padding: 20px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="brand">
+      <span class="v-icon">V</span>
+      <span>Vibe · Data Map</span>
+    </div>
+    <h1>Mapa de Dados — BigQuery</h1>
+    <p class="subtitle">
+      Inventário completo do export GA4/Firebase do app Vibe no BigQuery: schema canônico, eventos custom, parâmetros e padrões de uso. Base para descoberta de hipóteses de produto e segmentação.
+    </p>
+    <div class="meta">
+      <span class="pill">Projeto <code>vibe-285a7</code></span>
+      <span class="pill">Dataset <code>analytics_420328317</code></span>
+      <span class="pill">Range observado: <strong>21/04 → 01/05/2026</strong></span>
+      <span class="pill">Geração: 01/05/2026</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <nav class="toc">
+    <h2>Sumário</h2>
+    <ol>
+      <li><a href="#tldr">TL;DR — Resumo executivo</a></li>
+      <li><a href="#dataset">Dataset e tabelas</a></li>
+      <li><a href="#schema">Schema canônico</a></li>
+      <li><a href="#events">Catálogo de eventos</a></li>
+      <li><a href="#params">Parâmetros de evento</a></li>
+      <li><a href="#user-props">User properties</a></li>
+      <li><a href="#audience">Audiência: plataforma, geo, app</a></li>
+      <li><a href="#volume">Volume e crescimento</a></li>
+      <li><a href="#access">Como acessar</a></li>
+      <li><a href="#gaps">Gaps e oportunidades</a></li>
+    </ol>
+  </nav>
+
+  <!-- ========== TL;DR ========== -->
+  <section class="card" id="tldr">
+    <h2><span class="num">1</span>TL;DR — Resumo executivo</h2>
+    <p class="lead">Em uma página: o que existe hoje no BigQuery do Vibe, em que ordem de grandeza, e onde estão os pontos cegos.</p>
+
+    <div class="kpis">
+      <div class="kpi"><div class="label">Eventos / dia</div><div class="value">~600 mil</div><div class="desc">média desde 24/04</div></div>
+      <div class="kpi"><div class="label">Usuários únicos</div><div class="value">73 mil</div><div class="desc"><code>user_pseudo_id</code> distintos em 10 dias</div></div>
+      <div class="kpi"><div class="label">Eventos catalogados</div><div class="value">52</div><div class="desc">incluindo automáticos GA4 e custom Vibe</div></div>
+      <div class="kpi"><div class="label">Parâmetros distintos</div><div class="value">71</div><div class="desc">em <code>event_params</code></div></div>
+      <div class="kpi"><div class="label">User properties</div><div class="value">5</div><div class="desc">apenas defaults — gap claro</div></div>
+      <div class="kpi"><div class="label">Plataforma dominante</div><div class="value">Android</div><div class="desc">~92% dos usuários</div></div>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="icon">→</span>
+      <div class="content">
+        <strong>Chave canônica do usuário no Vibe</strong>
+        <p>O parâmetro de evento <code>digital_account_id</code> aparece em ~264 mil registros em 3 dias e é a referência consistente do usuário autenticado no app. <code>user_id</code> nativo do GA4 está vazio na maior parte dos eventos, e <code>user_pseudo_id</code> é o identificador anônimo do device/install.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="icon">!</span>
+      <div class="content">
+        <strong>Gap importante: user properties customizadas</strong>
+        <p>Apenas 5 keys aparecem em <code>user_properties</code>, e todas são defaults do Firebase (<code>first_open_time</code>, <code>ga_session_id</code>, <code>ga_session_number</code>, <code>firebase_last_notification</code>) ou ad-hoc (<code>_ltv_BRL</code>, com 64 ocorrências). Não há segmentação de usuário no nível do evento (tier, cohort, ARPU faixa, etc.) — qualquer recorte avançado precisa ser construído via JOIN com base externa ou via cálculo no próprio BigQuery a partir de <code>digital_account_id</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== DATASET ========== -->
+  <section class="card" id="dataset">
+    <h2><span class="num">2</span>Dataset e tabelas</h2>
+    <p class="lead">Estrutura física do export GA4 → BigQuery. Particionamento por dia via wildcard e shards.</p>
+
+    <table>
+      <thead>
+        <tr><th>Atributo</th><th>Valor</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Project ID</td><td><code>vibe-285a7</code></td></tr>
+        <tr><td>Project Number</td><td><code>919792268858</code></td></tr>
+        <tr><td>Dataset</td><td><code>analytics_420328317</code></td></tr>
+        <tr><td>Tipo de export</td><td>Google Analytics 4 → BigQuery (streaming + daily)</td></tr>
+        <tr><td>Tabela diária consolidada</td><td><code>events_YYYYMMDD</code> (uma por dia, fechada)</td></tr>
+        <tr><td>Tabela intraday</td><td><code>events_intraday_YYYYMMDD</code> (do dia corrente, parcial)</td></tr>
+        <tr><td>Wildcard de leitura</td><td><code>events_*</code> — sempre filtre <code>_TABLE_SUFFIX</code></td></tr>
+        <tr><td>Range observado</td><td>10 tabelas fechadas (<code>20260421</code> → <code>20260430</code>) + 1 intraday (<code>20260501</code>)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-warn">
+      <span class="icon">!</span>
+      <div class="content">
+        <strong>Ingestão começou parcial em 21/04</strong>
+        <p>As 3 primeiras tabelas (21–23/04) têm volume residual (140, 670, 5.4k eventos). O export estabilizou em 24/04 com ~390k eventos/dia. Para análises tendenciais, usar como ponto de partida a partir de <code>20260424</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SCHEMA ========== -->
+  <section class="card" id="schema">
+    <h2><span class="num">3</span>Schema canônico</h2>
+    <p class="lead">29 colunas top-level. Todas seguem o schema padrão do GA4 export — <a href="https://support.google.com/analytics/answer/7029846" target="_blank" rel="noopener">documentação Google</a>. Campos abaixo agrupados por função.</p>
+
+    <h3>Identificação do evento</h3>
+    <table>
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td><code>event_date</code></td><td><span class="tag tag-string">STRING</span></td><td>Data do evento no fuso do projeto, formato <code>YYYYMMDD</code></td></tr>
+        <tr><td><code>event_timestamp</code></td><td><span class="tag tag-int">INT64</span></td><td>Timestamp do evento em microssegundos desde epoch</td></tr>
+        <tr><td><code>event_name</code></td><td><span class="tag tag-string">STRING</span></td><td>Nome do evento (ex: <code>screen_view</code>, <code>navigate_home</code>). Ver <a href="#events">Catálogo</a></td></tr>
+        <tr><td><code>event_params</code></td><td><span class="tag tag-ga4">REPEATED STRUCT</span></td><td>Pares chave/valor anexados ao evento. Ver <a href="#params">Parâmetros</a></td></tr>
+        <tr><td><code>event_previous_timestamp</code></td><td><span class="tag tag-int">INT64</span></td><td>Timestamp do evento anterior do mesmo nome (uso interno GA4)</td></tr>
+        <tr><td><code>event_value_in_usd</code></td><td><span class="tag tag-float">FLOAT64</span></td><td>Valor monetário convertido em USD (geralmente null para o app)</td></tr>
+        <tr><td><code>event_bundle_sequence_id</code></td><td><span class="tag tag-int">INT64</span></td><td>Sequência do bundle de eventos enviado pelo SDK</td></tr>
+        <tr><td><code>event_server_timestamp_offset</code></td><td><span class="tag tag-int">INT64</span></td><td>Diferença entre timestamp do device e do servidor</td></tr>
+        <tr><td><code>is_active_user</code></td><td><span class="tag tag-int">BOOL</span></td><td>Se o usuário estava ativo no momento do evento</td></tr>
+        <tr><td><code>batch_event_index</code></td><td><span class="tag tag-int">INT64</span></td><td>Índice do evento dentro do batch enviado</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Identificação do usuário</h3>
+    <table>
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td><code>user_pseudo_id</code></td><td><span class="tag tag-string">STRING</span></td><td><strong>ID anônimo do device/install</strong>. Persistente entre sessões, perdido em reinstall. É a chave principal para análise comportamental quando não há login.</td></tr>
+        <tr><td><code>user_id</code></td><td><span class="tag tag-string">STRING</span></td><td>ID setado via <code>setUserId()</code> no SDK. <strong>Atualmente vazio</strong> na maior parte dos eventos. Substituído na prática pelo param <code>digital_account_id</code>.</td></tr>
+        <tr><td><code>user_first_touch_timestamp</code></td><td><span class="tag tag-int">INT64</span></td><td>Timestamp da primeira interação registrada do usuário</td></tr>
+        <tr><td><code>user_properties</code></td><td><span class="tag tag-ga4">REPEATED STRUCT</span></td><td>Atributos persistentes do usuário. Ver <a href="#user-props">User Properties</a></td></tr>
+        <tr><td><code>user_ltv</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td>Lifetime value do usuário em revenue/currency. Geralmente vazio neste app.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Device, app e geo</h3>
+    <table>
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Campos relevantes</th></tr></thead>
+      <tbody>
+        <tr><td><code>device</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td><code>category</code> (mobile/tablet/...), <code>mobile_brand_name</code>, <code>mobile_model_name</code>, <code>operating_system</code>, <code>operating_system_version</code>, <code>language</code>, <code>time_zone_offset_seconds</code></td></tr>
+        <tr><td><code>geo</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td><code>country</code>, <code>region</code>, <code>city</code>, <code>continent</code>, <code>sub_continent</code>, <code>metro</code></td></tr>
+        <tr><td><code>app_info</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td><code>id</code> (bundle id), <code>version</code>, <code>install_store</code>, <code>install_source</code>, <code>firebase_app_id</code></td></tr>
+        <tr><td><code>platform</code></td><td><span class="tag tag-string">STRING</span></td><td><code>ANDROID</code> / <code>IOS</code> / <code>WEB</code></td></tr>
+        <tr><td><code>stream_id</code></td><td><span class="tag tag-string">STRING</span></td><td>ID do data stream no GA4</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Aquisição e atribuição</h3>
+    <table>
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td><code>traffic_source</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td>Atribuição da primeira sessão do usuário: <code>name</code>, <code>medium</code>, <code>source</code></td></tr>
+        <tr><td><code>collected_traffic_source</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td>Manual UTM e identificadores de campanha capturados (gclid, dclid, srsltid, etc.)</td></tr>
+        <tr><td><code>session_traffic_source_last_click</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td>Atribuição last-click da sessão. Subestruturas: <code>manual_campaign</code>, <code>google_ads_campaign</code>, <code>cross_channel_campaign</code>, <code>sa360_campaign</code>, <code>cm360_campaign</code>, <code>dv360_campaign</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>E-commerce e itens</h3>
+    <table>
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td><code>ecommerce</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td><code>transaction_id</code>, <code>purchase_revenue</code>, <code>purchase_revenue_in_usd</code>, <code>refund_value</code>, <code>shipping_value</code>, <code>tax_value</code>, <code>total_item_quantity</code>, <code>unique_items</code></td></tr>
+        <tr><td><code>items</code></td><td><span class="tag tag-ga4">REPEATED STRUCT</span></td><td>Catálogo de itens do evento (relevante em <code>view_cart</code>, <code>purchase</code>, etc.). Inclui categorias, preço, quantidade, promoção, criativo. <strong>Hoje subutilizado</strong> — apenas 10 ocorrências de <code>view_cart</code> em 10 dias.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Outros</h3>
+    <table>
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td><code>privacy_info</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td>Estado do consent: <code>analytics_storage</code>, <code>ads_storage</code>, <code>uses_transient_token</code></td></tr>
+        <tr><td><code>publisher</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td>Receita de ads no app (<code>ad_revenue_in_usd</code>, <code>ad_format</code>, <code>ad_source_name</code>). Vazio se não houver monetização.</td></tr>
+        <tr><td><code>event_dimensions</code></td><td><span class="tag tag-ga4">STRUCT</span></td><td><code>hostname</code> (uso para web)</td></tr>
+        <tr><td><code>batch_page_id</code>, <code>batch_ordering_id</code></td><td><span class="tag tag-int">INT64</span></td><td>Metadados de batching do SDK</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ========== EVENTS ========== -->
+  <section class="card" id="events">
+    <h2><span class="num">4</span>Catálogo de eventos</h2>
+    <p class="lead">52 <code>event_name</code>s observados em 10 dias (21–30/04). Volume e usuários únicos por evento. Eventos marcados como <span class="tag tag-vibe">VIBE</span> são custom do app; <span class="tag tag-ga4">GA4</span> são automáticos do SDK; <span class="tag tag-firebase">FCM</span> vêm do Firebase Cloud Messaging.</p>
+
+    <h3>Top 15 eventos por volume</h3>
+    <div style="margin: 16px 0;">
+      <div class="bar-row"><div class="label"><span class="tag tag-firebase">FCM</span><code>notification_receive</code></div><div class="bar-wrap"><div class="bar" style="width: 100%"></div></div><div class="num">1.387.917</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-ga4">GA4</span><code>screen_view</code></div><div class="bar-wrap"><div class="bar" style="width: 56%"></div></div><div class="num">781.308</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-firebase">FCM</span><code>notification_dismiss</code></div><div class="bar-wrap"><div class="bar" style="width: 54%"></div></div><div class="num">755.008</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-ga4">GA4</span><code>user_engagement</code></div><div class="bar-wrap"><div class="bar" style="width: 19%"></div></div><div class="num">268.894</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>navigate_home</code></div><div class="bar-wrap"><div class="bar" style="width: 15%"></div></div><div class="num">211.306</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-ga4">GA4</span><code>session_start</code></div><div class="bar-wrap"><div class="bar" style="width: 6%"></div></div><div class="num">80.298</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>navigate_benefits</code></div><div class="bar-wrap"><div class="bar" style="width: 3%"></div></div><div class="num">39.450</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>change_category_from_benefits</code></div><div class="bar-wrap"><div class="bar" style="width: 3%"></div></div><div class="num">38.183</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>navigate_benefit_det_from_benefits</code></div><div class="bar-wrap"><div class="bar" style="width: 2%"></div></div><div class="num">32.338</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>navigate_missions</code></div><div class="bar-wrap"><div class="bar" style="width: 2%"></div></div><div class="num">26.316</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>navigate_mission_details_from_missions</code></div><div class="bar-wrap"><div class="bar" style="width: 1.3%"></div></div><div class="num">17.502</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>modal_roulette</code></div><div class="bar-wrap"><div class="bar" style="width: 1.2%"></div></div><div class="num">16.939</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>modal_benefit_red_from_benefit_det</code></div><div class="bar-wrap"><div class="bar" style="width: 1.2%"></div></div><div class="num">16.358</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-firebase">FCM</span><code>notification_open</code></div><div class="bar-wrap"><div class="bar" style="width: 1.1%"></div></div><div class="num">15.240</div></div>
+      <div class="bar-row"><div class="label"><span class="tag tag-vibe">VIBE</span><code>navigate_roulette</code></div><div class="bar-wrap"><div class="bar" style="width: 1.1%"></div></div><div class="num">15.051</div></div>
+    </div>
+
+    <h3>Eventos custom Vibe — agrupados por feature</h3>
+
+    <div class="group">
+      <div class="group-header">📱 Navegação <span style="font-weight: 400; color: rgba(41,37,98,0.6);">15 eventos</span></div>
+      <div class="group-body">
+        <table class="compact">
+          <tbody>
+            <tr><td><code>navigate_home</code></td><td class="num">211.306</td><td class="num">28.329</td></tr>
+            <tr><td><code>navigate_benefits</code></td><td class="num">39.450</td><td class="num">16.459</td></tr>
+            <tr><td><code>navigate_benefit_det_from_benefits</code></td><td class="num">32.338</td><td class="num">9.767</td></tr>
+            <tr><td><code>navigate_missions</code></td><td class="num">26.316</td><td class="num">10.973</td></tr>
+            <tr><td><code>navigate_mission_details_from_missions</code></td><td class="num">17.502</td><td class="num">6.629</td></tr>
+            <tr><td><code>navigate_roulette</code></td><td class="num">15.051</td><td class="num">10.333</td></tr>
+            <tr><td><code>navigate_raffles</code></td><td class="num">14.862</td><td class="num">8.151</td></tr>
+            <tr><td><code>navigate_benefit_det_from_home</code></td><td class="num">14.701</td><td class="num">7.928</td></tr>
+            <tr><td><code>navigate_extract_from_home</code></td><td class="num">13.959</td><td class="num">8.283</td></tr>
+            <tr><td><code>navigate_benefit_opt_from_benefits</code></td><td class="num">13.203</td><td class="num">6.836</td></tr>
+            <tr><td><code>navigate_benefits_from_home</code></td><td class="num">9.105</td><td class="num">6.051</td></tr>
+            <tr><td><code>navigate_showcase_from_home</code></td><td class="num">6.731</td><td class="num">4.720</td></tr>
+            <tr><td><code>navigate_mission_details_from_home</code></td><td class="num">4.642</td><td class="num">2.157</td></tr>
+            <tr><td><code>navigate_benefit_red_from_benefits</code></td><td class="num">3.442</td><td class="num">1.544</td></tr>
+            <tr><td><code>navigate_deeplink_from_home</code></td><td class="num">3.208</td><td class="num">2.309</td></tr>
+            <tr><td><code>navigate_deeplink_from_missions</code></td><td class="num">2.126</td><td class="num">1.087</td></tr>
+            <tr><td><code>navigate_benefit_opt_from_home</code></td><td class="num">1.526</td><td class="num">1.284</td></tr>
+            <tr><td><code>navigate_raffle_det_from_home</code></td><td class="num">1.520</td><td class="num">1.196</td></tr>
+            <tr><td><code>navigate_missions_from_home</code></td><td class="num">1.350</td><td class="num">959</td></tr>
+            <tr><td><code>navigate_mission_acc_from_missions</code></td><td class="num">1.276</td><td class="num">841</td></tr>
+            <tr><td><code>navigate_shop</code></td><td class="num">76</td><td class="num">54</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header">🎁 Benefícios e resgates <span style="font-weight: 400; color: rgba(41,37,98,0.6);">3 eventos</span></div>
+      <div class="group-body">
+        <table class="compact">
+          <tbody>
+            <tr><td><code>change_category_from_benefits</code></td><td class="num">38.183</td><td class="num">9.416</td></tr>
+            <tr><td><code>modal_benefit_red_from_benefit_det</code></td><td class="num">16.358</td><td class="num">7.733</td></tr>
+            <tr><td><code>response_benefit_red_from_benefit_det</code></td><td class="num">11.764</td><td class="num">6.634</td></tr>
+            <tr><td><code>change_tab_from_benefits</code></td><td class="num">8.729</td><td class="num">3.775</td></tr>
+            <tr><td><code>benefit_redemption_modal_confirm</code> <span class="tag tag-warn">novo</span></td><td class="num">1</td><td class="num">1</td></tr>
+            <tr><td><code>benefit_redemption_success</code> <span class="tag tag-warn">novo</span></td><td class="num">1</td><td class="num">1</td></tr>
+            <tr><td><code>benefits_category_filter</code> <span class="tag tag-warn">novo</span></td><td class="num">1</td><td class="num">1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header">🎯 Missões e roleta <span style="font-weight: 400; color: rgba(41,37,98,0.6);">3 eventos</span></div>
+      <div class="group-body">
+        <table class="compact">
+          <tbody>
+            <tr><td><code>modal_roulette</code></td><td class="num">16.939</td><td class="num">9.996</td></tr>
+            <tr><td><code>send_roulette</code></td><td class="num">6.691</td><td class="num">6.203</td></tr>
+            <tr><td><code>change_tab_from_missions</code></td><td class="num">5.471</td><td class="num">2.583</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header">🔐 Autenticação <span style="font-weight: 400; color: rgba(41,37,98,0.6);">4 eventos</span></div>
+      <div class="group-body">
+        <table class="compact">
+          <tbody>
+            <tr><td><code>login</code></td><td class="num">12.413</td><td class="num">11.803</td></tr>
+            <tr><td><code>response_authentication_error</code></td><td class="num">6.964</td><td class="num">6.466</td></tr>
+            <tr><td><code>refresh_authentication_error</code></td><td class="num">148</td><td class="num">8</td></tr>
+            <tr><td><code>response_general_error</code></td><td class="num">627</td><td class="num">77</td></tr>
+            <tr><td><code>general_response_error</code> <span class="tag tag-warn">duplicação?</span></td><td class="num">156</td><td class="num">10</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header">🏠 Tabs e contexto da home <span style="font-weight: 400; color: rgba(41,37,98,0.6);">2 eventos</span></div>
+      <div class="group-body">
+        <table class="compact">
+          <tbody>
+            <tr><td><code>change_tab_from_home</code></td><td class="num">13.968</td><td class="num">5.704</td></tr>
+            <tr><td><code>change_home_tab_context</code> <span class="tag tag-warn">novo</span></td><td class="num">4</td><td class="num">1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-header">📦 GA4 / Firebase automáticos <span style="font-weight: 400; color: rgba(41,37,98,0.6);">11 eventos</span></div>
+      <div class="group-body">
+        <table class="compact">
+          <tbody>
+            <tr><td><code>notification_receive</code></td><td class="num">1.387.917</td><td class="num">69.919</td></tr>
+            <tr><td><code>screen_view</code></td><td class="num">781.308</td><td class="num">27.352</td></tr>
+            <tr><td><code>notification_dismiss</code></td><td class="num">755.008</td><td class="num">49.740</td></tr>
+            <tr><td><code>user_engagement</code></td><td class="num">268.894</td><td class="num">31.890</td></tr>
+            <tr><td><code>session_start</code></td><td class="num">80.298</td><td class="num">36.727</td></tr>
+            <tr><td><code>notification_open</code></td><td class="num">15.240</td><td class="num">9.949</td></tr>
+            <tr><td><code>first_open</code></td><td class="num">7.559</td><td class="num">7.556</td></tr>
+            <tr><td><code>notification_foreground</code></td><td class="num">6.007</td><td class="num">3.231</td></tr>
+            <tr><td><code>app_update</code></td><td class="num">5.881</td><td class="num">4.970</td></tr>
+            <tr><td><code>app_remove</code></td><td class="num">3.637</td><td class="num">3.466</td></tr>
+            <tr><td><code>firebase_campaign</code></td><td class="num">2.769</td><td class="num">2.748</td></tr>
+            <tr><td><code>os_update</code></td><td class="num">1.981</td><td class="num">1.947</td></tr>
+            <tr><td><code>app_clear_data</code></td><td class="num">41</td><td class="num">32</td></tr>
+            <tr><td><code>view_cart</code> <span class="tag tag-warn">subutilizado</span></td><td class="num">10</td><td class="num">10</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="icon">!</span>
+      <div class="content">
+        <strong>Eventos com instrumentação inconsistente</strong>
+        <p>
+          • <code>response_general_error</code> e <code>general_response_error</code> coexistem — provável duplicação por troca de naming.<br>
+          • <code>benefit_redemption_*</code> e <code>benefits_category_filter</code> aparecem com 1 ocorrência — instrumentação nova ainda em rollout, vale alinhar com o time mobile.<br>
+          • <code>view_cart</code> tem só 10 ocorrências em 10 dias — funcionalidade pode estar desativada ou o evento não está sendo emitido em todos os fluxos relevantes.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== PARAMS ========== -->
+  <section class="card" id="params">
+    <h2><span class="num">5</span>Parâmetros de evento</h2>
+    <p class="lead">71 keys distintas em <code>event_params</code> ao longo de 3 dias (28–30/04). Separados em padrão GA4/Firebase vs. custom Vibe.</p>
+
+    <h3>Custom Vibe — chaves de domínio do produto</h3>
+    <table>
+      <thead><tr><th>Key</th><th>Tipo dominante</th><th>Ocorrências</th><th>Notas</th></tr></thead>
+      <tbody>
+        <tr><td><code>digital_account_id</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">264.491</td><td><strong>Chave canônica do user logado.</strong> Use para JOINs com base de contas.</td></tr>
+        <tr><td><code>benefit_id</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">36.377</td><td>Identificador do benefício no catálogo</td></tr>
+        <tr><td><code>action</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">34.201</td><td>Subação dentro de eventos genéricos</td></tr>
+        <tr><td><code>origin</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">28.808</td><td>Origem da navegação/ação</td></tr>
+        <tr><td><code>category_name</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">15.094</td><td>Nome da categoria de benefício/showcase</td></tr>
+        <tr><td><code>category_id</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">14.651</td><td>ID da categoria</td></tr>
+        <tr><td><code>vendor_id</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">12.877</td><td>ID do fornecedor / parceiro</td></tr>
+        <tr><td><code>cost</code></td><td><span class="tag tag-double">DOUBLE</span></td><td class="num">12.850</td><td>Custo (em moedas Vibe ou BRL — validar)</td></tr>
+        <tr><td><code>option</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">12.358</td><td>Opção escolhida pelo usuário</td></tr>
+        <tr><td><code>mission_id</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">8.151</td><td>ID da missão</td></tr>
+        <tr><td><code>enough_balance</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">7.411</td><td>Se o usuário tem saldo suficiente — booleano-as-string</td></tr>
+        <tr><td><code>prize_type</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">6.882</td><td>Tipo de prêmio (roleta/missões)</td></tr>
+        <tr><td><code>error_value</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">6.476</td><td>Valor textual do erro (acompanha <code>firebase_error</code>)</td></tr>
+        <tr><td><code>reason</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">5.621</td><td>Motivo de uma ação/erro</td></tr>
+        <tr><td><code>method</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">5.560</td><td>Método (login, pagamento, etc.)</td></tr>
+        <tr><td><code>item_type</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">5.489</td><td>Tipo do item</td></tr>
+        <tr><td><code>pin</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">5.466</td><td>Pin / token (validar se está sendo redacted)</td></tr>
+        <tr><td><code>id</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">4.574</td><td>ID genérico — semântica varia por evento</td></tr>
+        <tr><td><code>description</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">4.574</td><td>Descrição livre</td></tr>
+        <tr><td><code>showcase_id</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">4.224</td><td>ID da vitrine</td></tr>
+        <tr><td><code>lowestBenefitValue</code></td><td><span class="tag tag-double">DOUBLE</span></td><td class="num">2.731</td><td>Camel-case <span class="tag tag-warn">inconsistência</span></td></tr>
+        <tr><td><code>isSoldOff</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">2.731</td><td>0/1 — Camel-case <span class="tag tag-warn">inconsistência</span></td></tr>
+        <tr><td><code>isMapVisible</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">2.731</td><td>0/1 — Camel-case <span class="tag tag-warn">inconsistência</span></td></tr>
+        <tr><td><code>benefitsQuantity</code></td><td><span class="tag tag-double">DOUBLE</span></td><td class="num">2.731</td><td>Camel-case <span class="tag tag-warn">inconsistência</span></td></tr>
+        <tr><td><code>name</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">2.731</td><td>Nome (genérico)</td></tr>
+        <tr><td><code>value</code></td><td><span class="tag tag-double">DOUBLE</span></td><td class="num">1.849</td><td>Valor numérico genérico</td></tr>
+        <tr><td><code>hasSpending</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">1.843</td><td>0/1 — Camel-case</td></tr>
+        <tr><td><code>title</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">1.843</td><td>Título de uma missão/showcase</td></tr>
+        <tr><td><code>campaignName</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">1.843</td><td>Camel-case <span class="tag tag-warn">inconsistência</span></td></tr>
+        <tr><td><code>isAccomplished</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">1.843</td><td>0/1 — Camel-case</td></tr>
+        <tr><td><code>isRegular</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">1.843</td><td>0/1 — Camel-case</td></tr>
+        <tr><td><code>detailImage</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">1.843</td><td>URL — Camel-case</td></tr>
+        <tr><td><code>listImage</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">1.843</td><td>URL — Camel-case</td></tr>
+        <tr><td><code>type</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">1.843</td><td>Tipo genérico</td></tr>
+        <tr><td><code>redirect</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">590</td><td>Deeplink/URL de redirect</td></tr>
+        <tr><td><code>quizId</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">525</td><td>Camel-case</td></tr>
+        <tr><td><code>status</code></td><td><span class="tag tag-double">DOUBLE</span></td><td class="num">239</td><td>Status numérico — validar semântica</td></tr>
+        <tr><td><code>url</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">239</td><td>URL relacionada</td></tr>
+        <tr><td><code>device_info</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">19</td><td>Pouquíssimas ocorrências</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-warn">
+      <span class="icon">!</span>
+      <div class="content">
+        <strong>Inconsistência de naming convention</strong>
+        <p>Há mistura de <code>snake_case</code> (<code>benefit_id</code>, <code>category_name</code>) e <code>camelCase</code> (<code>lowestBenefitValue</code>, <code>isSoldOff</code>, <code>campaignName</code>, <code>quizId</code>). Recomendação: padronizar em <code>snake_case</code> (convenção GA4/BigQuery), pois facilita SQL e é consistente com os params nativos. Quebra de naming aumenta atrito em queries e introduz risco de bugs em dashboards.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-danger">
+      <span class="icon">⚠</span>
+      <div class="content">
+        <strong>Atenção: param <code>pin</code> em eventos</strong>
+        <p>O param <code>pin</code> aparece em 5.466 eventos com tipo <code>STRING</code>. Validar com o time se esse valor é um token sensível (PIN de autenticação) — se for, deve ser removido da telemetria ou redacted. PII/segredos no GA4/BigQuery aumentam superfície de risco e contrariam best practices Firebase.</p>
+      </div>
+    </div>
+
+    <h3>Padrão GA4/Firebase</h3>
+    <table>
+      <thead><tr><th>Key</th><th>Tipo</th><th>Ocorrências</th><th>Função</th></tr></thead>
+      <tbody>
+        <tr><td><code>firebase_event_origin</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">2.128.875</td><td>Origem do evento (app, auto, etc.)</td></tr>
+        <tr><td><code>firebase_conversion</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">1.315.876</td><td>Flag se o evento é conversão</td></tr>
+        <tr><td><code>message_name</code>, <code>message_id</code>, <code>message_time</code>, <code>message_device_time</code></td><td>mistos</td><td class="num">1.293.324 cada</td><td>Metadados de mensagens FCM (notificações)</td></tr>
+        <tr><td><code>message_type</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">847.965</td><td>Tipo da notificação</td></tr>
+        <tr><td><code>ga_session_id</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">845.635</td><td>ID da sessão GA4</td></tr>
+        <tr><td><code>ga_session_number</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">845.615</td><td>Número da sessão para o usuário</td></tr>
+        <tr><td><code>engaged_session_event</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">835.449</td><td>Indica engagement</td></tr>
+        <tr><td><code>firebase_screen</code>, <code>firebase_screen_class</code>, <code>firebase_screen_id</code></td><td>mistos</td><td class="num">~715k cada</td><td>Identificação da tela atual</td></tr>
+        <tr><td><code>engagement_time_msec</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">398.502</td><td>Tempo de engagement em ms</td></tr>
+        <tr><td><code>firebase_previous_class</code>, <code>firebase_previous_id</code>, <code>firebase_previous_screen</code></td><td>mistos</td><td class="num">~339k cada</td><td>Tela anterior (para navegação)</td></tr>
+        <tr><td><code>session_engaged</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">35.024</td><td>Se a sessão foi engajada</td></tr>
+        <tr><td><code>entrances</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">27.939</td><td>Sessão de entrada</td></tr>
+        <tr><td><code>firebase_error</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">6.476</td><td>Código de erro Firebase</td></tr>
+        <tr><td><code>previous_app_version</code>, <code>previous_first_open_count</code>, <code>update_with_analytics</code>, <code>system_app</code>, <code>system_app_update</code>, <code>previous_os_version</code></td><td>mistos</td><td class="num">~1k–3k cada</td><td>Acompanham <code>app_update</code> e <code>os_update</code></td></tr>
+        <tr><td><code>source</code>, <code>medium</code>, <code>campaign_info_source</code>, <code>campaign</code>, <code>term</code>, <code>content</code>, <code>currency</code></td><td>STRING</td><td class="num">5–1.267</td><td>UTM e atribuição (vêm de <code>firebase_campaign</code>)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Como ler um event_param em SQL</h3>
+    <pre><code>SELECT
+  event_timestamp,
+  event_name,
+  user_pseudo_id,
+  -- string param
+  (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'digital_account_id') AS digital_account_id,
+  -- int param
+  (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS session_id,
+  -- double param
+  (SELECT value.double_value FROM UNNEST(event_params) WHERE key = 'cost') AS cost
+FROM `vibe-285a7.analytics_420328317.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20260424' AND '20260430'
+  AND event_name = 'response_benefit_red_from_benefit_det'
+LIMIT 100;</code></pre>
+  </section>
+
+  <!-- ========== USER PROPS ========== -->
+  <section class="card" id="user-props">
+    <h2><span class="num">6</span>User properties</h2>
+    <p class="lead">Atributos persistentes do usuário, gravados a cada evento. Estado atual <strong>muito enxuto</strong>.</p>
+
+    <table>
+      <thead><tr><th>Key</th><th>Tipo</th><th>Ocorrências (3 dias)</th><th>Origem</th></tr></thead>
+      <tbody>
+        <tr><td><code>first_open_time</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">2.128.875</td><td>Default Firebase</td></tr>
+        <tr><td><code>ga_session_number</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">835.716</td><td>Default GA4</td></tr>
+        <tr><td><code>ga_session_id</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">835.716</td><td>Default GA4</td></tr>
+        <tr><td><code>firebase_last_notification</code></td><td><span class="tag tag-string">STRING</span></td><td class="num">1.337</td><td>Default FCM</td></tr>
+        <tr><td><code>_ltv_BRL</code></td><td><span class="tag tag-int">INT64</span></td><td class="num">64</td><td>Custom — só 64 ocorrências, possivelmente experimento</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-warn">
+      <span class="icon">!</span>
+      <div class="content">
+        <strong>Oportunidade alta: enriquecer user_properties</strong>
+        <p>Hoje qualquer recorte por perfil de usuário (tier, regional, segmento de risco, faixa de spending, persona, ARPU, cohort de signup, etc.) precisa ser construído via JOIN com base externa. Marcar essas dimensões como <code>setUserProperties()</code> no SDK Firebase reduz drasticamente o custo de toda análise comportamental e permite usar essas dimensões no GA4 UI também.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== AUDIENCE ========== -->
+  <section class="card" id="audience">
+    <h2><span class="num">7</span>Audiência: plataforma, geo, app</h2>
+    <p class="lead">Composição dos 73 mil usuários únicos observados em 10 dias.</p>
+
+    <h3>Plataforma</h3>
+    <table>
+      <thead><tr><th>Plataforma</th><th>Eventos</th><th>Usuários</th><th>% Users</th></tr></thead>
+      <tbody>
+        <tr><td><code>ANDROID</code></td><td class="num">3.432.368</td><td class="num">73.093</td><td class="num">92,1%</td></tr>
+        <tr><td><code>IOS</code></td><td class="num">456.290</td><td class="num">6.306</td><td class="num">7,9%</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Categoria de device × OS</h3>
+    <table>
+      <thead><tr><th>Categoria</th><th>OS</th><th>Usuários (3 dias)</th></tr></thead>
+      <tbody>
+        <tr><td>mobile</td><td>Android</td><td class="num">68.003</td></tr>
+        <tr><td>mobile</td><td>iOS</td><td class="num">3.887</td></tr>
+        <tr><td>tablet</td><td>Android</td><td class="num">169</td></tr>
+        <tr><td>tablet</td><td>iOS</td><td class="num">4</td></tr>
+        <tr><td>smart tv</td><td>Android</td><td class="num">1</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Geografia</h3>
+    <table>
+      <thead><tr><th>País</th><th>Usuários</th><th>% Total</th></tr></thead>
+      <tbody>
+        <tr><td>Brasil</td><td class="num">71.996</td><td class="num">99,67%</td></tr>
+        <tr><td>Estados Unidos</td><td class="num">112</td><td class="num">0,16%</td></tr>
+        <tr><td>Indonésia</td><td class="num">23</td><td class="num">0,03%</td></tr>
+        <tr><td>Paraguai</td><td class="num">14</td><td class="num">0,02%</td></tr>
+        <tr><td>Portugal</td><td class="num">13</td><td class="num">0,02%</td></tr>
+        <tr><td>Outros (15 países)</td><td class="num">~80</td><td class="num">0,11%</td></tr>
+      </tbody>
+    </table>
+
+    <h3>App ID e versões</h3>
+    <table>
+      <thead><tr><th>App ID</th><th>Versão</th><th>Usuários</th></tr></thead>
+      <tbody>
+        <tr><td><code>br.prd.inovaebiz.vibe</code></td><td><code>1.9.1</code></td><td class="num">59.252</td></tr>
+        <tr><td><code>br.prd.inovaebiz.vibe</code></td><td><code>1.9.0</code></td><td class="num">15.341</td></tr>
+        <tr><td><code>br.prd.inovaebiz.vibe</code></td><td><code>1.8.37</code></td><td class="num">5.961</td></tr>
+        <tr><td><code>br.prd.inovaebiz.vibe</code></td><td><code>1.8.25</code></td><td class="num">1.514</td></tr>
+        <tr><td><code>br.com.mercantil.vibe</code></td><td><code>1.8.11</code></td><td class="num">870</td></tr>
+        <tr><td><code>br.prd.inovaebiz.vibe</code></td><td>outras (≤1.8.36)</td><td class="num">~2.700</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-info">
+      <span class="icon">→</span>
+      <div class="content">
+        <strong>Dois bundle IDs em circulação</strong>
+        <p>O app principal é <code>br.prd.inovaebiz.vibe</code>. Existe também <code>br.com.mercantil.vibe</code> (variante white-label, ~870 users na 1.8.11). Para análises de produto canônicas, filtrar pelo app principal a menos que o objetivo seja comparar variantes.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== VOLUME ========== -->
+  <section class="card" id="volume">
+    <h2><span class="num">8</span>Volume e crescimento</h2>
+    <p class="lead">Eventos e usuários ativos por dia. A ingestão começou parcial em 21/04 e estabilizou a partir de 24/04.</p>
+
+    <table>
+      <thead><tr><th>Dia</th><th>Eventos</th><th>Usuários únicos</th></tr></thead>
+      <tbody>
+        <tr><td>21/04</td><td class="num">140</td><td class="num">46</td></tr>
+        <tr><td>22/04</td><td class="num">670</td><td class="num">110</td></tr>
+        <tr><td>23/04</td><td class="num">5.397</td><td class="num">1.108</td></tr>
+        <tr><td>24/04</td><td class="num">386.283</td><td class="num">63.578</td></tr>
+        <tr><td>25/04</td><td class="num">426.951</td><td class="num">63.096</td></tr>
+        <tr><td>26/04</td><td class="num">523.289</td><td class="num">64.971</td></tr>
+        <tr><td>27/04</td><td class="num">417.053</td><td class="num">65.159</td></tr>
+        <tr><td>28/04</td><td class="num">722.217</td><td class="num">66.013</td></tr>
+        <tr><td>29/04</td><td class="num">595.588</td><td class="num">65.635</td></tr>
+        <tr><td>30/04</td><td class="num">811.070</td><td class="num">66.587</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-success">
+      <span class="icon">✓</span>
+      <div class="content">
+        <strong>Base estável de DAU em ~65k</strong>
+        <p>A partir de 24/04 (primeiro dia "cheio"), o DAU se mantém entre 63k–66k usuários. O total de usuários únicos no período (10 dias) é 73 mil — indicando uma audiência ativa relativamente concentrada nos mesmos usuários ao longo da semana.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== ACCESS ========== -->
+  <section class="card" id="access">
+    <h2><span class="num">9</span>Como acessar</h2>
+    <p class="lead">Configuração atual e padrão de queries para iteração local.</p>
+
+    <h3>Credencial em uso</h3>
+    <ul>
+      <li><strong>Modo:</strong> Application Default Credentials (ADC) pessoal do operador</li>
+      <li><strong>Conta:</strong> <code>&lt;operador&gt;</code> (ADC pessoal com leitura BQ)</li>
+      <li><strong>Arquivo:</strong> <code>~/.config/gcloud/application_default_credentials.json</code></li>
+      <li><strong>Quota project:</strong> <code>vibe-285a7</code></li>
+    </ul>
+
+    <div class="callout callout-warn">
+      <span class="icon">!</span>
+      <div class="content">
+        <strong>Modo de acesso é provisório</strong>
+        <p>O ADC pessoal é a forma rápida para iterar agora. O caminho final, alinhado na conversa de arquitetura do Cowork, é uma Service Account dedicada read-only (<code>vibe-bq-readonly</code>) com <code>bigquery.dataViewer</code> + <code>bigquery.jobUser</code>, criada pelo Cloud Admin (Mori). Quando essa SA estiver pronta, revogar o ADC do projeto.</p>
+      </div>
+    </div>
+
+    <h3>Comando padrão</h3>
+    <pre><code>GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/application_default_credentials.json \
+  bq --project_id=vibe-285a7 query --nouse_legacy_sql --max_rows=50 \
+  'SELECT event_name, COUNT(*) AS n
+   FROM `vibe-285a7.analytics_420328317.events_*`
+   WHERE _TABLE_SUFFIX BETWEEN "20260424" AND "20260430"
+   GROUP BY 1
+   ORDER BY n DESC
+   LIMIT 50'</code></pre>
+
+    <h3>Dry-run antes de queries pesadas</h3>
+    <pre><code>GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/application_default_credentials.json \
+  bq --project_id=vibe-285a7 query --nouse_legacy_sql --dry_run \
+  'SELECT ...'</code></pre>
+
+    <h3>Skill Claude Code</h3>
+    <p>A skill <code>bigquery-readonly</code> (em <code>.claude/skills/bigquery-readonly/SKILL.md</code>) impõe modo somente-leitura: apenas <code>SELECT</code>, sem DML/DDL, sem mutação de IAM. Invocar com <code>/bigquery-readonly</code> antes de pedir queries.</p>
+  </section>
+
+  <!-- ========== GAPS ========== -->
+  <section class="card" id="gaps">
+    <h2><span class="num">10</span>Gaps e oportunidades</h2>
+    <p class="lead">O que falta no pipeline atual de telemetria — agrupado por impacto na descoberta de produto.</p>
+
+    <h3>Alto impacto</h3>
+    <ul>
+      <li><strong>Enriquecer <code>user_properties</code> com segmentação Vibe.</strong> Hoje só há defaults Firebase. Sem isso, qualquer recorte avançado (tier, faixa de spending, cohort de signup, regional, persona) exige JOIN externo. Ganho: análises self-service no GA4 UI + queries simples no BigQuery.</li>
+      <li><strong>Padronizar naming convention de event_params.</strong> Misturar <code>snake_case</code> e <code>camelCase</code> introduz risco de bug em queries e atrito de leitura. Convencional GA4 é <code>snake_case</code>.</li>
+      <li><strong>Auditar o param <code>pin</code>.</strong> Se for token sensível, precisa ser redacted antes de virar evento — risco de PII em data warehouse.</li>
+    </ul>
+
+    <h3>Médio impacto</h3>
+    <ul>
+      <li><strong>Consolidar <code>response_general_error</code> ↔ <code>general_response_error</code>.</strong> Eventos duplicados por troca de naming. Manter um, depreciar o outro com aviso.</li>
+      <li><strong>Validar instrumentação de <code>view_cart</code> e demais e-commerce.</strong> 10 ocorrências em 10 dias. Ou a feature está fora do funil principal, ou o evento não dispara onde devia.</li>
+      <li><strong>Usar a árvore <code>items</code> + <code>ecommerce</code>.</strong> Hoje subutilizada. Para qualquer fluxo de resgate/troca de moeda, popular esses campos canônicos do GA4 destrava relatórios de receita prontos.</li>
+    </ul>
+
+    <h3>Próximos passos sugeridos</h3>
+    <ol>
+      <li>Levantar com o time mobile o roadmap dos 3 eventos novos (<code>benefit_redemption_modal_confirm</code>, <code>benefit_redemption_success</code>, <code>benefits_category_filter</code>) para confirmar timeline de rollout.</li>
+      <li>Decidir e documentar a convenção de naming (snake_case) e abrir tarefa para migração progressiva.</li>
+      <li>Definir 5–10 user properties prioritárias (sugestão: <code>user_tier</code>, <code>signup_cohort</code>, <code>has_active_benefit</code>, <code>region</code>, <code>spending_band</code>) e instrumentar via <code>setUserProperties()</code>.</li>
+      <li>Quando o MCP do BigQuery for configurado pelo Cloud Admin, migrar este caderno para queries persistentes em SA dedicada read-only.</li>
+    </ol>
+  </section>
+
+  <footer>
+    <div class="v-mark">V</div>
+    <div>Mapa gerado a partir de leitura direta do BigQuery em 01/05/2026 — fonte: <code>vibe-285a7.analytics_420328317</code></div>
+    <div style="margin-top: 6px;">Identidade visual: <a href="../README.md">manual da marca Vibe</a></div>
+  </footer>
+
+</main>
+
+</body>
+</html>

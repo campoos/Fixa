@@ -1,0 +1,302 @@
+@startuml vibe-architecture
+!theme plain
+title Vibe — Arquitetura Geral (Apps + BFF + Infra + Serviços Externos)
+
+skinparam backgroundColor #FAFAFA
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam ArrowColor #555555
+skinparam ArrowFontColor #333333
+skinparam defaultTextAlignment center
+
+skinparam rectangle {
+  BorderColor #2C3E50
+  FontColor   #2C3E50
+}
+skinparam package {
+  BorderColor #34495E
+  FontColor   #2C3E50
+  BackgroundColor #FFFFFF
+}
+skinparam cloud {
+  BorderColor #1F618D
+  BackgroundColor #EAF2F8
+}
+skinparam database {
+  BorderColor #6C3483
+  BackgroundColor #F4ECF7
+}
+skinparam queue {
+  BorderColor #B9770E
+  BackgroundColor #FDEBD0
+}
+
+' =================================================================
+' ATORES
+' =================================================================
+actor "Participante\n(Usuario final)" as User
+actor "Parceiro / Integrador" as Partner
+actor "Time Vibe\n(Dev / Ops)" as Dev
+
+' =================================================================
+' CLIENTS — apps que consomem o BFF
+' =================================================================
+package "Clients" as Clients {
+  rectangle "vibe-mobile-app\n<size:11>Expo / React Native (TS)\nZustand + MMKV + React Query\nFirebase FCM + Notifee + Analytics</size>" as MobileApp #D6EAF8
+  rectangle "vibe-web-app\n<size:11>React 19 + Vite (TS)\nReact Query + TailwindCSS\nGoogle Tag Manager</size>" as WebApp #D6EAF8
+}
+
+' =================================================================
+' DISTRIBUICAO MOBILE / HOSTING WEB
+' =================================================================
+package "Distribuicao Mobile" as MobileDist {
+  cloud "Apple App Store" as AppStore
+  cloud "Google Play Store" as PlayStore
+  cloud "EAS Internal\n(preview / dev client)" as EASInternal
+}
+
+package "Hosting Web (AWS)" as WebHosting {
+  rectangle "CloudFront\n<size:10>CDN global, invalida /* a cada deploy</size>" as CloudFront #FCF3CF
+  rectangle "S3 vibe-web-app-{hml,prd}\n<size:10>SPA estatica (HTML/CSS/JS)</size>" as S3WebBucket #FCF3CF
+}
+
+User --> MobileApp : usa (Android / iOS)
+User --> WebApp    : usa (browser)
+WebApp <--> CloudFront : HTTPS
+CloudFront --> S3WebBucket : origin
+AppStore  --> MobileApp : instala
+PlayStore --> MobileApp : instala
+EASInternal --> MobileApp : preview / dev
+
+' =================================================================
+' API GATEWAYS / EDGE
+' =================================================================
+package "Edge / API Management" as Edge {
+  cloud "Azure APIM\napim-newbusiness.vertem.com/vibe\n<size:10>Subscription Key + JWT</size>" as APIM
+  cloud "AWS API Gateway v2\n<size:10>OpenAPI re-importada por pipeline</size>" as APIGW
+}
+
+MobileApp --> APIM : HTTPS\nOcp-Apim-Subscription-Key\nBearer JWT\nTenant-Config-Id\ngeolocation
+WebApp    --> APIM : HTTPS\nOcp-Apim-Subscription-Key\nBearer JWT
+APIM --> APIGW : roteamento
+
+' =================================================================
+' BFF — vibe-bff (.NET 8) rodando em EKS
+' =================================================================
+package "vibe-bff (AWS EKS)\nIstio + DataDog + HPA" as BFF {
+  rectangle "VibeBisBff.Api\n<size:10>BFF principal (mobile/web)</size>" as ApiBFF #FADBD8
+  rectangle "VibeHub.Api\n<size:10>Hub p/ parceiros</size>"               as ApiHub #FADBD8
+  rectangle "VibePartner.Api\n<size:10>Gestao de parceiros / campanhas</size>" as ApiPartner #FADBD8
+  rectangle "VibeChatbot.Api\n<size:10>Chatbot conversacional</size>"     as ApiChat #FADBD8
+
+  rectangle "MessageWorker\n<size:10>Consumer RabbitMQ\n(beneficios, creditos, push,\nzendesk, lucky number, shop)</size>" as Worker #F5CBA7
+  rectangle "RaffleNumberAwardedWorker\n<size:10>Processa premios de sorteio</size>" as RaffleWorker #F5CBA7
+  rectangle "CreditsToExpireNotifier\n<size:10>CronJob (Helm schedule)</size>" as CreditsCron #FAE5D3
+  rectangle "LuckyNumberReportGenerator\n<size:10>CronJob (Helm schedule)</size>" as LuckyCron #FAE5D3
+}
+
+APIGW --> ApiBFF
+APIGW --> ApiHub
+APIGW --> ApiPartner
+APIGW --> ApiChat
+Partner --> ApiHub : HTTPS (B2B)
+Partner --> ApiPartner : HTTPS (B2B)
+
+' =================================================================
+' DADOS / MENSAGERIA
+' =================================================================
+package "Dados & Mensageria" as Data {
+  database "MongoDB\n<size:10>campaigns, raffles, banners,\nshowcases, push tokens,\ntenant config, quests, etc.</size>" as Mongo
+  database "Redis\n<size:10>cache: showcases, quests, raffles</size>" as Redis
+  queue "RabbitMQ\n<size:10>beneficios / creditos / push /\nzendesk / lucky number / shop</size>" as RMQ
+}
+
+ApiBFF     --> Mongo
+ApiBFF     --> Redis
+ApiHub     --> Mongo
+ApiPartner --> Mongo
+ApiChat    --> Mongo
+Worker        --> Mongo
+RaffleWorker  --> Mongo
+CreditsCron   --> Mongo
+LuckyCron     --> Mongo
+
+ApiBFF     ..> RMQ : publish
+ApiHub     ..> RMQ : publish
+ApiPartner ..> RMQ : publish
+RMQ --> Worker       : consume
+RMQ --> RaffleWorker : consume
+
+' =================================================================
+' AWS — INFRA COMPARTILHADA
+' =================================================================
+package "AWS — Compartilhado" as AWS {
+  rectangle "S3 vibe-assets / termos / imagens\n<size:10>vibe-assets-prod\nplataforma-termfiles-prd</size>" as S3Assets #FCF3CF
+  rectangle "Secrets Manager\n<size:10>API keys, tokens, senhas</size>"     as Secrets #FCF3CF
+  rectangle "Systems Manager Parameter Store\n<size:10>config nao-sensivel</size>" as SSM #FCF3CF
+  rectangle "ECR\n<size:10>Docker images + Helm charts OCI</size>"         as ECR #FCF3CF
+}
+
+ApiBFF     --> S3Assets : upload imagens
+ApiBFF     --> Secrets  : fetch (cache+retry)
+ApiBFF     --> SSM      : config refresh
+ApiHub     --> Secrets
+ApiHub     --> SSM
+ApiPartner --> Secrets
+ApiChat    --> Secrets
+Worker     --> Secrets
+
+WebApp    --> S3Assets : imagens publicas
+MobileApp --> S3Assets : imagens publicas
+
+' =================================================================
+' AZURE — STORAGE DE ASSETS
+' =================================================================
+package "Azure Storage" as AzureStorage {
+  rectangle "stvertemvibeprd (Blob)\n<size:10>banners, raffles, docs/PDFs</size>" as AzureBlob #D5F5E3
+}
+MobileApp --> AzureBlob : imagens / PDFs
+WebApp    --> AzureBlob : imagens / PDFs
+
+' =================================================================
+' SERVICOS EXTERNOS — VERTEM (interno)
+' =================================================================
+package "Servicos Vertem (interno)" as VertemSvc {
+  rectangle "Vertem IAM\n<size:10>autorizacao multi-tenant</size>"           as IAM
+  rectangle "Vertem Digital Account\n<size:10>perfil / dados cadastrais</size>" as DigitalAcc
+  rectangle "Vertem Wallet\n<size:10>creditos / saldo / extrato</size>"       as Wallet
+  rectangle "Vertem Marketplace\napim-newbusiness.vertem.com/marketplace-middleware\n<size:10>catalogo / carrinho / pedidos</size>" as Marketplace
+  rectangle "Vertem MGM\n<size:10>indicacao member-get-member</size>"         as MGM
+  rectangle "Vertem Lucky Numbers\n<size:10>geracao numeros sorte</size>"     as LuckyNum
+  rectangle "Vertem Terms\n<size:10>termos de uso / politicas</size>"         as Terms
+}
+
+ApiBFF     --> IAM
+ApiBFF     --> DigitalAcc
+ApiBFF     --> Wallet
+ApiBFF     --> Marketplace
+ApiBFF     --> MGM
+ApiBFF     --> LuckyNum
+ApiBFF     --> Terms
+ApiPartner --> IAM
+ApiHub     --> Marketplace
+Worker     --> DigitalAcc
+Worker     --> LuckyNum
+
+' =================================================================
+' SERVICOS EXTERNOS — TERCEIROS
+' =================================================================
+package "Servicos externos (terceiros)" as ThirdParty {
+  cloud "Tradeback / Aberto\napi.aberto.com.br\n<size:10>autorizador beneficios v1/v2,\npromos, recibos, segmentos,\nspending behavior, quiz</size>" as Tradeback
+  cloud "Microsoft AD (via Aberto)\n<size:10>auth centralizada / JWT</size>" as MSAD
+  cloud "Icatu Seguros\n<size:10>modalidades de sorteio,\nnumeros premiados</size>" as Icatu
+  cloud "Insider (CDP)\n<size:10>upsert / delete user (LGPD)\neventos / segmentacao</size>" as Insider
+  cloud "Zendesk\n<size:10>tickets / usuarios suporte</size>" as Zendesk
+  cloud "ViaCEP\n<size:10>CEP -> endereco</size>" as ViaCep
+  cloud "Google Maps\n<size:10>geocoding, places</size>" as GMaps
+  cloud "Partner Hub / ShopHub\nvoucher-api.shophub.com.br\n<size:10>vouchers, catalogo parceiros</size>" as PartnerHub
+  cloud "Apple App Store API" as AppleAPI
+  cloud "Google Play API"     as GoogleAPI
+  cloud "Firebase\n<size:10>FCM (push) + Analytics + Crashlytics</size>" as Firebase
+  cloud "Google Tag Manager\nGTM-WNKGNMFB" as GTM
+  cloud "ipify (IP lookup)" as Ipify
+  cloud "WhatsApp (wa.me)"   as WA
+  cloud "OneLink (deeplink)" as OneLink
+}
+
+ApiBFF     --> Tradeback
+ApiBFF     --> Icatu
+ApiBFF     --> Insider
+ApiBFF     --> Zendesk
+ApiBFF     --> ViaCep
+ApiBFF     --> GMaps
+ApiBFF     --> PartnerHub
+ApiBFF     --> AppleAPI  : version check
+ApiBFF     --> GoogleAPI : version check
+ApiBFF     --> MSAD      : token
+ApiHub     --> Tradeback
+ApiHub     --> PartnerHub
+Worker     --> Insider
+Worker     --> Zendesk
+Worker     --> Tradeback
+Worker     --> Firebase  : envia push (FCM)
+
+MobileApp --> Firebase : FCM token, Analytics
+MobileApp --> GMaps    : Places (mapa beneficios)
+MobileApp --> OneLink  : deeplink
+MobileApp --> WA       : wa.me
+
+WebApp    --> GTM      : dataLayer
+WebApp    --> Ipify    : detect IP
+WebApp    --> WA       : wa.me
+WebApp    --> OneLink  : deeplink
+
+' =================================================================
+' CI / CD
+' =================================================================
+package "CI / CD" as CICD {
+  rectangle "Azure DevOps Pipelines\n<size:10>vibe-bff (CI + 7 CDs)\nvibe-web-app (build + deploy)</size>" as AzureDO
+  rectangle "GitHub Actions\n<size:10>vibe-mobile-app:\nbuild-preview-apk-for-pr,\neas-build-preview, version,\nsynchronize-azure</size>" as GHA
+  rectangle "EAS (Expo)\n<size:10>build prod Android/iOS</size>"     as EAS
+  rectangle "Mirror GitHub -> Azure DevOps\n<size:10>commit.sh force push</size>" as Mirror
+}
+
+Dev --> AzureDO : push (vibe-bff, vibe-web-app)
+Dev --> GHA     : push / PR (vibe-mobile-app)
+
+GHA --> Mirror : sincroniza branches/tags
+Mirror --> AzureDO : repos espelhados
+GHA --> EAS    : build cloud (production)
+
+' Pipelines BFF -> ECR -> EKS
+AzureDO --> ECR     : docker push + helm push (OCI)\n7 componentes\nbranches: develop->dev, hml->hml, main->prd
+ECR     --> ApiBFF      : pull image
+ECR     --> ApiHub      : pull image
+ECR     --> ApiPartner  : pull image
+ECR     --> ApiChat     : pull image
+ECR     --> Worker      : pull image
+ECR     --> RaffleWorker: pull image
+ECR     --> CreditsCron : pull image
+ECR     --> LuckyCron   : pull image
+AzureDO --> APIGW       : reimport OpenAPI (apos deploy de cada API)
+
+' Pipeline web-app -> S3 + CloudFront
+AzureDO --> S3WebBucket : pnpm build + S3Upload\nbranches: hml, main
+AzureDO --> CloudFront  : invalidate /*
+
+' Pipeline mobile -> stores
+EAS --> AppStore   : submit (manual)
+EAS --> PlayStore  : submit (manual)
+EAS --> EASInternal: preview builds
+
+' =================================================================
+' OBSERVABILIDADE
+' =================================================================
+package "Observabilidade" as Obs {
+  rectangle "DataDog\n<size:10>APM / logs / metrics</size>" as DD
+}
+ApiBFF       --> DD
+ApiHub       --> DD
+ApiPartner   --> DD
+ApiChat      --> DD
+Worker       --> DD
+RaffleWorker --> DD
+LuckyCron    --> DD
+
+' =================================================================
+' LEGENDA
+' =================================================================
+legend bottom
+|= Cor |= Significado |
+|<#D6EAF8> | Clients (apps) |
+|<#FADBD8> | BFF APIs (.NET 8 em EKS) |
+|<#F5CBA7> | Workers (consumers RabbitMQ) |
+|<#FAE5D3> | CronJobs (Helm schedule) |
+|<#FCF3CF> | AWS managed |
+|<#D5F5E3> | Azure managed |
+
+Branches -> ambientes (BFF & web): develop -> dev | hml -> hml | main -> prd
+Cluster: AWS EKS por ambiente | Helm atomic upgrade | Istio ingress | DataDog sidecar
+endlegend
+
+@enduml
