@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Node
+**/node_modules/
+*.log
+
+# Python
+**/.venv/
+**/venv/
+__pycache__/
+
+# Editores
+.vscode/
+.idea/
+
+# Claude Code: overrides pessoais (cada dev tem o seu)
+.claude/settings.local.json
+
+# Cursor: cache/index (gerado localmente)
+.cursor/cache/
+
+# Workspace local
+repos/

@@ -2,3 +2,5 @@
 # Formato: nome|caminho (caminho relativo à raiz do workspace)
 vibe-bff|../vibe-bff
 vibe-mobile-app|../vibe-mobile-app
+vibe-web-app|../vibe-web-app
+mgm-suhai-bff|../mgm-suhai-bff
