@@ -1,0 +1,19 @@
+{
+  "name": "@vibe-workspace/azdo-sprint",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Consulta Azure DevOps (grupoltm/Vertem Innovation) via PAT no Keychain.",
+  "type": "module",
+  "scripts": {
+    "list": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "azure-devops-node-api": "^14.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
