@@ -1,0 +1,170 @@
+@startuml vibe-architecture-domains
+!theme plain
+title Vibe — Visao por Dominios (DDD) e Integracoes
+
+skinparam backgroundColor #FAFAFA
+skinparam shadowing false
+skinparam roundCorner 10
+skinparam ArrowColor #555555
+skinparam ArrowFontColor #333333
+skinparam defaultTextAlignment center
+
+skinparam rectangle {
+  BorderColor #2C3E50
+  FontColor   #2C3E50
+}
+skinparam package {
+  BorderColor #34495E
+  FontColor   #2C3E50
+  BackgroundColor #FFFFFF
+}
+skinparam cloud {
+  BorderColor #1F618D
+  BackgroundColor #EAF2F8
+}
+
+' =================================================================
+' Atores
+' =================================================================
+actor "Participante" as User
+actor "Parceiro B2B" as Partner
+
+' =================================================================
+' Clients
+' =================================================================
+package "Clients" as Clients #D6EAF8 {
+  rectangle "vibe-mobile-app" as Mobile
+  rectangle "vibe-web-app"    as Web
+}
+
+User --> Mobile
+User --> Web
+
+' =================================================================
+' BFF — composer / anti-corruption layer entre clients e dominios
+' =================================================================
+package "vibe-bff (Composer / ACL)" as BFF #FADBD8 {
+  rectangle "Vibe API\n(participante)"  as ApiBis
+  rectangle "Hub API\n(B2B / parceiros)" as ApiHub
+  rectangle "Partner API\n(gestao parceiros)" as ApiPartner
+  rectangle "Chatbot API"               as ApiChat
+}
+
+Mobile  --> ApiBis
+Web     --> ApiBis
+Partner --> ApiHub
+Partner --> ApiPartner
+Mobile  --> ApiChat
+Web     --> ApiChat
+
+' =================================================================
+' DOMINIOS DE NEGOCIO (bounded contexts) — owned ou consumidos
+' =================================================================
+
+package "Identidade & Acesso" as IdContext #F9E79F {
+  cloud "Microsoft AD\n(via Aberto)"  as MSAD
+  cloud "Vertem IAM\n(multi-tenant)"  as IAM
+  cloud "Vertem Digital Account\n(perfil cadastral)" as DigitalAcc
+}
+
+package "Engajamento & Beneficios" as EngContext #ABEBC6 {
+  cloud "Tradeback / Aberto\n(autorizador, promos,\nrecibos, segmentos, quiz)" as Tradeback
+}
+
+package "Carteira & Creditos" as WalletContext #D2B4DE {
+  cloud "Vertem Wallet\n(saldo, extrato, expiracao)" as Wallet
+}
+
+package "Sorteios" as RaffleContext #F5B7B1 {
+  cloud "Vertem Lucky Numbers\n(geracao numeros sorte)" as LuckyNum
+  cloud "Icatu Seguros\n(modalidades, premios)"        as Icatu
+}
+
+package "Marketplace & Loja" as ShopContext #AED6F1 {
+  cloud "Vertem Marketplace\n(catalogo, carrinho,\npedidos, tracking)" as Marketplace
+  cloud "Partner Hub / ShopHub\n(vouchers, catalogo parceiros)" as PartnerHub
+}
+
+package "Indicacao" as MgmContext #FAD7A0 {
+  cloud "Vertem MGM\n(member-get-member)" as MGM
+}
+
+package "Comunicacao com Cliente" as CommContext #F5CBA7 {
+  cloud "Insider (CDP)\n(eventos, segmentacao,\nLGPD upsert/delete)" as Insider
+  cloud "Firebase Cloud Messaging\n(push notifications)"             as FCM
+  cloud "Zendesk\n(suporte / tickets)"                               as Zendesk
+}
+
+package "Localizacao & Endereco" as GeoContext #A2D9CE {
+  cloud "ViaCEP\n(CEP -> endereco)"          as ViaCep
+  cloud "Google Maps\n(geocoding, places)"   as GMaps
+}
+
+package "Conteudo & Conformidade" as ContentContext #D5DBDB {
+  cloud "Vertem Terms\n(termos / politicas)" as Terms
+}
+
+package "Distribuicao Mobile" as AppDistContext #E8DAEF {
+  cloud "Apple App Store API"   as AppleAPI
+  cloud "Google Play API"       as GoogleAPI
+}
+
+' =================================================================
+' Integracoes — BFF como ACL central
+' =================================================================
+ApiBis --> MSAD       : autenticacao
+ApiBis --> IAM        : autorizacao / tenant
+ApiBis --> DigitalAcc : perfil
+ApiBis --> Tradeback  : resgate / promos / recibos
+ApiBis --> Wallet     : saldo / extrato
+ApiBis --> LuckyNum   : numeros da sorte
+ApiBis --> Icatu      : resultado sorteios
+ApiBis --> Marketplace: loja Vibe
+ApiBis --> PartnerHub : vouchers
+ApiBis --> MGM        : indicacao
+ApiBis --> Insider    : eventos / LGPD
+ApiBis --> FCM        : push (registro / envio)
+ApiBis --> Zendesk    : abrir suporte
+ApiBis --> ViaCep     : CEP
+ApiBis --> GMaps      : geolocalizacao
+ApiBis --> Terms      : aceite / versao
+ApiBis --> AppleAPI   : version check
+ApiBis --> GoogleAPI  : version check
+
+ApiHub     --> Tradeback
+ApiHub     --> Marketplace
+ApiHub     --> PartnerHub
+ApiPartner --> IAM
+
+ApiChat --> Tradeback : consulta beneficios
+ApiChat --> Wallet    : consulta saldo
+ApiChat --> IAM       : login chatbot
+
+' =================================================================
+' Integracoes diretas dos clients (sem passar pelo BFF)
+' =================================================================
+Mobile ..> FCM   : recebe push (token)
+Mobile ..> GMaps : mapa de beneficios
+
+' =================================================================
+' Legenda
+' =================================================================
+legend bottom
+|= Cor |= Significado |
+|<#D6EAF8> | Clients (mobile + web) |
+|<#FADBD8> | BFF (composer / ACL) |
+|<#F9E79F> | Identidade & Acesso |
+|<#ABEBC6> | Engajamento & Beneficios |
+|<#D2B4DE> | Carteira & Creditos |
+|<#F5B7B1> | Sorteios |
+|<#AED6F1> | Marketplace & Loja |
+|<#FAD7A0> | Indicacao |
+|<#F5CBA7> | Comunicacao com Cliente |
+|<#A2D9CE> | Localizacao & Endereco |
+|<#D5DBDB> | Conteudo & Conformidade |
+|<#E8DAEF> | Distribuicao Mobile |
+
+Linha cheia = chamada sincrona (HTTP/REST)   |   Linha tracejada = integracao do client
+endlegend
+
+@enduml
