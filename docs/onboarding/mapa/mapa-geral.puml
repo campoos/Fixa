@@ -1,16 +1,15 @@
 @startwbs mapa-geral
 ' Mapa GERAL do Onboarding (Épico #482695) — FEITO vs. O QUE FALTA
-' Atualizado 2026-06-25 após fechar o débito técnico no nosso alcance (6 PRs mergeados).
-' Cor: verde=feito · amarelo=nosso/atacável · laranja=produto · cinza=infra/bloqueado · azul=board
+' Atualizado 2026-06-25: débito técnico NO NOSSO ALCANCE = ZERADO (9 PRs).
+' Cor: verde=feito · laranja=produto · cinza=infra/bloqueado · azul=board
 
 title Engagement / Onboarding #482695 — feito vs. o que falta (2026-06-25)
 
-caption Débito técnico no nosso alcance: FECHADO. O que resta é de terceiro (infra/produto/board) ou bloqueado por pré-requisito.
+caption Débito técnico no nosso alcance: ZERADO (9 PRs). O que resta é 100% de terceiro (infra/produto/board) ou bloqueado por pré-requisito.
 
 legend bottom left
 |= Cor |= Significado |
-|<#C8E6C9>   | Feito / mergeado na develop |
-|<#FFF59D>   | Nosso — dá pra atacar agora |
+|<#C8E6C9>   | Feito (mergeado ou em PR aprovado) |
 |<#FFE0B2>   | Produto/design — decisão de terceiro |
 |<#E0E0E0>   | Infra/ops OU bloqueado por pré-requisito |
 |<#BBDEFB>   | Board/PO — transição de estado |
@@ -19,24 +18,22 @@ endlegend
 *[#FFFFFF] Engagement\nOnboarding\n#482695
 
 ' ===================== FEITO =====================
-**[#C8E6C9] FEITO\n(débito técnico fechado)
-***[#C8E6C9] 6 PRs mergeados\nna develop (25/06)
+**[#C8E6C9] FEITO\n(débito técnico nosso ZERADO)
+***[#C8E6C9] 7 PRs mergeados na develop
 ****[#C8E6C9] #141058 error-state na listagem
 ****[#C8E6C9] #141060 a11y card Solicitar
 ****[#C8E6C9] #141061 bundle hardening
 ****[#C8E6C9] #141064 pilares sem duplicata
 ****[#C8E6C9] #141075 guard de acesso + subject=401
 ****[#C8E6C9] #141078 guard de transição (TransitionTo)
+****[#C8E6C9] #141079 axios 0.21 -> 1.18 (segurança)
+***[#C8E6C9] 2 PRs em review (follow-ups)
+****[#C8E6C9] #141108 trancar setter Status (internal set)
+****[#C8E6C9] #141109 CancelToken -> AbortController
 ***[#C8E6C9] Produto roda ponta-a-ponta\nem DEV · BE praticamente fechado
 
 ' ===================== O QUE FALTA =====================
-**[#FFCDD2] O QUE FALTA\n(atacar)
-
-***[#FFF59D] NOSSO — dá pra fazer
-****[#FFF59D] axios #141079\n(merge pendente — sua call;\nbuild-validado, external)
-****[#FFF59D] CancelToken -> AbortController\n(faxina pós-axios)
-****[#FFF59D] trancar setter Program.Status\n(internal set + InternalsVisibleTo)
-****[#FFF59D] site da Saga p/ TransitionTo\n(quando o fluxo da Saga existir)
+**[#FFCDD2] O QUE FALTA\n(nada é nosso — tudo de terceiro\nou bloqueado)
 
 ***[#E0E0E0] DELES (infra) — pedir/esperar
 ****[#E0E0E0] SQL real · PRD · CORS
@@ -59,6 +56,6 @@ endlegend
 ***[#E0E0E0] BLOQUEADO — pré-requisito não existe
 ****[#E0E0E0] Step10 abortar 401/403\n(precisa 401 global no MFE)
 ****[#E0E0E0] #489006 worker em container\n(precisa multi-réplica)
-****[#E0E0E0] fluxo de falha da Saga\n(não existe no código)
+****[#E0E0E0] fluxo de falha da Saga + site do TransitionTo\n(Saga não existe no código)
 
 @endwbs

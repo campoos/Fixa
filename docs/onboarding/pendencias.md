@@ -22,9 +22,10 @@ Leva fechando o débito de código que estava **no nosso alcance**. 7 PRs aberto
 ### Follow-ups novos (gerados nesta leva)
 
 - **Migration in-place #487205 — confirmar premissa:** o `defaultValue` da `20260608142056_AddBundleSelectionToProgram` foi editado de `""` p/ `"[]"` **assumindo que nenhum SQL persistente aplicou a migration ainda** (DEV roda InMemory). Confirmar com o time antes de promover; se algum ambiente já aplicou, o default lá fica `""` (inócuo — o reader trata `IsNullOrEmpty`).
-- **Setter de `Program.Status` segue público** — `TransitionTo` guarda os 4 sites reais, mas o setter não está trancado (ergonomia de EF + seed do `ProgramBuilder`). Trancar de vez exigiria `internal set` + `InternalsVisibleTo`/factory. Dívida menor aceita.
+- ~~**Setter de `Program.Status` segue público**~~ — RESOLVIDO (25/06): trancado com `internal set` + `[InternalsVisibleTo]` (Test.Shared/Unit/Integration). Produção só muda via `TransitionTo` (compiler-verified, CS0272 se houvesse set cru); EF materializa via reflection; seed de teste via InternalsVisibleTo. **PR #141108**.
 - **Fluxo de falha de provisionamento da Saga sem site de `TransitionTo`** — o `CanTransitionTo` permite `Provisioning→Failed`/`Failed→Provisioning`, mas nenhum código dispara hoje (a Saga de reversão não existe). Quando entrar, usar `TransitionTo` (não setar `Status` direto).
-- **axios `CancelToken` → `AbortController`** — o bump #141079 manteve `CancelToken` (deprecated, mas funcional no 1.x; sai só no 2.x). Migrar os 8 arquivos quando fizer a faxina.
+- ~~**axios `CancelToken` → `AbortController`**~~ — RESOLVIDO (25/06): migrados os 9 fontes (services + hooks + Step3) de `CancelToken.source()` p/ `AbortController` (`signal`/`abort()`); `Axios.isCancel` mantido. tsc 0 + jest 316. **PR #141109**.
+- **`useOnboarding.ts` é código morto** (nenhum caller; `Promise<any>` em todos os métodos + bug pré-existente de `signal` indo como body do POST em `activate`/`inactivate`). Candidato a remover o arquivo + a interface em `adminContext.ts`. Achado no review do #141109.
 - **axios 1.x: serialização de `status[]` em query** — o default mudou (`status[]=...`). O `SearchProgramsParams.status` é `string[]` mas **nenhum caller passa hoje** (filtro de status sem UI). Quando ligar o filtro, conferir o formato que o binder do .NET espera (`status=A&status=B`) e, se preciso, fixar `paramsSerializer` no `Axios.create`.
 
 ## Sprint 1 — Hype (entregue)
