@@ -1,7 +1,7 @@
-# Render Blueprint — theme-studies
+# Render Blueprint — Fixa
 services:
   - type: web
-    name: theme-studies
+    name: fixa
     runtime: node
     plan: free
     buildCommand: cd web && npm ci && npm run build
