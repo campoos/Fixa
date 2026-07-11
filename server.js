@@ -25,7 +25,7 @@ const PORT = Number(process.env.PORT || 4022);
 const HOST = process.env.HOST || "0.0.0.0";
 // geração direta (opcional): Gemini Flash — sem key o app segue 100% funcional no fluxo manual
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest"; // alias evergreen (2.5-flash 404 pra keys novas)
 const GEN_ENABLED = Boolean(GEMINI_API_KEY);
 const SSO_SECRET = process.env.SSO_SECRET || "dev-secret-troca-em-prod";
 const APP_PASS = process.env.APP_PASS || "estudar";       // senha da conta fundadora (bootstrap)
