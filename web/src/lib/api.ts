@@ -70,6 +70,19 @@ export interface TrashItem { id: string; title: string; deletedAt: string; count
 export const getTrash = () => api.get<{ items: TrashItem[] }>("/api/trash").then((r) => r.items);
 export const restoreTrack = (id: string) => api.post<{ ok: true; id: string }>("/api/track/restore", { id });
 export const setTrackTarget = (id: string, date: string | null) => api.post("/api/track/target", { id, date });
+export const renameTrack = (id: string, title: string, summary?: string) => api.post("/api/track/rename", { id, title, summary });
+export type TaskPatch = Partial<Pick<Task, "title" | "objective" | "keyPoints" | "steps" | "expected" | "hint" | "snippet" | "language">> & { sample?: Sample };
+export const editTask = (trackId: string, taskId: string, patch: TaskPatch) => api.post("/api/task/edit", { trackId, taskId, patch });
+export const removeTask = (trackId: string, taskId: string) => api.post("/api/task/remove", { trackId, taskId });
+export const appendTrack = (id: string, jsonStr: string) => {
+  let parsed: unknown;
+  try { parsed = JSON.parse(jsonStr); } catch (e) { return Promise.reject(new ApiError(400, `JSON inválido: ${(e as Error).message}`)); }
+  return api.post<{ ok: true; added: Counts }>("/api/track/append", { id, json: parsed });
+};
+// geração direta (Gemini) — disponível quando o server tem GEMINI_API_KEY
+export const getConfig = () => api.get<{ genEnabled: boolean }>("/api/config");
+export const generateTrack = (p: PromptParams) =>
+  api.post<{ ok: true; id: string; title: string; counts: Counts }>("/api/generate", p);
 export const purgeTrash = (id?: string) => api.post("/api/trash/purge", id ? { id } : {});
 export interface PromptParams { theme: string; level?: string; mode?: string; depth?: string }
 export const getImportPrompt = (p: PromptParams) => {

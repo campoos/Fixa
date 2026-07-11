@@ -22,6 +22,10 @@ await loadEnv();
 
 const PORT = Number(process.env.PORT || 4022);
 const HOST = process.env.HOST || "0.0.0.0";
+// geração direta (opcional): Gemini Flash — sem key o app segue 100% funcional no fluxo manual
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEN_ENABLED = Boolean(GEMINI_API_KEY);
 const SSO_SECRET = process.env.SSO_SECRET || "dev-secret-troca-em-prod";
 const APP_PASS = process.env.APP_PASS || "estudar";
 const APP_USER = process.env.APP_USER || "João";
@@ -235,6 +239,48 @@ const server = createServer(async (req, res) => {
     if (!me) return json(res, 401, { error: "login requerido" });
 
     if (path === "/api/me") return json(res, 200, { name: me });
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED });
+    // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
+    if (path === "/api/generate" && req.method === "POST") {
+      if (!GEN_ENABLED) return json(res, 400, { error: "geração direta não configurada (GEMINI_API_KEY)" });
+      const { theme, level, mode, depth } = await readBody(req);
+      if (!theme || !String(theme).trim()) return json(res, 400, { error: "tema obrigatório" });
+      const prompt = buildPrompt({ theme, level, mode, depth });
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 120000);
+      let text = "";
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
+          }),
+          signal: ac.signal,
+        });
+        if (r.status === 429) return json(res, 429, { error: "limite do Gemini atingido — tenta de novo em instantes ou usa o fluxo manual" });
+        if (!r.ok) return json(res, 502, { error: `Gemini respondeu ${r.status}` });
+        const d = await r.json();
+        text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
+      } catch (e) {
+        return json(res, 502, { error: e.name === "AbortError" ? "geração demorou demais (timeout) — tenta de novo" : `falha ao chamar o Gemini: ${e.message}` });
+      } finally { clearTimeout(timer); }
+      if (!text.trim()) return json(res, 502, { error: "Gemini devolveu vazio — tenta de novo" });
+      // remove cercas de markdown se vierem, e valida
+      const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+      const v = validateTrack(cleaned);
+      if (!v.ok) return json(res, 422, { error: "o conteúdo gerado veio fora do formato — tenta de novo ou usa o fluxo manual", errors: v.errors.slice(0, 8) });
+      let id = v.track.id, n = 2;
+      while (tracks[id]) id = `${v.track.id}-${n++}`;
+      v.track.id = id;
+      v.track.createdAt = new Date().toISOString();
+      v.track.generatedBy = GEMINI_MODEL;
+      tracks[id] = v.track;
+      tState(id);
+      await Promise.all([saveTracks(), saveState()]);
+      return json(res, 200, { ok: true, id, title: v.track.title, counts: trackCounts(v.track) });
+    }
     if (path === "/api/import/prompt") {
       const prompt = buildPrompt({ theme: url.searchParams.get("theme") || "", level: url.searchParams.get("level") || undefined, mode: url.searchParams.get("mode") || undefined, depth: url.searchParams.get("depth") || undefined });
       return json(res, 200, { prompt });
@@ -294,6 +340,76 @@ const server = createServer(async (req, res) => {
       if (date) tracks[id].targetDate = date; else delete tracks[id].targetDate;
       await saveTracks();
       return json(res, 200, { ok: true });
+    }
+    if (path === "/api/track/rename" && req.method === "POST") {
+      const { id, title, summary } = await readBody(req);
+      if (!tracks[id]) return json(res, 404, { error: "tema não encontrado" });
+      if (title && String(title).trim()) tracks[id].title = String(title).trim();
+      if (summary !== undefined) tracks[id].summary = String(summary || "").trim();
+      await saveTracks();
+      return json(res, 200, { ok: true });
+    }
+    // edita campos de uma task (whitelist por tipo)
+    if (path === "/api/task/edit" && req.method === "POST") {
+      const { trackId, taskId, patch } = await readBody(req);
+      const track = tracks[trackId];
+      if (!track) return json(res, 404, { error: "tema não encontrado" });
+      let target = null;
+      for (const e of track.epics) for (const st of e.stories) for (const t of st.tasks) if (t.id === taskId) target = t;
+      if (!target) return json(res, 404, { error: "task não encontrada" });
+      const p = patch || {};
+      const setStr = (k) => { if (typeof p[k] === "string" && p[k].trim()) target[k] = p[k].trim(); };
+      const setStrOpt = (k) => { if (k in p) target[k] = typeof p[k] === "string" && p[k].trim() ? p[k].trim() : null; };
+      setStr("title"); setStr("objective");
+      if (p.sample && typeof p.sample.q === "string" && typeof p.sample.a === "string" && p.sample.q.trim() && p.sample.a.trim())
+        target.sample = { q: p.sample.q.trim(), a: p.sample.a.trim() };
+      if (target.type === "theory") {
+        if (Array.isArray(p.keyPoints)) target.keyPoints = p.keyPoints.map((s) => String(s).trim()).filter(Boolean);
+      } else {
+        if (Array.isArray(p.steps)) { const st = p.steps.map((s) => String(s).trim()).filter(Boolean); if (st.length) target.steps = st; }
+        setStr("expected"); setStrOpt("hint"); setStrOpt("snippet"); setStrOpt("language");
+      }
+      await saveTracks();
+      return json(res, 200, { ok: true });
+    }
+    // remove uma task (ids das demais ficam estáveis; estado da task some junto)
+    if (path === "/api/task/remove" && req.method === "POST") {
+      const { trackId, taskId } = await readBody(req);
+      const track = tracks[trackId];
+      if (!track) return json(res, 404, { error: "tema não encontrado" });
+      let removed = false;
+      for (const e of track.epics) for (const st of e.stories) {
+        const i = st.tasks.findIndex((t) => t.id === taskId);
+        if (i >= 0) { st.tasks.splice(i, 1); removed = true; }
+      }
+      if (!removed) return json(res, 404, { error: "task não encontrada" });
+      // poda stories/epics vazios
+      for (const e of track.epics) e.stories = e.stories.filter((st) => st.tasks.length);
+      track.epics = track.epics.filter((e) => e.stories.length);
+      if (!track.epics.length) return json(res, 400, { error: "não dá pra remover a última task do tema — exclua o tema" });
+      const s = tState(trackId);
+      delete s.done[taskId]; delete s.comments[taskId]; delete s.review[taskId];
+      await Promise.all([saveTracks(), saveState()]);
+      return json(res, 200, { ok: true });
+    }
+    // anexa epics novos (JSON no mesmo shape do import, só a parte de epics) — renumera a partir do fim
+    if (path === "/api/track/append" && req.method === "POST") {
+      const { id, json: raw } = await readBody(req);
+      const track = tracks[id];
+      if (!track) return json(res, 404, { error: "tema não encontrado" });
+      let data = raw;
+      if (typeof data === "string") { try { data = JSON.parse(data); } catch (e) { return json(res, 400, { ok: false, errors: [`JSON inválido: ${e.message}`] }); } }
+      if (data && typeof data === "object" && !data.title) data = { ...data, title: track.title }; // título é ignorado no append
+      const v = validateTrack(data);
+      if (!v.ok) return json(res, 400, { ok: false, errors: v.errors });
+      const base = track.epics.length;
+      const renumbered = v.track.epics.map((e, ei) => {
+        const en = base + ei + 1;
+        return { ...e, id: `${en}`, stories: e.stories.map((st, si) => ({ ...st, id: `${en}.${si + 1}`, tasks: st.tasks.map((t, ti) => ({ ...t, id: `${en}.${si + 1}.${ti + 1}` })) })) };
+      });
+      track.epics.push(...renumbered);
+      await saveTracks();
+      return json(res, 200, { ok: true, added: trackCounts({ epics: renumbered }) });
     }
 
     // ações por task (validam trackId + taskId)

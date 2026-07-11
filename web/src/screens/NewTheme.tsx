@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
-import { Check, ClipboardCopy, Loader2, Sparkles, Upload } from "lucide-react";
-import { ApiError, getImportPrompt, importTrack } from "@/lib/api";
+import { useEffect, useState, type ReactNode } from "react";
+import { Check, ClipboardCopy, Loader2, Sparkles, Upload, Wand2 } from "lucide-react";
+import { ApiError, generateTrack, getConfig, getImportPrompt, importTrack } from "@/lib/api";
 import { navigate } from "@/App";
 import { Card } from "@/components/ui/card";
 
@@ -37,11 +37,25 @@ export function NewTheme() {
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [genBusy, setGenBusy] = useState(false);
+  const [genEnabled, setGenEnabled] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  useEffect(() => { getConfig().then((c) => setGenEnabled(c.genEnabled)).catch(() => {}); }, []);
 
   const gen = async () => {
     if (!theme.trim()) return;
     setGenBusy(true);
     try { setPrompt(await getImportPrompt({ theme, level, mode, depth })); } finally { setGenBusy(false); }
+  };
+  const genDirect = async () => {
+    if (!theme.trim() || aiBusy) return;
+    setAiBusy(true); setAiError(null);
+    try {
+      const r = await generateTrack({ theme, level, mode, depth });
+      navigate(`/t/${encodeURIComponent(r.id)}`);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "falha na geração");
+    } finally { setAiBusy(false); }
   };
   const copy = async () => {
     try { await navigator.clipboard.writeText(prompt); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard bloqueado */ }
@@ -70,9 +84,17 @@ export function NewTheme() {
           <Field label="Abordagem"><select value={mode} onChange={(e) => setMode(e.target.value)} className={selCls}>{MODES.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}</select></Field>
           <Field label="Profundidade"><select value={depth} onChange={(e) => setDepth(e.target.value)} className={selCls}>{DEPTHS.map((d) => <option key={d.v} value={d.v}>{d.l}</option>)}</select></Field>
         </div>
-        <button onClick={gen} disabled={!theme.trim() || genBusy} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-          {genBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Gerar prompt
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {genEnabled && (
+            <button onClick={genDirect} disabled={!theme.trim() || aiBusy} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+              {aiBusy ? <><Loader2 className="h-4 w-4 animate-spin" /> gerando… (até 1 min)</> : <><Wand2 className="h-4 w-4" /> Gerar direto</>}
+            </button>
+          )}
+          <button onClick={gen} disabled={!theme.trim() || genBusy} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50 ${genEnabled ? "border border-border hover:bg-accent" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+            {genBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} {genEnabled ? "ou gerar prompt manual" : "Gerar prompt"}
+          </button>
+        </div>
+        {aiError && <p className="text-sm text-red-400">{aiError} — dá pra usar o fluxo manual abaixo.</p>}
       </Card>
 
       {/* passo 2: copiar prompt */}
