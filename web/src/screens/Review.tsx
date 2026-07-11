@@ -48,6 +48,7 @@ export function Review() {
     setBusy(true);
     try {
       await taskReview(cur.trackId, cur.id, result);
+      window.dispatchEvent(new Event("fx-review-changed")); // badge do header acompanha
       if (result === "pass") setHits((h) => h + 1); else setMisses((m) => m + 1);
       setPos((p) => p + 1);
       setShown(false);

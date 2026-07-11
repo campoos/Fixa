@@ -49,8 +49,14 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
     window.addEventListener("popstate", on);
     return () => window.removeEventListener("popstate", on);
   }, []);
-  const { data: review } = useApi(getReview, [route.name]);
+  const { data: review, refetch: refetchReview } = useApi(getReview, [route.name]);
   const dueCount = review?.due.length ?? 0;
+  // badge atualiza na hora quando uma revisão é avaliada (evento disparado pela tela Revisar)
+  useEffect(() => {
+    const on = () => refetchReview(true);
+    window.addEventListener("fx-review-changed", on);
+    return () => window.removeEventListener("fx-review-changed", on);
+  }, [refetchReview]);
   const NavBtn = ({ to, active, children }: { to: string; active: boolean; children: ReactNode }) => (
     <button onClick={() => navigate(to)} className={`rounded-md px-3 py-1.5 text-sm transition ${active ? "bg-secondary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
       {children}
