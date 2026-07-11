@@ -1,11 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, Eye, Loader2, PartyPopper, RotateCcw, Shuffle, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
+import { BookOpen, Check, Eye, EyeOff, FlaskConical, Loader2, RotateCcw, Shuffle } from "lucide-react";
 import { getReview, taskReview, type Due } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { usePersistentState } from "@/lib/usePersistentState";
 import { cn } from "@/lib/utils";
+import { FOCUS, navigate } from "@/App";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// eyebrow padrão de zona (DESIGN-HOME §2.2) — mesma string da constante da Home
+const EYEBROW = "font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground";
+// botão quieto (fim de sessão / fila vazia — DESIGN-REVISAR §5/§6)
+const QUIET_BTN = "inline-flex h-9 items-center rounded-lg border border-border bg-card px-3.5 text-sm font-medium transition-colors hover:bg-accent";
+// chip de atalho de teclado (§4.e) — invisível no mobile, decorativo pro leitor de tela
+const KBD = "hidden h-[18px] items-center rounded border border-transparent px-1 font-mono text-[10px] sm:inline-flex";
 
 // intercala a fila entre temas (round-robin) — força discriminar contextos (interleaving)
 function interleave(due: Due[]): Due[] {
@@ -21,16 +30,112 @@ function interleave(due: Due[]): Due[] {
   return out;
 }
 
+/* ── contexto do card (§4.a): tipo com ícone; a palavra some em <sm (o title assume) ── */
+
+function TypeTag({ type }: { type: Due["type"] }) {
+  const label = type === "theory" ? "teoria" : "prática";
+  const Icon = type === "theory" ? BookOpen : FlaskConical;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1" title={label}>
+      <Icon className="h-3 w-3" />
+      <span className="hidden sm:inline">{label}</span>
+    </span>
+  );
+}
+
+/* ── escada Leitner (§4.b): degraus vencidos apagados, o atual forte, à frente neutro ── */
+
+function LeitnerLadder({ box, ladder }: { box: number; ladder: number[] }) {
+  const boxes = ladder.length;
+  const label =
+    box + 1 >= boxes
+      ? `caixa ${box + 1} de ${boxes} · acertou → dominada (sai da fila) · errou → caixa 1 (amanhã)`
+      : `caixa ${box + 1} de ${boxes} · acertou → caixa ${box + 2} (revisa em ${ladder[box + 1]}d) · errou → caixa 1 (amanhã)`;
+  return (
+    <span role="img" aria-label={label} title={label} className="ml-auto flex shrink-0 items-center gap-1.5">
+      <span className="flex items-center gap-[3px]">
+        {ladder.map((_, i) => (
+          <span key={i} className={cn("h-[5px] w-2.5 rounded-full", i < box ? "bg-recall/40" : i === box ? "bg-recall" : "bg-secondary")} />
+        ))}
+      </span>
+      <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{box + 1}/{boxes}</span>
+    </span>
+  );
+}
+
+/* ── estados de página (§2, §5, §6) ── */
+
+function ReviewSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-xl">
+      <Skeleton className="h-4 w-32" />
+      <Skeleton className="mt-3 h-1.5 w-full rounded-full" />
+      <Skeleton className="mt-5 h-[280px] rounded-xl" />
+      <Skeleton className="mt-3 h-12 rounded-lg" />
+    </div>
+  );
+}
+
+function EmptyQueue({ ladder }: { ladder: number[] }) {
+  return (
+    <div className="mt-5 rounded-xl border border-dashed border-border px-6 py-14 text-center">
+      <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-domain/12 text-domain"><Check className="h-5 w-5" /></div>
+      <p className="mt-4 font-semibold">Fila limpa</p>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Nada pra revisar agora. As tasks concluídas voltam no tempo certo — é o espaçamento trabalhando.</p>
+      <button onClick={() => navigate("/")} className={cn("mt-5", QUIET_BTN, FOCUS)}>Continuar estudando</button>
+      {ladder.length > 0 && (
+        <p className="mt-6 font-mono text-[11px] text-muted-foreground/70">revisa em {ladder.map((d) => `${d}d`).join(" · ")}</p>
+      )}
+    </div>
+  );
+}
+
+function SessionDone({ hits, misses, titleRef, onSeeQueue }: { hits: number; misses: number; titleRef: RefObject<HTMLParagraphElement | null>; onSeeQueue: () => void }) {
+  const tiles = [
+    { icon: <Check className="h-4 w-4 text-domain" />, value: hits, label: hits === 1 ? "acerto" : "acertos" },
+    { icon: <RotateCcw className="h-4 w-4 text-recall" />, value: misses, label: misses === 1 ? "erro" : "erros" },
+  ];
+  return (
+    <Card className="mt-5 gap-0 rounded-xl p-8 text-center">
+      <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-domain/12 text-domain"><Check className="h-5 w-5" /></div>
+      <p ref={titleRef} tabIndex={-1} className="mt-4 font-semibold outline-none">Sessão concluída</p>
+      <div className="mx-auto mt-4 grid w-full max-w-[280px] grid-cols-2 gap-2.5">
+        {tiles.map((t) => (
+          <div key={t.label} className="rounded-lg border border-border px-4 py-2.5 text-left">
+            <div className="flex items-center gap-1.5">
+              {t.icon}
+              <span className="font-mono text-xl font-semibold tabular-nums text-foreground">{t.value}</span>
+            </div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">{t.label}</div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-sm text-muted-foreground">{misses > 0 ? "Erros voltam amanhã — é assim que fixa." : "Tudo subiu de caixa — os intervalos aumentam."}</p>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+        <button onClick={() => navigate("/")} className={cn(QUIET_BTN, FOCUS)}>Voltar aos temas</button>
+        <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Ver fila</button>
+      </div>
+    </Card>
+  );
+}
+
+/* ── Revisar: player de sessão (DESIGN-REVISAR) ── */
+
 export function Review() {
-  const { data, loading, error, refetch } = useApi(getReview, []);
+  const { data, error, refetch } = useApi(getReview, []);
   const [mix, setMix] = usePersistentState("fx-review-mix", true);
   // fila da sessão: congelada no início (não re-embaralha a cada grade)
   const [queue, setQueue] = useState<Due[] | null>(null);
   const [pos, setPos] = useState(0);
   const [shown, setShown] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"pass" | "fail" | null>(null);
   const [hits, setHits] = useState(0);
   const [misses, setMisses] = useState(0);
+  // feedback não-visual (§8): live region + alvos de foco pós-ação
+  const [live, setLive] = useState("");
+  const answerRef = useRef<HTMLDivElement>(null);
+  const revealRef = useRef<HTMLButtonElement>(null);
+  const doneRef = useRef<HTMLParagraphElement>(null);
 
   const trackCount = useMemo(() => new Set((data?.due ?? []).map((d) => d.trackId)).size, [data]);
 
@@ -42,17 +147,29 @@ export function Review() {
     setPos(0); setShown(false); setHits(0); setMisses(0);
   }, [data, mix, trackCount]);
 
+  const total = queue?.length ?? 0;
   const cur = queue && pos < queue.length ? queue[pos] : null;
   const grade = async (result: "pass" | "fail") => {
     if (!cur || busy) return;
-    setBusy(true);
+    setBusy(result);
     try {
       await taskReview(cur.trackId, cur.id, result);
       window.dispatchEvent(new Event("fx-review-changed")); // badge do header acompanha
-      if (result === "pass") setHits((h) => h + 1); else setMisses((m) => m + 1);
+      const n = pos + 1;
+      const newHits = hits + (result === "pass" ? 1 : 0);
+      const newMisses = misses + (result === "fail" ? 1 : 0);
+      setHits(newHits); setMisses(newMisses);
+      // live region (§8): resultado a cada avaliação; na última, o placar do fim assume
+      setLive(
+        n >= total
+          ? `sessão concluída — ${newHits} ${newHits === 1 ? "acerto" : "acertos"}, ${newMisses} ${newMisses === 1 ? "erro" : "erros"}`
+          : result === "pass"
+            ? `acerto registrado — ${n} de ${total}`
+            : `erro registrado, volta amanhã — ${n} de ${total}`,
+      );
       setPos((p) => p + 1);
       setShown(false);
-    } finally { setBusy(false); }
+    } finally { setBusy(null); }
   };
 
   // atalhos: Espaço/Enter revela · 1 = errei · 2 = acertei
@@ -69,79 +186,146 @@ export function Review() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  if (loading && !data) return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28" />)}</div>;
-  if (error) return <Card className="p-4 text-sm text-destructive">erro: {error}</Card>;
+  // ao revelar → foco no slot da resposta (leitor de tela lê antes de chegar em Errei/Acertei)
+  useEffect(() => {
+    if (shown) answerRef.current?.focus();
+  }, [shown]);
 
-  const total = queue?.length ?? 0;
-  const finished = queue !== null && pos >= total;
+  // ao avaliar → foco no Revelar do próximo card; no fim → foco no título do placar (§8)
+  useEffect(() => {
+    if (pos === 0 || total === 0) return; // montagem/reset de sessão: não roubar foco
+    if (pos < total) revealRef.current?.focus();
+    else doneRef.current?.focus();
+  }, [pos, total]);
+
+  if (error) return <div className="mx-auto w-full max-w-xl"><Card className="p-4 text-sm text-destructive">erro: {error}</Card></div>;
+  if (queue === null) return <ReviewSkeleton />; // cobre loading inicial e o frame entre data → fila
+
+  const finished = pos >= total;
+  const ladder = data?.ladder ?? [];
+  // consequência do Acertei (title, §4.e): próxima caixa ou graduação
+  const passTitle = cur
+    ? cur.box + 1 >= ladder.length
+      ? "dominada — sai da fila"
+      : `sobe pra caixa ${cur.box + 2} — revisa em ${ladder[cur.box + 1]}d`
+    : undefined;
 
   return (
-    <div className="mx-auto max-w-xl space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <RotateCcw className="h-5 w-5 text-amber-500" />
-        <h1 className="text-lg font-semibold">Revisar hoje</h1>
-        {total > 0 && !finished && (
-          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-500 tabular-nums">{Math.min(pos + 1, total)}/{total}</span>
-        )}
-        {trackCount > 1 && (
-          <button onClick={() => setMix(!mix)} title="intercalar entre temas (fixa mais)" className={cn("ml-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition", mix ? "border-primary/50 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent")}>
-            <Shuffle className="h-3.5 w-3.5" /> intercalar
-          </button>
-        )}
-      </div>
+    <div className="mx-auto w-full max-w-xl">
+      <h1 className="sr-only">Revisar hoje</h1>
+      <div aria-live="polite" className="sr-only">{live}</div>
 
-      {/* barra de progresso da sessão */}
+      {/* cabeçalho da sessão (§3) — some no vazio (não há sessão) */}
       {total > 0 && (
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${(pos / total) * 100}%` }} />
-        </div>
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className={EYEBROW}>revisão de hoje</h2>
+            {trackCount > 1 && (
+              <button
+                onClick={() => setMix(!mix)}
+                aria-pressed={mix}
+                title="misturar os temas na sessão — fixa mais (reinicia a sessão)"
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
+                  mix ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
+                  FOCUS,
+                )}
+              >
+                <Shuffle className="h-3.5 w-3.5" /> intercalar
+              </button>
+            )}
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-valuenow={pos}
+              aria-label="progresso da sessão"
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+            >
+              <div className="h-full rounded-full bg-recall ease-out motion-safe:transition-[width] motion-safe:duration-300" style={{ width: `${(pos / total) * 100}%` }} />
+            </div>
+            {!finished && (
+              <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{Math.min(pos + 1, total)}/{total}</span>
+            )}
+          </div>
+        </>
       )}
 
       {total === 0 ? (
-        <Card className="p-8 text-center">
-          <PartyPopper className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
-          <p className="font-medium">Nada pra revisar agora 🎉</p>
-          <p className="text-sm text-muted-foreground">Volte amanhã — as tasks concluídas reaparecem no tempo certo.</p>
-        </Card>
+        <EmptyQueue ladder={ladder} />
       ) : finished ? (
-        <Card className="p-8 text-center">
-          <PartyPopper className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
-          <p className="font-medium">Sessão concluída!</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            <span className="font-medium text-emerald-500">{hits} acerto{hits === 1 ? "" : "s"}</span> · <span className="font-medium text-red-400">{misses} erro{misses === 1 ? "" : "s"}</span>
-            {misses > 0 && " — os erros voltam amanhã."}
-          </p>
-          <button onClick={() => refetch()} className="mt-4 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent">ver fila</button>
-        </Card>
+        <SessionDone hits={hits} misses={misses} titleRef={doneRef} onSeeQueue={() => refetch()} />
       ) : cur ? (
-        <Card className="p-4">
-          <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="font-mono">{cur.id}</span>
-            <span className="min-w-0 truncate">{cur.trackTitle} · {cur.epic}</span>
-            <span className="ml-auto shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 font-medium text-amber-500">caixa {cur.box + 1}/8</span>
-          </div>
-          <p className="text-base font-medium leading-relaxed">{cur.sample.q}</p>
-          {shown ? (
-            <>
-              <p className="mt-3 rounded-md border border-border bg-background p-2.5 text-sm text-muted-foreground"><span className="font-medium text-emerald-500">→ </span>{cur.sample.a}</p>
-              <div className="mt-3 flex gap-2">
-                <button onClick={() => grade("fail")} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-red-500/50 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50">
-                  <X className="h-4 w-4" /> Errei <kbd className="ml-1 hidden rounded bg-muted px-1 font-mono text-[10px] sm:inline">1</kbd>
+        <>
+          {/* card de revisão (§4) — min-h segura o pulo entre cards de tamanhos diferentes */}
+          <Card className="mt-5 min-h-[260px] gap-0 rounded-xl border-border bg-card p-5 shadow-sm sm:min-h-[280px]">
+            <div className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
+              <TypeTag type={cur.type} />
+              <span className="min-w-0 truncate">{cur.trackTitle} · {cur.epic}</span>
+              <LeitnerLadder box={cur.box} ladder={ladder} />
+            </div>
+            <p className="mt-4 text-[17px] font-semibold leading-snug text-balance">{cur.sample.q}</p>
+            {/* slot da resposta (§4.d): mesmo min-h nos dois estados → revelar não move nada */}
+            {shown ? (
+              <div
+                ref={answerRef}
+                tabIndex={-1}
+                className="mt-4 min-h-[96px] rounded-lg border border-domain/25 bg-domain/5 p-3.5 outline-none duration-200 motion-safe:animate-in motion-safe:fade-in"
+              >
+                <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-domain">resposta</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{cur.sample.a}</p>
+              </div>
+            ) : (
+              <div className="mt-4 grid min-h-[96px] place-items-center rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
+                <div className="flex flex-col items-center gap-1.5 text-center">
+                  <EyeOff className="h-4 w-4 text-muted-foreground/60" />
+                  <p className="text-xs text-muted-foreground/70">responda de cabeça — depois revela</p>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* dock de ações (§4.e): sticky bottom, altura constante nos dois estados */}
+          <div className="sticky bottom-0 z-10 -mx-4 mt-3 bg-background/85 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur-md">
+            {!shown ? (
+              <button
+                ref={revealRef}
+                onClick={() => setShown(true)}
+                className={cn("flex h-12 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent active:bg-accent", FOCUS)}
+              >
+                <Eye className="h-4 w-4" /> Revelar resposta
+                <kbd aria-hidden="true" className={cn(KBD, "bg-muted text-muted-foreground")}>espaço</kbd>
+              </button>
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => grade("fail")}
+                  disabled={busy !== null}
+                  title="volta pra caixa 1 — revisa amanhã"
+                  className={cn("flex h-12 items-center justify-center gap-1.5 rounded-lg border border-recall/45 bg-recall/10 text-sm font-medium text-recall transition-colors hover:bg-recall/15 active:bg-recall/20 disabled:opacity-50", FOCUS)}
+                >
+                  {busy === "fail" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} Errei
+                  <kbd aria-hidden="true" className={cn(KBD, "bg-recall/15 text-recall")}>1</kbd>
                 </button>
-                <button onClick={() => grade("pass")} disabled={busy} className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-500 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50">
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Acertei <kbd className="ml-1 hidden rounded bg-emerald-600 px-1 font-mono text-[10px] sm:inline">2</kbd>
+                <button
+                  onClick={() => grade("pass")}
+                  disabled={busy !== null}
+                  title={passTitle}
+                  className={cn("flex h-12 items-center justify-center gap-1.5 rounded-lg bg-domain text-sm font-medium text-domain-foreground transition-colors hover:bg-domain/90 active:bg-domain/85 disabled:opacity-50", FOCUS)}
+                >
+                  {busy === "pass" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Acertei
+                  <kbd aria-hidden="true" className={cn(KBD, "bg-domain-foreground/20 text-domain-foreground")}>2</kbd>
                 </button>
               </div>
-            </>
-          ) : (
-            <button onClick={() => setShown(true)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-border py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent">
-              <Eye className="h-4 w-4" /> Revelar resposta <kbd className="ml-1 hidden rounded bg-muted px-1 font-mono text-[10px] sm:inline">espaço</kbd>
-            </button>
-          )}
-        </Card>
-      ) : null}
+            )}
+          </div>
 
-      {!finished && total > 0 && <p className="text-center text-[11px] text-muted-foreground">responda de cabeça antes de revelar · espaço revela · 1 errei · 2 acertei</p>}
+          {/* hint de atalhos (§4.f) — desktop only; no mobile o método já mora no slot oculto */}
+          <p className="mt-3 hidden text-center font-mono text-[11px] text-muted-foreground/70 sm:block">espaço revela · 1 errei · 2 acertei</p>
+        </>
+      ) : null}
     </div>
   );
 }
