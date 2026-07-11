@@ -57,8 +57,11 @@ const kv = {
 // ---- estado em memória (persistido no KV) ----
 let tracks = (await kv.get("theme:tracks")) || {}; // id -> conteúdo do tema
 let state = (await kv.get("theme:state")) || {};   // trackId -> { done, comments, review }
+let trash = (await kv.get("theme:trash")) || {};   // id -> { track, state, deletedAt } (lixeira reversível)
 const saveTracks = () => kv.set("theme:tracks", tracks).catch((e) => console.error("[tracks]", e.message));
 const saveState = () => kv.set("theme:state", state).catch((e) => console.error("[state]", e.message));
+const saveTrash = () => kv.set("theme:trash", trash).catch((e) => console.error("[trash]", e.message));
+const freeId = (base) => { let id = base, n = 2; while (tracks[id]) id = `${base}-${n++}`; return id; };
 function tState(id) {
   const s = state[id] || (state[id] = { done: {}, comments: {}, review: {} });
   s.done ||= {}; s.comments ||= {}; s.review ||= {};
@@ -240,8 +243,32 @@ const server = createServer(async (req, res) => {
     if (path === "/api/track/delete" && req.method === "POST") {
       const { id } = await readBody(req);
       if (!tracks[id]) return json(res, 404, { error: "tema não encontrado" });
+      // soft-delete: vai pra lixeira (reversível), não some
+      trash[id] = { track: tracks[id], state: state[id] || { done: {}, comments: {}, review: {} }, deletedAt: new Date().toISOString() };
       delete tracks[id]; delete state[id];
-      await Promise.all([saveTracks(), saveState()]);
+      await Promise.all([saveTracks(), saveState(), saveTrash()]);
+      return json(res, 200, { ok: true });
+    }
+    if (path === "/api/trash") {
+      const items = Object.entries(trash).map(([id, t]) => ({ id, title: t.track.title, deletedAt: t.deletedAt, counts: trackCounts(t.track) }))
+        .sort((a, b) => (a.deletedAt < b.deletedAt ? 1 : -1));
+      return json(res, 200, { items });
+    }
+    if (path === "/api/track/restore" && req.method === "POST") {
+      const { id } = await readBody(req);
+      const t = trash[id];
+      if (!t) return json(res, 404, { error: "não está na lixeira" });
+      const newId = tracks[id] ? freeId(id) : id; // se recriaram um tema com o mesmo id, restaura com sufixo
+      t.track.id = newId;
+      tracks[newId] = t.track; state[newId] = t.state || { done: {}, comments: {}, review: {} };
+      delete trash[id];
+      await Promise.all([saveTracks(), saveState(), saveTrash()]);
+      return json(res, 200, { ok: true, id: newId });
+    }
+    if (path === "/api/trash/purge" && req.method === "POST") {
+      const { id } = await readBody(req);
+      if (id) delete trash[id]; else trash = {};
+      await saveTrash();
       return json(res, 200, { ok: true });
     }
     if (path === "/api/review") return json(res, 200, globalReview());

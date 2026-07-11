@@ -1,10 +1,42 @@
 import type { MouseEvent } from "react";
-import { BookOpen, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { deleteTrack, getStats, getTracks, type Progress, type TrackSummary } from "@/lib/api";
+import { useState } from "react";
+import { BookOpen, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { deleteTrack, getStats, getTracks, getTrash, purgeTrash, restoreTrack, type Progress, type TrackSummary } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { navigate } from "@/App";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const fmtDate = (s: string) => new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+
+function Trash({ onChange }: { onChange: () => void }) {
+  const { data, loading, refetch } = useApi(getTrash, []);
+  const [open, setOpen] = useState(false);
+  const items = data ?? [];
+  if (loading || !items.length) return null;
+  const restore = async (id: string) => { await restoreTrack(id); await refetch(true); onChange(); };
+  const purge = async (id: string) => { if (!confirm("Apagar de vez? Isso é irreversível.")) return; await purgeTrash(id); await refetch(true); };
+  return (
+    <div className="rounded-lg border border-border bg-muted/20">
+      <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 p-3 text-left text-sm text-muted-foreground">
+        <Trash2 className="h-4 w-4" /> Lixeira <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums">{items.length}</span>
+        <span className="ml-auto text-xs">{open ? "ocultar" : "ver"}</span>
+      </button>
+      {open && (
+        <div className="space-y-1.5 px-2 pb-2">
+          {items.map((t) => (
+            <div key={t.id} className="flex items-center gap-2 rounded-md border border-border bg-card p-2 text-sm">
+              <span className="min-w-0 flex-1 truncate">{t.title}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{t.counts.tasks} tasks · excluído {fmtDate(t.deletedAt)}</span>
+              <button onClick={() => restore(t.id)} title="restaurar" className="grid h-7 w-7 shrink-0 place-items-center rounded text-emerald-500 hover:bg-emerald-500/10"><Undo2 className="h-4 w-4" /></button>
+              <button onClick={() => purge(t.id)} title="apagar de vez" className="grid h-7 w-7 shrink-0 place-items-center rounded text-muted-foreground hover:bg-red-500/10 hover:text-red-400"><X className="h-4 w-4" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const pct = (p: Progress) => (p.total ? Math.round((p.done / p.total) * 100) : 0);
 
@@ -39,11 +71,13 @@ function StatStrip() {
 
 export function Home() {
   const { data, loading, error, refetch } = useApi(getTracks, []);
+  const [rev, setRev] = useState(0);
+  const bump = () => { refetch(true); setRev((v) => v + 1); };
   const del = async (e: MouseEvent, t: TrackSummary) => {
     e.stopPropagation();
-    if (!confirm(`Excluir o tema "${t.title}" e todo o progresso?`)) return;
+    if (!confirm(`Mover "${t.title}" pra lixeira? Dá pra restaurar depois.`)) return;
     await deleteTrack(t.id);
-    refetch(true);
+    bump();
   };
   if (loading && !data) return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>;
   if (error) return <Card className="p-4 text-sm text-destructive">erro: {error}</Card>;
@@ -57,6 +91,7 @@ export function Home() {
         <button onClick={() => navigate("/novo")} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
           <Plus className="h-4 w-4" /> Criar primeiro tema
         </button>
+        <div className="mx-auto mt-6 max-w-md text-left"><Trash key={rev} onChange={bump} /></div>
       </div>
     );
   return (
@@ -92,6 +127,7 @@ export function Home() {
         </Card>
       ))}
       </div>
+      <Trash key={rev} onChange={bump} />
     </div>
   );
 }

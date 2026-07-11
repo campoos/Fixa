@@ -66,6 +66,10 @@ export const logout = () => api.post("/api/logout");
 export const getTracks = () => api.get<{ tracks: TrackSummary[] }>("/api/tracks").then((r) => r.tracks);
 export const getTrack = (id: string) => api.get<Track>(`/api/track?id=${encodeURIComponent(id)}`);
 export const deleteTrack = (id: string) => api.post("/api/track/delete", { id });
+export interface TrashItem { id: string; title: string; deletedAt: string; counts: Counts }
+export const getTrash = () => api.get<{ items: TrashItem[] }>("/api/trash").then((r) => r.items);
+export const restoreTrack = (id: string) => api.post<{ ok: true; id: string }>("/api/track/restore", { id });
+export const purgeTrash = (id?: string) => api.post("/api/trash/purge", id ? { id } : {});
 export interface PromptParams { theme: string; level?: string; mode?: string; depth?: string }
 export const getImportPrompt = (p: PromptParams) => {
   const qs = new URLSearchParams({ theme: p.theme, ...(p.level && { level: p.level }), ...(p.mode && { mode: p.mode }), ...(p.depth && { depth: p.depth }) });
