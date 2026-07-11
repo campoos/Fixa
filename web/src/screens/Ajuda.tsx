@@ -7,7 +7,7 @@ const METHOD = [
   { n: "04", tag: "espaça", t: "Revisa no tempo certo", d: "A task volta em intervalos crescentes. Acertou, espaça mais; errou, volta amanhã." },
 ];
 const FAQ = [
-  { q: "O que é revisão espaçada?", a: "Revisar cada coisa no intervalo em que você está quase esquecendo. A Fixa usa o sistema Leitner: acertou uma task, ela volta mais longe (1 → 2 → 4 → 7 → 15 → 30 dias); errou, volta amanhã. O que você domina se espaça; o que escorrega insiste." },
+  { q: "O que é revisão espaçada?", a: "Revisar cada coisa no intervalo em que você está quase esquecendo. A Fixa usa o sistema Leitner: acertou uma task, ela volta mais longe (1 → 2 → 3 → 4 → 7 → 15 → 21 → 30 dias); errou, volta amanhã. O que você domina se espaça; o que escorrega insiste." },
   { q: "Preciso saber programar?", a: "Não. Serve pra qualquer assunto, teórico ou prático. As tasks práticas de código são um tipo entre vários." },
   { q: "De onde vem o conteúdo dos temas?", a: "De você + IA. Em 'Novo tema' a Fixa gera um prompt pronto; você cola no ChatGPT/Gemini, ele devolve a trilha em JSON e você importa. Tudo editável depois." },
   { q: "Serve pra passar numa certificação?", a: "É pra isso que nasceu. Você monta a trilha da prova, estuda com o método e a fila de revisão garante que o conteúdo esteja fresco no dia." },
