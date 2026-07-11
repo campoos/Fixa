@@ -41,10 +41,16 @@ const kv = {
     if (UPSTASH_URL) { const v = await this._cmd(["GET", key]); return v ? JSON.parse(v) : null; }
     try { return JSON.parse(await readFile(KV_FILE, "utf8"))[key] ?? null; } catch { return null; }
   },
+  _writeQ: Promise.resolve(),
   async set(key, val) {
     if (UPSTASH_URL) { await this._cmd(["SET", key, JSON.stringify(val)]); return; }
-    let all = {}; try { all = JSON.parse(await readFile(KV_FILE, "utf8")); } catch { /* primeiro */ }
-    all[key] = val; await writeFile(KV_FILE, JSON.stringify(all, null, 2));
+    // serializa TODAS as escritas de arquivo (evita read-modify-write concorrente corromper o kv-store.json)
+    const run = async () => {
+      let all = {}; try { all = JSON.parse(await readFile(KV_FILE, "utf8")); } catch { /* primeiro a escrever */ }
+      all[key] = val; await writeFile(KV_FILE, JSON.stringify(all, null, 2));
+    };
+    this._writeQ = this._writeQ.then(run, run); // roda mesmo se a escrita anterior falhou
+    return this._writeQ;
   },
 };
 
