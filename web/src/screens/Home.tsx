@@ -107,6 +107,12 @@ const DAY_LABELS: [string, number][] = [["seg", 3], ["qua", 5], ["sex", 7]];
    rola horizontal só quando o mínimo (~704px) não cabe, ancorado nas semanas recentes */
 function Heatmap({ days }: { days: Stats["days"] }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  // tooltip customizado: um único chip flutuante (fixed) que segue a célula sob o cursor
+  const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const showTip = (text: string) => (e: MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ text, x: r.left + r.width / 2, y: r.top });
+  };
   useEffect(() => {
     scrollerRef.current?.scrollTo({ left: scrollerRef.current.scrollWidth });
   }, [days]);
@@ -129,7 +135,7 @@ function Heatmap({ days }: { days: Stats["days"] }) {
 
   return (
     <Card className="gap-0 p-4">
-      <div ref={scrollerRef} className="scroll-custom overflow-x-auto pb-1">
+      <div ref={scrollerRef} onScroll={() => setTip(null)} onMouseLeave={() => setTip(null)} className="scroll-custom overflow-x-auto pb-1">
         <div
           role="img"
           aria-label={`Consistência: ${total} ${total === 1 ? "ação" : "ações"} nas últimas 52 semanas`}
@@ -149,12 +155,12 @@ function Heatmap({ days }: { days: Stats["days"] }) {
           {days.map((d, i) => {
             const slot = startDow + i;
             const isToday = i === days.length - 1;
-            const tip = `${d.count === 0 ? "sem atividade" : d.count === 1 ? "1 ação" : `${d.count} ações`} · ${fmtShort(dateFromYmd(d.day))}`;
+            const cellTip = `${d.count === 0 ? "sem atividade" : d.count === 1 ? "1 ação" : `${d.count} ações`} · ${fmtShort(dateFromYmd(d.day))}`;
             return (
               <div
                 key={d.day}
                 style={{ gridRow: (slot % 7) + 2, gridColumn: Math.floor(slot / 7) + 2 }}
-                title={tip}
+                onMouseEnter={showTip(cellTip)}
                 className={`aspect-square w-full rounded-[2px] ${HEAT[heatLevel(d.count)]} ${isToday ? "outline outline-[1.5px] outline-offset-1 outline-primary" : "hover:outline hover:outline-1 hover:outline-foreground/30"}`}
               />
             );
@@ -171,6 +177,15 @@ function Heatmap({ days }: { days: Stats["days"] }) {
           })}
         </div>
       </div>
+      {tip && (
+        <div
+          style={{ position: "fixed", left: tip.x, top: tip.y - 8, transform: "translate(-50%, -100%)" }}
+          className="pointer-events-none z-50 rounded-md bg-foreground px-2 py-1 font-mono text-[11px] whitespace-nowrap text-background shadow-md"
+        >
+          {tip.text}
+          <span className="absolute left-1/2 top-full -ml-1 border-4 border-transparent border-t-foreground" />
+        </div>
+      )}
       <div className="mt-2 flex items-center justify-between gap-2">
         <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{total} {total === 1 ? "ação" : "ações"} no último ano</span>
         <div className="flex items-center gap-[3px]">
