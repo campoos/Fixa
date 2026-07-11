@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { useState } from "react";
-import { BookOpen, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { BookOpen, CalendarClock, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { deleteTrack, getStats, getTracks, getTrash, purgeTrash, restoreTrack, type Progress, type TrackSummary } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { navigate } from "@/App";
@@ -115,6 +115,11 @@ export function Home() {
                 {t.mastery > 0 && <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-emerald-500"><GraduationCap className="h-3 w-3" />{t.mastery}</span>}
                 <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{t.progress.done}/{t.progress.total}</span>
               </div>
+              {t.targetDate && t.daysLeft != null && (
+                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                  <CalendarClock className="h-3 w-3" />{t.daysLeft < 0 ? "prova passou" : t.daysLeft === 0 ? "prova hoje" : `prova em ${t.daysLeft}d`}
+                </span>
+              )}
               {t.summary && <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.summary}</p>}
               <div className="mt-2"><Bar p={t.progress} /></div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">

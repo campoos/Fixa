@@ -84,9 +84,15 @@ function addDays(ymd, n) {
   return dt.toISOString().slice(0, 10);
 }
 const isGraduated = (rv) => rv.box >= REVIEW_LADDER.length;
-function seedReview(s, id, fromDay) {
+function daysBetween(a, b) {
+  const p = (s) => { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d); };
+  return Math.round((p(b) - p(a)) / 86400000);
+}
+// agenda adaptativa (Cepeda): nenhuma revisão é agendada DEPOIS da data da prova — cai no máx no dia da prova
+const clampNext = (next, targetDate) => (targetDate && next && next > targetDate ? targetDate : next);
+function seedReview(s, id, fromDay, targetDate) {
   const day = fromDay || spDay();
-  s.review[id] = { box: 0, last: day, next: addDays(day, REVIEW_LADDER[0]) };
+  s.review[id] = { box: 0, last: day, next: clampNext(addDays(day, REVIEW_LADDER[0]), targetDate) };
 }
 
 // ---- atividade / streak (dias em que estudou/revisou) ----
@@ -146,11 +152,16 @@ function buildTrack(id) {
   let mastery = 0;
   for (const e of epics) for (const st of e.stories) for (const t of st.tasks) if (t.review && t.review.graduated) mastery++;
   due.sort((a, b) => (a.next < b.next ? -1 : a.next > b.next ? 1 : 0));
-  return { id, title: track.title, summary: track.summary, epics, progress: { done: dn, total }, mastery, review: { due, ladder: REVIEW_LADDER } };
+  const targetDate = track.targetDate || null;
+  const daysLeft = targetDate ? daysBetween(spDay(), targetDate) : null;
+  // meta diária pra dominar tudo a tempo (heurística: o que falta dominar ÷ dias restantes)
+  const remaining = total - mastery;
+  const dailyGoal = targetDate && daysLeft && daysLeft > 0 ? Math.ceil(remaining / daysLeft) : null;
+  return { id, title: track.title, summary: track.summary, epics, progress: { done: dn, total }, mastery, targetDate, daysLeft, dailyGoal, review: { due, ladder: REVIEW_LADDER } };
 }
 function trackSummary(id) {
   const t = buildTrack(id);
-  return { id, title: t.title, summary: t.summary, progress: t.progress, mastery: t.mastery, due: t.review.due.length, counts: trackCounts(tracks[id]) };
+  return { id, title: t.title, summary: t.summary, progress: t.progress, mastery: t.mastery, due: t.review.due.length, targetDate: t.targetDate, daysLeft: t.daysLeft, counts: trackCounts(tracks[id]) };
 }
 function globalReview() {
   const today = spDay();
@@ -276,6 +287,14 @@ const server = createServer(async (req, res) => {
     }
     if (path === "/api/review") return json(res, 200, globalReview());
     if (path === "/api/stats") return json(res, 200, computeStats());
+    if (path === "/api/track/target" && req.method === "POST") {
+      const { id, date } = await readBody(req);
+      if (!tracks[id]) return json(res, 404, { error: "tema não encontrado" });
+      if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return json(res, 400, { error: "data inválida (use YYYY-MM-DD)" });
+      if (date) tracks[id].targetDate = date; else delete tracks[id].targetDate;
+      await saveTracks();
+      return json(res, 200, { ok: true });
+    }
 
     // ações por task (validam trackId + taskId)
     if (path.startsWith("/api/task/") && req.method === "POST") {
@@ -285,7 +304,7 @@ const server = createServer(async (req, res) => {
       if (!track || !taskIdsOf(track).has(taskId)) return json(res, 400, { error: "trackId/taskId inválido" });
       const s = tState(trackId);
       if (path === "/api/task/done") {
-        if (body.done) { s.done[taskId] = new Date().toISOString(); if (!s.review[taskId]) seedReview(s, taskId); }
+        if (body.done) { s.done[taskId] = new Date().toISOString(); if (!s.review[taskId]) seedReview(s, taskId, null, track.targetDate); }
         else { delete s.done[taskId]; delete s.review[taskId]; }
       } else if (path === "/api/task/comment") {
         const text = (body.text || "").trim();
@@ -301,8 +320,8 @@ const server = createServer(async (req, res) => {
         if (!rv) return json(res, 409, { error: "task não está na fila" });
         if (body.result !== "pass" && body.result !== "fail") return json(res, 400, { error: "result pass|fail" });
         const today = spDay();
-        if (body.result === "fail") { rv.box = 0; rv.last = today; rv.next = addDays(today, REVIEW_LADDER[0]); }
-        else { const nb = rv.box + 1; rv.last = today; if (nb >= REVIEW_LADDER.length) { rv.box = REVIEW_LADDER.length; rv.next = null; } else { rv.box = nb; rv.next = addDays(today, REVIEW_LADDER[nb]); } }
+        if (body.result === "fail") { rv.box = 0; rv.last = today; rv.next = clampNext(addDays(today, REVIEW_LADDER[0]), track.targetDate); }
+        else { const nb = rv.box + 1; rv.last = today; if (nb >= REVIEW_LADDER.length) { rv.box = REVIEW_LADDER.length; rv.next = null; } else { rv.box = nb; rv.next = clampNext(addDays(today, REVIEW_LADDER[nb]), track.targetDate); } }
       } else return json(res, 404, { error: "rota inválida" });
       if (path === "/api/task/done" || path === "/api/task/review") markActive(); // conta o dia pro streak
       await saveState();

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Code2, Eye, GraduationCap, Loader2, MessageSquarePlus, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, ChevronDown, ChevronRight, Code2, Eye, GraduationCap, Loader2, MessageSquarePlus, Target, Trash2 } from "lucide-react";
 import {
-  getTrack, taskComment, taskCommentDelete, taskDone,
+  getTrack, setTrackTarget, taskComment, taskCommentDelete, taskDone,
   type Comment, type Epic, type Me, type Progress, type Story, type Task, type Track as TrackData,
 } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
@@ -156,6 +156,35 @@ function EpicCard({ trackId, epic, meName, onChanged }: { trackId: string; epic:
   );
 }
 
+function TargetControl({ track, onChange }: { track: TrackData; onChange: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const save = async (date: string | null) => { setBusy(true); try { await setTrackTarget(track.id, date); onChange(); setEditing(false); } finally { setBusy(false); } };
+  if (track.targetDate && !editing) {
+    const dl = track.daysLeft ?? 0;
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
+          <CalendarClock className="h-3.5 w-3.5" />{dl < 0 ? "prova já passou" : dl === 0 ? "prova é hoje" : `prova em ${dl} dia${dl === 1 ? "" : "s"}`}
+        </span>
+        {track.dailyGoal ? <span className="text-muted-foreground">meta ~{track.dailyGoal}/dia pra dominar a tempo</span> : null}
+        <button onClick={() => setEditing(true)} className="text-muted-foreground underline-offset-2 hover:underline">editar</button>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+      <input type="date" min={today} defaultValue={track.targetDate ?? ""} disabled={busy}
+        onChange={(e) => e.target.value && save(e.target.value)}
+        className="rounded-md border border-border bg-background px-2 py-1 text-xs" />
+      <span className="text-muted-foreground">data da prova — as revisões se ajustam a ela</span>
+      {track.targetDate && <button onClick={() => save(null)} className="text-red-400 hover:underline">remover</button>}
+    </div>
+  );
+}
+
 export function Track({ id, me }: { id: string; me: Me }) {
   const { data, loading, error, refetch } = useApi<TrackData>(() => getTrack(id), [id]);
   const changed = () => refetch(true);
@@ -179,6 +208,7 @@ export function Track({ id, me }: { id: string; me: Me }) {
           {data.review.due.length > 0 && <span className="text-amber-500">{data.review.due.length} pra revisar hoje</span>}
         </div>
         <p className="mt-1 text-[11px] text-muted-foreground">Dominar ≠ concluir: uma task vira “dominada” quando você acerta ela nas revisões espaçadas até graduar.</p>
+        <TargetControl track={data} onChange={changed} />
       </Card>
       {data.epics.map((e) => <EpicCard key={e.id} trackId={id} epic={e} meName={me.name} onChanged={changed} />)}
     </div>

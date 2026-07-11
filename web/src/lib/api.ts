@@ -28,7 +28,7 @@ const api = {
 export interface Me { name: string }
 export interface Counts { epics: number; stories: number; tasks: number; practice: number; theory: number }
 export interface Progress { done: number; total: number }
-export interface TrackSummary { id: string; title: string; summary: string; progress: Progress; mastery: number; due: number; counts: Counts }
+export interface TrackSummary { id: string; title: string; summary: string; progress: Progress; mastery: number; due: number; targetDate: string | null; daysLeft: number | null; counts: Counts }
 export interface Comment { text: string; at: string; author: string }
 export interface Review { box: number; next: string | null; graduated: boolean; due: boolean; ladder: number }
 export interface Sample { q: string; a: string }
@@ -54,7 +54,7 @@ export interface Task {
 export interface Story { id: string; title: string; tasks: Task[]; progress: Progress }
 export interface Epic { id: string; title: string; goal: string; stories: Story[]; progress: Progress }
 export interface Due { trackId: string; trackTitle?: string; id: string; title: string; sample: Sample; type: "theory" | "practice"; epic: string; story: string; box: number; next: string }
-export interface Track { id: string; title: string; summary: string; epics: Epic[]; progress: Progress; mastery: number; review: { due: Due[]; ladder: number[] } }
+export interface Track { id: string; title: string; summary: string; epics: Epic[]; progress: Progress; mastery: number; targetDate: string | null; daysLeft: number | null; dailyGoal: number | null; review: { due: Due[]; ladder: number[] } }
 export interface ReviewList { due: Due[]; ladder: number[] }
 
 // ---- auth ----
@@ -69,6 +69,7 @@ export const deleteTrack = (id: string) => api.post("/api/track/delete", { id })
 export interface TrashItem { id: string; title: string; deletedAt: string; counts: Counts }
 export const getTrash = () => api.get<{ items: TrashItem[] }>("/api/trash").then((r) => r.items);
 export const restoreTrack = (id: string) => api.post<{ ok: true; id: string }>("/api/track/restore", { id });
+export const setTrackTarget = (id: string, date: string | null) => api.post("/api/track/target", { id, date });
 export const purgeTrash = (id?: string) => api.post("/api/trash/purge", id ? { id } : {});
 export interface PromptParams { theme: string; level?: string; mode?: string; depth?: string }
 export const getImportPrompt = (p: PromptParams) => {
