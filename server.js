@@ -5,6 +5,7 @@ import { dirname, join, extname, normalize } from "node:path";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
+import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, clampNext, seedEntry, gradeEntry } from "./review-engine.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -77,26 +78,9 @@ const taskIdsOf = (track) => {
   return set;
 };
 
-// ---- repetição espaçada (Leitner) ----
-const REVIEW_LADDER = [1, 2, 3, 4, 7, 15, 21, 30];
-const STUDY_TZ = "America/Sao_Paulo";
-const spDay = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: STUDY_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-function addDays(ymd, n) {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + n);
-  return dt.toISOString().slice(0, 10);
-}
-const isGraduated = (rv) => rv.box >= REVIEW_LADDER.length;
-function daysBetween(a, b) {
-  const p = (s) => { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d); };
-  return Math.round((p(b) - p(a)) / 86400000);
-}
-// agenda adaptativa (Cepeda): nenhuma revisão é agendada DEPOIS da data da prova — cai no máx no dia da prova
-const clampNext = (next, targetDate) => (targetDate && next && next > targetDate ? targetDate : next);
+// ---- repetição espaçada (Leitner) — motor puro em review-engine.js ----
 function seedReview(s, id, fromDay, targetDate) {
-  const day = fromDay || spDay();
-  s.review[id] = { box: 0, last: day, next: clampNext(addDays(day, REVIEW_LADDER[0]), targetDate) };
+  s.review[id] = seedEntry(fromDay, targetDate);
 }
 
 // ---- atividade / streak (contagem de ações de estudo por dia) ----
@@ -441,9 +425,7 @@ const server = createServer(async (req, res) => {
         const rv = s.review[taskId];
         if (!rv) return json(res, 409, { error: "task não está na fila" });
         if (body.result !== "pass" && body.result !== "fail") return json(res, 400, { error: "result pass|fail" });
-        const today = spDay();
-        if (body.result === "fail") { rv.box = 0; rv.last = today; rv.next = clampNext(addDays(today, REVIEW_LADDER[0]), track.targetDate); }
-        else { const nb = rv.box + 1; rv.last = today; if (nb >= REVIEW_LADDER.length) { rv.box = REVIEW_LADDER.length; rv.next = null; } else { rv.box = nb; rv.next = clampNext(addDays(today, REVIEW_LADDER[nb]), track.targetDate); } }
+        s.review[taskId] = gradeEntry(rv, body.result, spDay(), track.targetDate);
       } else return json(res, 404, { error: "rota inválida" });
       if (path === "/api/task/done" || path === "/api/task/review") markActive(); // conta o dia pro streak
       await saveState();
