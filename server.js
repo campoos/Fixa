@@ -99,13 +99,15 @@ function seedReview(s, id, fromDay, targetDate) {
   s.review[id] = { box: 0, last: day, next: clampNext(addDays(day, REVIEW_LADDER[0]), targetDate) };
 }
 
-// ---- atividade / streak (dias em que estudou/revisou) ----
-let activity = new Set((await kv.get("theme:activity")) || []);
-const markActive = () => { activity.add(spDay()); kv.set("theme:activity", [...activity]).catch((e) => console.error("[activity]", e.message)); };
+// ---- atividade / streak (contagem de ações de estudo por dia) ----
+let activityRaw = (await kv.get("theme:activity")) || {};
+if (Array.isArray(activityRaw)) activityRaw = Object.fromEntries(activityRaw.map((d) => [d, 1])); // migra formato antigo (set de dias)
+let activity = activityRaw; // { "YYYY-MM-DD": count }
+const markActive = () => { const d = spDay(); activity[d] = (activity[d] || 0) + 1; kv.set("theme:activity", activity).catch((e) => console.error("[activity]", e.message)); };
 function computeStreak() {
   let s = 0, d = spDay();
-  if (!activity.has(d)) d = addDays(d, -1); // hoje ainda não estudou? conta a partir de ontem
-  while (activity.has(d)) { s++; d = addDays(d, -1); }
+  if (!activity[d]) d = addDays(d, -1); // hoje ainda não estudou? conta a partir de ontem
+  while (activity[d]) { s++; d = addDays(d, -1); }
   return s;
 }
 function computeStats() {
@@ -119,7 +121,11 @@ function computeStats() {
       if (rv && isGraduated(rv)) mastered++;
     }
   }
-  return { streak: computeStreak(), dueToday: globalReview().due.length, themes: Object.keys(tracks).length, tasksDone, tasksTotal, mastered };
+  // heatmap: últimos 119 dias (17 semanas)
+  const days = [];
+  let d = addDays(spDay(), -118);
+  for (let i = 0; i < 119; i++) { days.push({ day: d, count: activity[d] || 0 }); d = addDays(d, 1); }
+  return { streak: computeStreak(), dueToday: globalReview().due.length, themes: Object.keys(tracks).length, tasksDone, tasksTotal, mastered, days };
 }
 
 // ---- montagem ----

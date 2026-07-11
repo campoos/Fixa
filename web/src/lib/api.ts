@@ -101,5 +101,5 @@ export const taskComment = (trackId: string, taskId: string, text: string) => ap
 export const taskCommentDelete = (trackId: string, taskId: string, index: number, at: string) => api.post("/api/task/comment/delete", { trackId, taskId, index, at });
 export const taskReview = (trackId: string, taskId: string, result: "pass" | "fail") => api.post("/api/task/review", { trackId, taskId, result });
 export const getReview = () => api.get<ReviewList>("/api/review");
-export interface Stats { streak: number; dueToday: number; themes: number; tasksDone: number; tasksTotal: number; mastered: number }
+export interface Stats { streak: number; dueToday: number; themes: number; tasksDone: number; tasksTotal: number; mastered: number; days: { day: string; count: number }[] }
 export const getStats = () => api.get<Stats>("/api/stats");

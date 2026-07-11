@@ -48,6 +48,28 @@ function Bar({ p }: { p: Progress }) {
   );
 }
 
+/* heatmap de atividade (estilo GitHub): 17 semanas, intensidade = ações de estudo no dia */
+function Heatmap({ days }: { days: { day: string; count: number }[] }) {
+  const level = (c: number) => (c === 0 ? "bg-muted" : c <= 2 ? "bg-primary/30" : c <= 5 ? "bg-primary/60" : "bg-primary");
+  // organiza em colunas de 7 (semanas)
+  const weeks: { day: string; count: number }[][] = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  return (
+    <Card className="overflow-x-auto p-3.5">
+      <div className="mb-2 text-xs text-muted-foreground">Consistência (últimas 17 semanas)</div>
+      <div className="flex gap-1">
+        {weeks.map((w, i) => (
+          <div key={i} className="flex flex-col gap-1">
+            {w.map((d) => (
+              <div key={d.day} title={`${d.day} · ${d.count} ação${d.count === 1 ? "" : "s"}`} className={`h-2.5 w-2.5 rounded-[3px] ${level(d.count)}`} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function StatStrip() {
   const { data: s } = useApi(getStats, []);
   if (!s) return null;
@@ -58,13 +80,16 @@ function StatStrip() {
     { ic: <Layers className="h-4 w-4" />, v: s.tasksDone, l: `de ${s.tasksTotal} tasks`, c: "text-primary" },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {items.map((it, i) => (
-        <Card key={i} onClick={it.go ? () => navigate(it.go!) : undefined} className={`p-3.5 ${it.go ? "cursor-pointer transition hover:border-primary/50" : ""}`}>
-          <div className={`flex items-center gap-1.5 ${it.c}`}>{it.ic}<span className="text-xl font-bold tabular-nums text-foreground">{it.v}</span></div>
-          <div className="mt-0.5 text-xs text-muted-foreground">{it.l}</div>
-        </Card>
-      ))}
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {items.map((it, i) => (
+          <Card key={i} onClick={it.go ? () => navigate(it.go!) : undefined} className={`p-3.5 ${it.go ? "cursor-pointer transition hover:border-primary/50" : ""}`}>
+            <div className={`flex items-center gap-1.5 ${it.c}`}>{it.ic}<span className="text-xl font-bold tabular-nums text-foreground">{it.v}</span></div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{it.l}</div>
+          </Card>
+        ))}
+      </div>
+      <Heatmap days={s.days} />
     </div>
   );
 }
