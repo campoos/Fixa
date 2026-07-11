@@ -24,6 +24,7 @@ REGRAS DE CONTEÚDO:
 - Task "theory": ensina um conceito. Campos: objective (1 frase), keyPoints (3 a 5 bullets curtos do que dominar), sample (uma pergunta-modelo "q" no estilo de prova + a resposta correta "a").
 - Task "practice": exercício mão na massa. Campos: objective, language (ex.: "js", "python", "sql"...), steps (3 a 6 passos objetivos do que fazer), expected (qual o resultado/critério de acerto — como sei que fiz certo), hint (uma dica curta, opcional), snippet (trechinho de exemplo, opcional). Faça progressão real: ex. "GET simples" → "tratar erro 404" → "retry/backoff".
 - Português. Seja concreto e específico do tema, nada genérico.
+- NÃO inclua URLs/links cruos no conteúdo (ex.: "https://..."). Descreva o recurso por extenso (ex.: "a documentação da JSONPlaceholder") — links quebram o JSON ao copiar do chat.
 
 FORMATO DE SAÍDA — responda SOMENTE com um JSON válido (sem markdown, sem comentários, sem texto antes ou depois), exatamente neste shape:
 {

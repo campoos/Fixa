@@ -90,6 +90,7 @@ export function NewTheme() {
       {/* passo 3: colar JSON e importar */}
       <Card className="space-y-2 p-4">
         <div className="flex items-center gap-2 text-sm font-medium"><span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-500/15 text-[11px] font-semibold text-emerald-500">3</span> Cole o JSON e importe</div>
+        <p className="text-[11px] text-muted-foreground">Dica: se o import acusar erro perto de um link, o chat “linkificou” uma URL ao copiar — apague o trecho <code className="rounded bg-muted px-1">[...](...)</code> e deixe o texto simples.</p>
         <textarea value={json} onChange={(e) => setJson(e.target.value)} rows={7} placeholder='{ "title": "...", "epics": [ ... ] }' className="w-full resize-y rounded-md border border-border bg-background px-2.5 py-2 font-mono text-xs outline-none focus:border-primary" />
         {errors.length > 0 && (
           <div className="rounded-md border border-red-500/40 bg-red-500/10 p-2.5 text-xs text-red-400">
