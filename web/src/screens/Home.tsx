@@ -112,6 +112,7 @@ export function Home() {
                     <RotateCcw className="h-3 w-3" /> {t.due}
                   </span>
                 )}
+                {t.mastery > 0 && <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-emerald-500"><GraduationCap className="h-3 w-3" />{t.mastery}</span>}
                 <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{t.progress.done}/{t.progress.total}</span>
               </div>
               {t.summary && <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.summary}</p>}

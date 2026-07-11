@@ -28,7 +28,7 @@ const api = {
 export interface Me { name: string }
 export interface Counts { epics: number; stories: number; tasks: number; practice: number; theory: number }
 export interface Progress { done: number; total: number }
-export interface TrackSummary { id: string; title: string; summary: string; progress: Progress; due: number; counts: Counts }
+export interface TrackSummary { id: string; title: string; summary: string; progress: Progress; mastery: number; due: number; counts: Counts }
 export interface Comment { text: string; at: string; author: string }
 export interface Review { box: number; next: string | null; graduated: boolean; due: boolean; ladder: number }
 export interface Sample { q: string; a: string }
@@ -54,7 +54,7 @@ export interface Task {
 export interface Story { id: string; title: string; tasks: Task[]; progress: Progress }
 export interface Epic { id: string; title: string; goal: string; stories: Story[]; progress: Progress }
 export interface Due { trackId: string; trackTitle?: string; id: string; title: string; sample: Sample; type: "theory" | "practice"; epic: string; story: string; box: number; next: string }
-export interface Track { id: string; title: string; summary: string; epics: Epic[]; progress: Progress; review: { due: Due[]; ladder: number[] } }
+export interface Track { id: string; title: string; summary: string; epics: Epic[]; progress: Progress; mastery: number; review: { due: Due[]; ladder: number[] } }
 export interface ReviewList { due: Due[]; ladder: number[] }
 
 // ---- auth ----

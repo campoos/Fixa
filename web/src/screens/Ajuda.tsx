@@ -35,6 +35,16 @@ export function Ajuda() {
         ))}
       </div>
 
+      <Card className="p-4">
+        <h2 className="text-base font-semibold">Por que funciona (a ciência)</h2>
+        <p className="mt-2 text-sm text-muted-foreground">A Fixa não inventou moda — é feita das duas técnicas de estudo com maior evidência científica:</p>
+        <ul className="mt-2 space-y-1.5 text-sm">
+          <li className="flex gap-2"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /><span><b>Recall ativo:</b> tentar lembrar (mesmo errando) grava mais que reler. Por isso a resposta fica escondida até você tentar.</span></li>
+          <li className="flex gap-2"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /><span><b>Revisão espaçada:</b> rever no intervalo em que você está quase esquecendo fixa de vez. Por isso a fila “Revisar hoje” traz cada task no tempo certo.</span></li>
+        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">Num ranking de 10 técnicas (Dunlosky et al., 2013), essas duas foram as únicas de “alta utilidade”. Reler e grifar — o que a maioria faz — ficaram embaixo. Por isso <b>“dominar” aqui não é “marquei feito”</b>: é acertar a task nas revisões até ela graduar.</p>
+      </Card>
+
       <div>
         <h2 className="mb-3 text-base font-semibold">Dúvidas frequentes</h2>
         <div className="flex flex-col gap-2">

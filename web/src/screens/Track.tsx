@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Code2, Eye, Loader2, MessageSquarePlus, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Code2, Eye, GraduationCap, Loader2, MessageSquarePlus, Target, Trash2 } from "lucide-react";
 import {
   getTrack, taskComment, taskCommentDelete, taskDone,
   type Comment, type Epic, type Me, type Progress, type Story, type Task, type Track as TrackData,
@@ -53,37 +53,40 @@ function Comments({ list, meName, onAdd, onDelete }: { list: Comment[]; meName: 
 }
 
 function TaskDetail({ task, meName, onComment, onDeleteComment }: { task: Task; meName: string; onComment: (t: string) => Promise<void>; onDeleteComment: (i: number, at: string) => Promise<void> }) {
-  const [showA, setShowA] = useState(false);
+  // recall forçado: a resposta (e os pontos-chave, na teórica) ficam ocultos até você tentar de cabeça
+  const [reveal, setReveal] = useState(false);
+  const isPractice = task.type === "practice";
   return (
     <div className="space-y-3 border-t border-border px-3 py-3">
       <Section title="Objetivo"><p className="text-sm leading-relaxed">{task.objective}</p></Section>
 
-      {task.type === "theory" ? (
-        <>
-          {!!task.keyPoints?.length && (
-            <Section title="Pontos-chave">
-              <ul className="space-y-1 text-sm leading-relaxed">{task.keyPoints.map((k, i) => <li key={i} className="flex gap-2"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-emerald-500" /><span>{k}</span></li>)}</ul>
-            </Section>
-          )}
-        </>
-      ) : (
+      {/* prática: os passos são pra fazer o exercício, então ficam visíveis */}
+      {isPractice && (
         <>
           {!!task.steps?.length && (
-            <Section title="Passos">
-              <ol className="space-y-1 text-sm leading-relaxed">{task.steps.map((s, i) => <li key={i} className="flex gap-2"><span className="font-mono text-xs text-muted-foreground">{i + 1}.</span><span>{s}</span></li>)}</ol>
-            </Section>
+            <Section title="Passos"><ol className="space-y-1 text-sm leading-relaxed">{task.steps.map((s, i) => <li key={i} className="flex gap-2"><span className="font-mono text-xs text-muted-foreground">{i + 1}.</span><span>{s}</span></li>)}</ol></Section>
           )}
           {task.hint && <Section title="Dica"><p className="text-sm text-muted-foreground">{task.hint}</p></Section>}
           {task.snippet && <Section title="Exemplo"><pre className="overflow-x-auto rounded-md border border-border bg-background p-2.5 font-mono text-xs"><code>{task.snippet}</code></pre></Section>}
-          {task.expected && <Section title="Resultado esperado"><p className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2 text-sm">{task.expected}</p></Section>}
         </>
       )}
 
-      <Section title="Questão-modelo (tenta responder antes de revelar)">
+      <Section title="Responda de cabeça — depois revele">
         <div className="space-y-2 rounded-md border border-border bg-background p-2.5 text-sm">
           <p className="font-medium">{task.sample.q}</p>
-          {showA ? <p className="text-muted-foreground"><span className="font-medium text-emerald-500">→ </span>{task.sample.a}</p>
-            : <button onClick={() => setShowA(true)} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><Eye className="h-3.5 w-3.5" /> revelar resposta</button>}
+          {reveal ? (
+            <div className="space-y-2 border-t border-border pt-2">
+              {!isPractice && !!task.keyPoints?.length && (
+                <ul className="space-y-1">{task.keyPoints.map((k, i) => <li key={i} className="flex gap-2 text-muted-foreground"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /><span>{k}</span></li>)}</ul>
+              )}
+              {isPractice && task.expected && <p className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2"><span className="font-medium text-emerald-500">esperado: </span>{task.expected}</p>}
+              <p className="text-muted-foreground"><span className="font-medium text-emerald-500">→ </span>{task.sample.a}</p>
+            </div>
+          ) : (
+            <button onClick={() => setReveal(true)} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
+              <Eye className="h-3.5 w-3.5" /> tentei — revelar {isPractice ? "resposta" : "resposta e pontos-chave"}
+            </button>
+          )}
         </div>
       </Section>
 
@@ -106,6 +109,7 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
           <span className="font-mono text-[11px] text-muted-foreground">{task.id}</span>
           {task.type === "practice" && <Code2 className="h-3.5 w-3.5 shrink-0 text-blue-400" aria-label="prática" />}
           <span className={cn("min-w-0 flex-1 truncate text-sm", task.done && "text-muted-foreground line-through")}>{task.title}</span>
+          {task.review?.graduated && <span className="shrink-0 text-[11px] text-emerald-500" title="dominada">✓ dominada</span>}
           {task.review?.due && <span className="shrink-0 text-[11px] text-amber-500">revisar</span>}
           {task.comments.length > 0 && <span className="shrink-0 text-[11px] text-muted-foreground">💬{task.comments.length}</span>}
           {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
@@ -169,7 +173,12 @@ export function Track({ id, me }: { id: string; me: Me }) {
         </div>
         {data.summary && <p className="mt-1 text-sm text-muted-foreground">{data.summary}</p>}
         <Bar p={data.progress} className="mt-3 h-2" />
-        {data.review.due.length > 0 && <p className="mt-2 text-xs text-amber-500">{data.review.due.length} task(s) pra revisar hoje — vá em “Revisar”.</p>}
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <span className="text-muted-foreground">{data.progress.done} concluídas</span>
+          <span className="inline-flex items-center gap-1 text-emerald-500"><GraduationCap className="h-3.5 w-3.5" />{data.mastery} dominadas</span>
+          {data.review.due.length > 0 && <span className="text-amber-500">{data.review.due.length} pra revisar hoje</span>}
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">Dominar ≠ concluir: uma task vira “dominada” quando você acerta ela nas revisões espaçadas até graduar.</p>
       </Card>
       {data.epics.map((e) => <EpicCard key={e.id} trackId={id} epic={e} meName={me.name} onChanged={changed} />)}
     </div>

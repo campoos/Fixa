@@ -142,12 +142,15 @@ function buildTrack(id) {
   });
   const total = epics.reduce((a, e) => a + e.progress.total, 0);
   const dn = epics.reduce((a, e) => a + e.progress.done, 0);
+  // domínio = tasks que graduaram na revisão espaçada (recall consolidado), ≠ "concluído"
+  let mastery = 0;
+  for (const e of epics) for (const st of e.stories) for (const t of st.tasks) if (t.review && t.review.graduated) mastery++;
   due.sort((a, b) => (a.next < b.next ? -1 : a.next > b.next ? 1 : 0));
-  return { id, title: track.title, summary: track.summary, epics, progress: { done: dn, total }, review: { due, ladder: REVIEW_LADDER } };
+  return { id, title: track.title, summary: track.summary, epics, progress: { done: dn, total }, mastery, review: { due, ladder: REVIEW_LADDER } };
 }
 function trackSummary(id) {
   const t = buildTrack(id);
-  return { id, title: t.title, summary: t.summary, progress: t.progress, due: t.review.due.length, counts: trackCounts(tracks[id]) };
+  return { id, title: t.title, summary: t.summary, progress: t.progress, mastery: t.mastery, due: t.review.due.length, counts: trackCounts(tracks[id]) };
 }
 function globalReview() {
   const today = spDay();
