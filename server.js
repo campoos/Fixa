@@ -149,10 +149,12 @@ function computeStats(ud) {
       if (rv && isGraduated(rv)) mastered++;
     }
   }
-  // heatmap: últimos 119 dias (17 semanas)
+  // heatmap: 52 semanas — do domingo da semana de 51 semanas atrás até hoje (alinha a grade dom→sáb do front)
   const days = [];
-  let d = addDays(spDay(), -118);
-  for (let i = 0; i < 119; i++) { days.push({ day: d, count: ud.activity[d] || 0 }); d = addDays(d, 1); }
+  const today = spDay();
+  const dow = new Date(`${today}T00:00:00Z`).getUTCDay(); // 0=dom … 6=sáb (dia de calendário, sem fuso)
+  let d = addDays(today, -(51 * 7 + dow)); // sempre um domingo ⇒ coluna 52 = semana corrente (parcial)
+  while (d <= today) { days.push({ day: d, count: ud.activity[d] || 0 }); d = addDays(d, 1); }
   return { streak: computeStreak(ud), dueToday: globalReview(ud).due.length, themes: Object.keys(ud.tracks).length, tasksDone, tasksTotal, mastered, days };
 }
 

@@ -1,13 +1,248 @@
-import type { MouseEvent } from "react";
-import { useState } from "react";
-import { BookOpen, CalendarClock, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
-import { deleteTrack, getStats, getTracks, getTrash, purgeTrash, restoreTrack, type Progress, type TrackSummary } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
+import { Activity, BookOpen, CalendarClock, Check, ChevronDown, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { deleteTrack, getStats, getTracks, getTrash, purgeTrash, restoreTrack } from "@/lib/api";
+import type { Progress, Stats, TrackSummary } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
-import { navigate } from "@/App";
+import { FOCUS, Logo, navigate } from "@/App";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const fmtDate = (s: string) => new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+// eyebrow padrão de zona (spec §2.2)
+const EYEBROW = "font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground";
+
+// "sex, 11 jul" — pt-BR curto, sem pontos nem "de"
+const fmtShort = (d: Date) =>
+  d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" }).replace(/\./g, "").replace(/ de /g, " ");
+// "05 jul" — pra meta da lixeira
+const fmtDayMonth = (iso: string) =>
+  new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(/\./g, "").replace(/ de /g, " ");
+// "YYYY-MM-DD" (dia de calendário SP) → Date à meia-noite local, só pra formatar/weekday
+const dateFromYmd = (ymd: string) => new Date(`${ymd}T00:00:00`);
+
+const pct = (p: Progress) => (p.total ? Math.round((p.done / p.total) * 100) : 0);
+
+/* ── zona HOJE — cards de ação ── */
+
+function ReviewCard({ due }: { due: number }) {
+  if (due === 0)
+    return (
+      <div className="flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-domain/12 text-domain"><Check className="h-[18px] w-[18px]" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">Fila limpa</p>
+          <p className="text-xs text-muted-foreground">Nada pendente. Amanhã tem mais.</p>
+        </div>
+      </div>
+    );
+  return (
+    <button onClick={() => navigate("/revisar")} className={`flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-recall/50 ${FOCUS}`}>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-recall/12 text-recall"><RotateCcw className="h-[18px] w-[18px]" /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Revisar hoje</span>
+        <span className="block text-xs text-muted-foreground">{due} {due === 1 ? "task" : "tasks"} na fila</span>
+      </span>
+      <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-recall/12 px-3 text-[13px] font-medium text-recall">Revisar</span>
+    </button>
+  );
+}
+
+function ContinueCard({ next }: { next: TrackSummary | undefined }) {
+  return (
+    <button
+      onClick={() => navigate(next ? `/t/${encodeURIComponent(next.id)}` : "/novo")}
+      className={`flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/50 ${FOCUS}`}
+    >
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+        {next ? <BookOpen className="h-[18px] w-[18px]" /> : <Plus className="h-[18px] w-[18px]" />}
+      </span>
+      {next ? (
+        <span className="min-w-0 flex-1">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">continuar</span>
+          <span className="block truncate text-sm font-semibold">{next.title}</span>
+          <span className="block text-xs text-muted-foreground">{next.progress.done} de {next.progress.total} tasks</span>
+        </span>
+      ) : (
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Tudo concluído</span>
+          <span className="block text-xs text-muted-foreground">Crie outro tema ou adicione conteúdo.</span>
+        </span>
+      )}
+      <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-primary/10 px-3 text-[13px] font-medium text-primary">{next ? "Abrir" : "Novo tema"}</span>
+    </button>
+  );
+}
+
+/* ── zona CONSISTÊNCIA — stat tiles + heatmap ── */
+
+function StatTiles({ s }: { s: Stats }) {
+  const today = s.days[s.days.length - 1]?.count ?? 0;
+  const tiles = [
+    { icon: <Flame className="h-4 w-4 text-recall" />, value: s.streak, label: s.streak === 1 ? "dia seguido" : "dias seguidos" },
+    { icon: <Activity className="h-4 w-4 text-primary" />, value: today, label: today === 1 ? "ação hoje" : "ações hoje" },
+    { icon: <GraduationCap className="h-4 w-4 text-domain" />, value: s.mastered, label: s.mastered === 1 ? "dominada" : "dominadas" },
+    { icon: <Layers className="h-4 w-4 text-muted-foreground" />, value: s.tasksDone, label: `de ${s.tasksTotal} tasks` },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      {tiles.map((t) => (
+        <div key={t.label} className="rounded-lg border border-border bg-card px-3.5 py-3">
+          <div className="flex items-center gap-1.5">
+            {t.icon}
+            <span className="font-mono text-xl font-semibold tabular-nums text-foreground">{t.value}</span>
+          </div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">{t.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const HEAT = ["bg-heat-0", "bg-heat-1", "bg-heat-2", "bg-heat-3", "bg-heat-4"];
+const heatLevel = (c: number) => (c === 0 ? 0 : c <= 2 ? 1 : c <= 5 ? 2 : c <= 9 ? 3 : 4);
+const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const DAY_LABELS: [string, number][] = [["seg", 3], ["qua", 5], ["sex", 7]];
+
+/* heatmap GitHub-style: 52 semanas, colunas fluidas (minmax(10px, 1fr)) que enchem o card;
+   rola horizontal só quando o mínimo (~704px) não cabe, ancorado nas semanas recentes */
+function Heatmap({ days }: { days: Stats["days"] }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scrollerRef.current?.scrollTo({ left: scrollerRef.current.scrollWidth });
+  }, [days]);
+  if (!days.length) return null;
+
+  const startDow = dateFromYmd(days[0].day).getDay(); // 0 = dom (o server alinha no domingo)
+  const weekCount = Math.ceil((startDow + days.length) / 7);
+  const total = days.reduce((acc, d) => acc + d.count, 0);
+  const trailing = weekCount * 7 - startDow - days.length; // dias futuros da semana corrente
+
+  // labels de mês: semanas agrupadas pelo mês do seu domingo; segmento < 3 colunas é suprimido
+  const segments: { start: number; month: number; len: number }[] = [];
+  for (let w = 0; w < weekCount; w++) {
+    const sundayIdx = Math.max(0, Math.min(w * 7 - startDow, days.length - 1));
+    const month = dateFromYmd(days[sundayIdx].day).getMonth();
+    const last = segments[segments.length - 1];
+    if (!last || last.month !== month) segments.push({ start: w, month, len: 1 });
+    else last.len++;
+  }
+
+  return (
+    <Card className="gap-0 p-4">
+      <div ref={scrollerRef} className="scroll-custom overflow-x-auto pb-1">
+        <div
+          role="img"
+          aria-label={`Consistência: ${total} ${total === 1 ? "ação" : "ações"} nas últimas 52 semanas`}
+          className="grid gap-[3px]"
+          style={{ gridTemplateColumns: `28px repeat(${weekCount}, minmax(10px, 1fr))`, gridTemplateRows: "14px repeat(7, auto)" }}
+        >
+          {segments.filter((seg) => seg.len >= 3).map((seg) => (
+            <div key={seg.start} style={{ gridRow: 1, gridColumn: `${seg.start + 2} / span ${Math.min(seg.len, 4)}` }} className="font-mono text-[10px] lowercase text-muted-foreground">
+              {MONTHS[seg.month]}
+            </div>
+          ))}
+          {DAY_LABELS.map(([label, row]) => (
+            <div key={label} style={{ gridRow: row, gridColumn: 1 }} className="self-center pr-1.5 text-right font-mono text-[10px] leading-none text-muted-foreground/80">
+              {label}
+            </div>
+          ))}
+          {days.map((d, i) => {
+            const slot = startDow + i;
+            const isToday = i === days.length - 1;
+            const tip = `${d.count === 0 ? "sem atividade" : d.count === 1 ? "1 ação" : `${d.count} ações`} · ${fmtShort(dateFromYmd(d.day))}`;
+            return (
+              <div
+                key={d.day}
+                style={{ gridRow: (slot % 7) + 2, gridColumn: Math.floor(slot / 7) + 2 }}
+                title={tip}
+                className={`aspect-square w-full rounded-[2px] ${HEAT[heatLevel(d.count)]} ${isToday ? "outline outline-[1.5px] outline-offset-1 outline-primary" : "hover:outline hover:outline-1 hover:outline-foreground/30"}`}
+              />
+            );
+          })}
+          {Array.from({ length: trailing }).map((_, i) => {
+            const slot = startDow + days.length + i;
+            return (
+              <div
+                key={`future-${i}`}
+                style={{ gridRow: (slot % 7) + 2, gridColumn: Math.floor(slot / 7) + 2, visibility: "hidden" }}
+                className="aspect-square w-full rounded-[2px] bg-heat-0"
+              />
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{total} {total === 1 ? "ação" : "ações"} no último ano</span>
+        <div className="flex items-center gap-[3px]">
+          <span className="mr-1 font-mono text-[10px] text-muted-foreground">menos</span>
+          {HEAT.map((h) => <span key={h} className={`h-[10px] w-[10px] rounded-[2px] ${h}`} />)}
+          <span className="ml-1 font-mono text-[10px] text-muted-foreground">mais</span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* ── zona SEUS TEMAS — card de tema ── */
+
+const PILL = "inline-flex h-[20px] shrink-0 items-center gap-1 rounded-full px-2 text-[11px] font-medium";
+
+function ExamBadge({ daysLeft }: { daysLeft: number }) {
+  const tone = daysLeft < 0 ? "bg-muted text-muted-foreground" : daysLeft > 7 ? "bg-primary/10 text-primary" : "bg-recall/12 text-recall";
+  const text = daysLeft < 0 ? "prova passou" : daysLeft === 0 ? "prova hoje" : `prova em ${daysLeft}d`;
+  return (
+    <span className={`${PILL} ${tone}`}>
+      <CalendarClock className="h-3 w-3" />{text}
+    </span>
+  );
+}
+
+function ThemeCard({ t, onDelete }: { t: TrackSummary; onDelete: (e: MouseEvent<HTMLButtonElement>, t: TrackSummary) => void }) {
+  const open = () => navigate(`/t/${encodeURIComponent(t.id)}`);
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return; // Enter no botão de excluir não abre o tema
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+  };
+  return (
+    <Card role="button" tabIndex={0} onClick={open} onKeyDown={onKey} className={`cursor-pointer rounded-xl p-4 transition-colors hover:border-primary/40 ${FOCUS}`}>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{t.title}</h3>
+            {t.targetDate && t.daysLeft != null && <ExamBadge daysLeft={t.daysLeft} />}
+            {t.due > 0 && (
+              <span className={`${PILL} bg-recall/12 text-recall`} title="pra revisar hoje">
+                <RotateCcw className="h-3 w-3" /><span className="font-mono tabular-nums">{t.due}</span>
+              </span>
+            )}
+            {t.mastery > 0 && (
+              <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-domain" title="dominadas">
+                <GraduationCap className="h-3 w-3" /><span className="font-mono tabular-nums">{t.mastery}</span>
+              </span>
+            )}
+            <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{t.progress.done}/{t.progress.total}</span>
+          </div>
+          {t.summary && <p className="mt-1 truncate text-xs text-muted-foreground">{t.summary}</p>}
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-domain transition-all" style={{ width: `${pct(t.progress)}%` }} />
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            {t.counts.epics} epics · {t.counts.stories} stories · {t.counts.tasks} tasks ({t.counts.practice} práticas)
+          </p>
+        </div>
+        <button
+          onClick={(e) => onDelete(e, t)}
+          title="mover pra lixeira"
+          className={`grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground/50 transition-colors hover:bg-destructive/10 hover:text-destructive ${FOCUS}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+/* ── lixeira discreta ── */
 
 function Trash({ onChange }: { onChange: () => void }) {
   const { data, loading, refetch } = useApi(getTrash, []);
@@ -15,21 +250,21 @@ function Trash({ onChange }: { onChange: () => void }) {
   const items = data ?? [];
   if (loading || !items.length) return null;
   const restore = async (id: string) => { await restoreTrack(id); await refetch(true); onChange(); };
-  const purge = async (id: string) => { if (!confirm("Apagar de vez? Isso é irreversível.")) return; await purgeTrash(id); await refetch(true); };
+  const purge = async (id: string) => { if (!confirm("Apagar de vez? Não dá pra desfazer.")) return; await purgeTrash(id); await refetch(true); };
   return (
-    <div className="rounded-lg border border-border bg-muted/20">
-      <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 p-3 text-left text-sm text-muted-foreground">
-        <Trash2 className="h-4 w-4" /> Lixeira <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums">{items.length}</span>
-        <span className="ml-auto text-xs">{open ? "ocultar" : "ver"}</span>
+    <div>
+      <button onClick={() => setOpen(!open)} aria-expanded={open} className={`flex items-center gap-2 rounded-md text-xs text-muted-foreground transition-colors hover:text-foreground ${FOCUS}`}>
+        <Trash2 className="h-3.5 w-3.5" /> Lixeira <span className="font-mono tabular-nums">({items.length})</span>
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
       </button>
       {open && (
-        <div className="space-y-1.5 px-2 pb-2">
+        <div className="mt-2 space-y-1.5">
           {items.map((t) => (
             <div key={t.id} className="flex items-center gap-2 rounded-md border border-border bg-card p-2 text-sm">
               <span className="min-w-0 flex-1 truncate">{t.title}</span>
-              <span className="shrink-0 text-[11px] text-muted-foreground">{t.counts.tasks} tasks · excluído {fmtDate(t.deletedAt)}</span>
-              <button onClick={() => restore(t.id)} title="restaurar" className="grid h-7 w-7 shrink-0 place-items-center rounded text-emerald-500 hover:bg-emerald-500/10"><Undo2 className="h-4 w-4" /></button>
-              <button onClick={() => purge(t.id)} title="apagar de vez" className="grid h-7 w-7 shrink-0 place-items-center rounded text-muted-foreground hover:bg-red-500/10 hover:text-red-400"><X className="h-4 w-4" /></button>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{t.counts.tasks} tasks · excluído {fmtDayMonth(t.deletedAt)}</span>
+              <button onClick={() => restore(t.id)} title="restaurar" className={`grid h-7 w-7 shrink-0 place-items-center rounded text-domain hover:bg-domain/10 ${FOCUS}`}><Undo2 className="h-4 w-4" /></button>
+              <button onClick={() => purge(t.id)} title="apagar de vez" className={`grid h-7 w-7 shrink-0 place-items-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive ${FOCUS}`}><X className="h-4 w-4" /></button>
             </div>
           ))}
         </div>
@@ -38,138 +273,101 @@ function Trash({ onChange }: { onChange: () => void }) {
   );
 }
 
-const pct = (p: Progress) => (p.total ? Math.round((p.done / p.total) * 100) : 0);
+/* ── estados da página ── */
 
-function Bar({ p }: { p: Progress }) {
+function EmptyState({ trashKey, onTrashChange }: { trashKey: number; onTrashChange: () => void }) {
   return (
-    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-      <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct(p)}%` }} />
+    <>
+      <h1 className="sr-only">Início</h1>
+      <div className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
+        <div className="flex justify-center opacity-70"><Logo size={32} /></div>
+        <p className="mt-4 font-semibold">Nenhum tema ainda</p>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Descreva um assunto e a Fixa monta a trilha — com revisão espaçada pra você não esquecer.</p>
+        <button onClick={() => navigate("/novo")} className={`mt-5 inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 ${FOCUS}`}>
+          <Plus className="h-4 w-4" /> Criar primeiro tema
+        </button>
+        <p className="mt-6 font-mono text-[11px] text-muted-foreground/70">revisa em 1d · 2d · 4d · 7d · 15d · 30d</p>
+        <div className="mx-auto mt-8 max-w-md text-left"><Trash key={trashKey} onChange={onTrashChange} /></div>
+      </div>
+    </>
+  );
+}
+
+function HomeSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-[76px] rounded-xl" />)}
+      </div>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[64px] rounded-lg" />)}
+        </div>
+        <Skeleton className="h-[180px] rounded-xl" />
+      </div>
+      <div className="space-y-2.5">
+        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[120px] rounded-xl" />)}
+      </div>
     </div>
   );
 }
 
-/* heatmap de atividade (estilo GitHub): 17 semanas, intensidade = ações de estudo no dia */
-function Heatmap({ days }: { days: { day: string; count: number }[] }) {
-  const level = (c: number) => (c === 0 ? "bg-muted" : c <= 2 ? "bg-primary/30" : c <= 5 ? "bg-primary/60" : "bg-primary");
-  // organiza em colunas de 7 (semanas)
-  const weeks: { day: string; count: number }[][] = [];
-  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
-  return (
-    <Card className="overflow-x-auto p-3.5">
-      <div className="mb-2 text-xs text-muted-foreground">Consistência (últimas 17 semanas)</div>
-      <div className="flex gap-1">
-        {weeks.map((w, i) => (
-          <div key={i} className="flex flex-col gap-1">
-            {w.map((d) => (
-              <div key={d.day} title={`${d.day} · ${d.count} ação${d.count === 1 ? "" : "s"}`} className={`h-2.5 w-2.5 rounded-[3px] ${level(d.count)}`} />
-            ))}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function StatStrip() {
-  const { data: s } = useApi(getStats, []);
-  if (!s) return null;
-  const items = [
-    { ic: <Flame className="h-4 w-4" />, v: s.streak, l: s.streak === 1 ? "dia seguido" : "dias seguidos", c: "text-orange-400" },
-    { ic: <RotateCcw className="h-4 w-4" />, v: s.dueToday, l: "revisar hoje", c: "text-amber-500", go: "/revisar" },
-    { ic: <GraduationCap className="h-4 w-4" />, v: s.mastered, l: "dominadas", c: "text-emerald-500" },
-    { ic: <Layers className="h-4 w-4" />, v: s.tasksDone, l: `de ${s.tasksTotal} tasks`, c: "text-primary" },
-  ];
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {items.map((it, i) => (
-          <Card key={i} onClick={it.go ? () => navigate(it.go!) : undefined} className={`p-3.5 ${it.go ? "cursor-pointer transition hover:border-primary/50" : ""}`}>
-            <div className={`flex items-center gap-1.5 ${it.c}`}>{it.ic}<span className="text-xl font-bold tabular-nums text-foreground">{it.v}</span></div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{it.l}</div>
-          </Card>
-        ))}
-      </div>
-      <Heatmap days={s.days} />
-    </div>
-  );
-}
+/* ── Home ── */
 
 export function Home() {
-  const { data, loading, error, refetch } = useApi(getTracks, []);
+  const tracksQ = useApi(getTracks, []);
+  const statsQ = useApi(getStats, []);
   const [rev, setRev] = useState(0);
-  const bump = () => { refetch(true); setRev((v) => v + 1); };
-  const del = async (e: MouseEvent, t: TrackSummary) => {
+  const bump = () => { tracksQ.refetch(true); statsQ.refetch(true); setRev((v) => v + 1); };
+  const del = async (e: MouseEvent<HTMLButtonElement>, t: TrackSummary) => {
     e.stopPropagation();
     if (!confirm(`Mover "${t.title}" pra lixeira? Dá pra restaurar depois.`)) return;
     await deleteTrack(t.id);
     bump();
   };
-  if (loading && !data) return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>;
-  if (error) return <Card className="p-4 text-sm text-destructive">erro: {error}</Card>;
-  const tracks = data ?? [];
-  if (!tracks.length)
-    return (
-      <div className="rounded-xl border border-dashed border-border p-10 text-center">
-        <BookOpen className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-        <p className="mb-1 font-medium">Nenhum tema ainda</p>
-        <p className="mb-4 text-sm text-muted-foreground">Gere um tema (qualquer assunto) e comece a estudar com o método.</p>
-        <button onClick={() => navigate("/novo")} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-          <Plus className="h-4 w-4" /> Criar primeiro tema
-        </button>
-        <div className="mx-auto mt-6 max-w-md text-left"><Trash key={rev} onChange={bump} /></div>
-      </div>
-    );
+
+  if ((tracksQ.loading && !tracksQ.data) || (statsQ.loading && !statsQ.data)) return <HomeSkeleton />;
+  if (tracksQ.error) return <Card className="p-4 text-sm text-destructive">erro: {tracksQ.error}</Card>;
+
+  const tracks = tracksQ.data ?? [];
+  const s = statsQ.data;
+  if (!tracks.length) return <EmptyState trashKey={rev} onTrashChange={bump} />;
   const next = tracks.find((t) => t.progress.done < t.progress.total);
+
   return (
-    <div className="space-y-4">
-      <StatStrip />
-      {next && (
-        <button onClick={() => navigate(`/t/${encodeURIComponent(next.id)}`)} className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3.5 text-left transition hover:bg-primary/10">
-          <BookOpen className="h-5 w-5 shrink-0 text-primary" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium">Continuar: {next.title}</span>
-            <span className="block text-xs text-muted-foreground">{next.progress.done}/{next.progress.total} tasks · próxima te espera</span>
-          </span>
-          <span className="shrink-0 text-primary">→</span>
-        </button>
-      )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-sm font-medium text-muted-foreground">Seus temas</h1>
-      </div>
-      <div className="space-y-3">
-      {tracks.map((t) => (
-        <Card key={t.id} onClick={() => navigate(`/t/${encodeURIComponent(t.id)}`)} className="cursor-pointer p-4 transition hover:border-primary/50">
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="min-w-0 flex-1 truncate text-base font-semibold">{t.title}</h2>
-                {t.due > 0 && (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
-                    <RotateCcw className="h-3 w-3" /> {t.due}
-                  </span>
-                )}
-                {t.mastery > 0 && <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-emerald-500"><GraduationCap className="h-3 w-3" />{t.mastery}</span>}
-                <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{t.progress.done}/{t.progress.total}</span>
-              </div>
-              {t.targetDate && t.daysLeft != null && (
-                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                  <CalendarClock className="h-3 w-3" />{t.daysLeft < 0 ? "prova passou" : t.daysLeft === 0 ? "prova hoje" : `prova em ${t.daysLeft}d`}
-                </span>
-              )}
-              {t.summary && <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.summary}</p>}
-              <div className="mt-2"><Bar p={t.progress} /></div>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
-                {t.counts.epics} epics · {t.counts.stories} stories · {t.counts.tasks} tasks ({t.counts.practice} práticas)
-              </p>
-            </div>
-            <button onClick={(e) => del(e, t)} title="excluir tema" className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-red-500/10 hover:text-red-400">
-              <Trash2 className="h-4 w-4" />
-            </button>
+    <div>
+      <h1 className="sr-only">Início</h1>
+      <div className="space-y-8">
+        <section>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className={EYEBROW}>hoje</h2>
+            <span className="font-mono text-[11px] lowercase text-muted-foreground/70">{fmtShort(new Date())}</span>
           </div>
-        </Card>
-      ))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {s && <ReviewCard due={s.dueToday} />}
+            <ContinueCard next={next} />
+          </div>
+        </section>
+        {s && (
+          <section>
+            <h2 className={`mb-3 ${EYEBROW}`}>consistência</h2>
+            <div className="space-y-3">
+              <StatTiles s={s} />
+              <Heatmap days={s.days} />
+            </div>
+          </section>
+        )}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className={EYEBROW}>seus temas · <span className="tabular-nums">{tracks.length}</span></h2>
+            <button onClick={() => navigate("/novo")} className={`rounded-sm text-xs text-primary underline-offset-2 hover:underline ${FOCUS}`}>+ novo tema</button>
+          </div>
+          <div className="space-y-2.5">
+            {tracks.map((t) => <ThemeCard key={t.id} t={t} onDelete={del} />)}
+          </div>
+        </section>
       </div>
-      <Trash key={rev} onChange={bump} />
+      <div className="mt-10"><Trash key={rev} onChange={bump} /></div>
     </div>
   );
 }

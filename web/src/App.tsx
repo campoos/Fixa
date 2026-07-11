@@ -9,8 +9,11 @@ import { Track } from "@/screens/Track";
 import { Review } from "@/screens/Review";
 import { Ajuda } from "@/screens/Ajuda";
 
+// anel de foco padrão de todo interativo do app (spec §3)
+export const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 // marca Fixa: um "loop" que fecha (o ciclo do método) com o ponto de recall
-function Logo({ size = 24 }: { size?: number }) {
+export function Logo({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <path d="M16 3a13 13 0 1 0 11.5 7" stroke="var(--primary)" strokeWidth="3.4" strokeLinecap="round" />
@@ -36,7 +39,7 @@ export function navigate(path: string) {
 function ThemeButton() {
   const { theme, toggle } = useTheme();
   return (
-    <button onClick={toggle} title="tema" className="grid h-9 w-9 place-items-center rounded-md border border-border hover:bg-accent">
+    <button onClick={toggle} title="tema" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}>
       {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
   );
@@ -58,35 +61,45 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
     return () => window.removeEventListener("fx-review-changed", on);
   }, [refetchReview]);
   const NavBtn = ({ to, active, children }: { to: string; active: boolean; children: ReactNode }) => (
-    <button onClick={() => navigate(to)} className={`rounded-md px-3 py-1.5 text-sm transition ${active ? "bg-secondary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+    <button
+      onClick={() => navigate(to)}
+      aria-current={active ? "page" : undefined}
+      className={`inline-flex h-8 items-center rounded-lg px-3 text-sm transition-colors ${active ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"} ${FOCUS}`}
+    >
       {children}
     </button>
   );
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-4xl items-center gap-2 px-4">
-          <button onClick={() => navigate("/")} className="mr-2 flex items-center gap-2 text-[19px] font-extrabold tracking-tight">
-            <Logo /> Fixa
+          <button onClick={() => navigate("/")} className={`mr-2 flex items-center gap-2 rounded-lg ${FOCUS}`}>
+            <Logo />
+            <span className="hidden text-[17px] font-extrabold tracking-[-0.02em] sm:inline">Fixa</span>
           </button>
           <nav className="flex items-center gap-1">
             <NavBtn to="/" active={route.name === "home" || route.name === "track"}>Temas</NavBtn>
             <NavBtn to="/revisar" active={route.name === "revisar"}>
-              Revisar{dueCount > 0 && <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 text-[11px] font-medium text-amber-500">{dueCount}</span>}
+              Revisar
+              {dueCount > 0 && (
+                <span className="ml-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-recall/15 px-1 font-mono text-[11px] tabular-nums text-recall">
+                  {dueCount > 99 ? "99+" : dueCount}
+                </span>
+              )}
             </NavBtn>
             <NavBtn to="/ajuda" active={route.name === "ajuda"}>Ajuda</NavBtn>
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => navigate("/novo")} className="hidden items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:flex">
+            <button onClick={() => navigate("/novo")} className={`hidden h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:inline-flex ${FOCUS}`}>
               <Plus className="h-4 w-4" /> Novo tema
             </button>
-            <button onClick={() => navigate("/novo")} className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground sm:hidden" title="Novo tema"><Plus className="h-4 w-4" /></button>
+            <button onClick={() => navigate("/novo")} className={`grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 sm:hidden ${FOCUS}`} title="Novo tema"><Plus className="h-4 w-4" /></button>
             <ThemeButton />
-            <button onClick={onLogout} title="sair" className="grid h-9 w-9 place-items-center rounded-md border border-border hover:bg-accent"><LogOut className="h-4 w-4" /></button>
+            <button onClick={onLogout} title="sair" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}><LogOut className="h-4 w-4" /></button>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-5">
+      <main className="mx-auto max-w-4xl px-4 py-6">
         {route.name === "home" && <Home />}
         {route.name === "novo" && <NewTheme />}
         {route.name === "revisar" && <Review />}

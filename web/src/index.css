@@ -262,6 +262,82 @@ a {
   cursor: pointer;
 }
 
-/* ── marca Fixa: primária violeta (sobrescreve o neutro do tema base) ── */
-:root { --primary: oklch(0.58 0.23 287); --primary-foreground: oklch(0.99 0 0); --ring: oklch(0.58 0.23 287); }
-.dark { --primary: oklch(0.66 0.20 288); --primary-foreground: oklch(0.99 0 0); --ring: oklch(0.66 0.20 288); }
+/* ── marca Fixa: neutros com tinta violeta + acentos semânticos ── */
+:root {
+  /* neutros light — branco com véu violeta, nunca cinza puro */
+  --background: oklch(0.975 0.005 290);        /* ≈ #f8f7fb */
+  --foreground: oklch(0.235 0.03 290);         /* ≈ #231c39 (tinta índigo) */
+  --card: oklch(1 0 0);                        /* card branco sobre fundo tingido */
+  --card-foreground: oklch(0.235 0.03 290);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.235 0.03 290);
+  --secondary: oklch(0.93 0.012 290);          /* ≈ #eae6f3 — pill ativa do nav */
+  --secondary-foreground: oklch(0.235 0.03 290);
+  --muted: oklch(0.955 0.008 290);             /* ≈ #f1eff7 */
+  --muted-foreground: oklch(0.50 0.03 290);    /* ≈ #6a6285 — AA sobre bg e card */
+  --accent: oklch(0.95 0.01 290);              /* ≈ #efecf6 — hover sutil */
+  --accent-foreground: oklch(0.235 0.03 290);
+  --border: oklch(0.905 0.012 290);            /* ≈ #e2deec */
+  --input: oklch(0.905 0.012 290);
+  --primary: oklch(0.58 0.23 287);             /* ≈ #6c47f0 (brand light da landing) */
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.58 0.23 287);
+
+  /* acentos semânticos */
+  --recall: oklch(0.58 0.12 70);               /* ≈ #a06f0a — âmbar queimado, AA 4.5+ em texto 11px */
+  --recall-foreground: oklch(0.99 0 0);
+  --domain: oklch(0.52 0.10 168);              /* ≈ #0a7a58 — esmeralda escura, AA em texto 11px */
+  --domain-foreground: oklch(0.99 0 0);
+
+  /* heatmap — ramp violeta 5 níveis (light: clareia → satura) */
+  --heat-0: oklch(0.94 0.012 290);             /* ≈ #eae7f2 (vazio, um passo abaixo do card) */
+  --heat-1: oklch(0.87 0.06 290);              /* ≈ #d6c9f6 */
+  --heat-2: oklch(0.76 0.12 289);              /* ≈ #ad90f0 */
+  --heat-3: oklch(0.64 0.19 288);              /* ≈ #8257ec */
+  --heat-4: oklch(0.50 0.24 287);              /* ≈ #5b2bd6 (máximo = violeta profundo) */
+}
+
+.dark {
+  /* neutros dark — índigo-tinta dessaturado (a landing usa croma ~2×; aqui é tool) */
+  --background: oklch(0.155 0.015 290);        /* ≈ #12101b */
+  --foreground: oklch(0.93 0.01 290);          /* ≈ #eae7f3 */
+  --card: oklch(0.19 0.018 290);               /* ≈ #1b1726 */
+  --card-foreground: oklch(0.93 0.01 290);
+  --popover: oklch(0.19 0.018 290);
+  --popover-foreground: oklch(0.93 0.01 290);
+  --secondary: oklch(0.275 0.02 290);          /* ≈ #2b2539 — pill ativa */
+  --secondary-foreground: oklch(0.93 0.01 290);
+  --muted: oklch(0.23 0.02 290);               /* ≈ #221d2e */
+  --muted-foreground: oklch(0.665 0.03 292);   /* ≈ #9992b5 */
+  --accent: oklch(0.235 0.02 290);             /* ≈ #231e30 — hover, mais sutil que secondary */
+  --accent-foreground: oklch(0.93 0.01 290);
+  --border: oklch(0.28 0.02 290);              /* ≈ #2e2839 — sólida (não alpha), corte nítido GitHub-like */
+  --input: oklch(0.30 0.02 290);
+  --primary: oklch(0.66 0.20 288);             /* ≈ #8b68fa (entre brand e brand-2 da landing) */
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.66 0.20 288);
+
+  --recall: oklch(0.82 0.14 80);               /* ≈ #f0b73e (o #f4b740 da landing) */
+  --recall-foreground: oklch(0.25 0.05 80);    /* tinta escura p/ eventual fill sólido */
+  --domain: oklch(0.77 0.13 168);              /* ≈ #33d0a1 (o #35d6a4 da landing) */
+  --domain-foreground: oklch(0.20 0.04 168);
+
+  /* heatmap — ramp violeta 5 níveis (dark: escurece → acende até o brand-2) */
+  --heat-0: oklch(0.25 0.02 290);              /* ≈ #282235 (vazio, um passo acima do card) */
+  --heat-1: oklch(0.35 0.09 292);              /* ≈ #40306b */
+  --heat-2: oklch(0.47 0.14 290);              /* ≈ #5b429f */
+  --heat-3: oklch(0.59 0.19 288);              /* ≈ #7852d9 */
+  --heat-4: oklch(0.72 0.19 288);              /* ≈ #9c7bff (máximo = brand-2 #9d7bff) */
+}
+
+@theme inline {
+  --color-recall: var(--recall);
+  --color-recall-foreground: var(--recall-foreground);
+  --color-domain: var(--domain);
+  --color-domain-foreground: var(--domain-foreground);
+  --color-heat-0: var(--heat-0);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
+}
