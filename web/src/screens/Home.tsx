@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
-import { BookOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { deleteTrack, getTracks, type Progress, type TrackSummary } from "@/lib/api";
+import { BookOpen, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { deleteTrack, getStats, getTracks, type Progress, type TrackSummary } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { navigate } from "@/App";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,27 @@ function Bar({ p }: { p: Progress }) {
   return (
     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
       <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct(p)}%` }} />
+    </div>
+  );
+}
+
+function StatStrip() {
+  const { data: s } = useApi(getStats, []);
+  if (!s) return null;
+  const items = [
+    { ic: <Flame className="h-4 w-4" />, v: s.streak, l: s.streak === 1 ? "dia seguido" : "dias seguidos", c: "text-orange-400" },
+    { ic: <RotateCcw className="h-4 w-4" />, v: s.dueToday, l: "revisar hoje", c: "text-amber-500", go: "/revisar" },
+    { ic: <GraduationCap className="h-4 w-4" />, v: s.mastered, l: "dominadas", c: "text-emerald-500" },
+    { ic: <Layers className="h-4 w-4" />, v: s.tasksDone, l: `de ${s.tasksTotal} tasks`, c: "text-primary" },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {items.map((it, i) => (
+        <Card key={i} onClick={it.go ? () => navigate(it.go!) : undefined} className={`p-3.5 ${it.go ? "cursor-pointer transition hover:border-primary/50" : ""}`}>
+          <div className={`flex items-center gap-1.5 ${it.c}`}>{it.ic}<span className="text-xl font-bold tabular-nums text-foreground">{it.v}</span></div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{it.l}</div>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -39,7 +60,12 @@ export function Home() {
       </div>
     );
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <StatStrip />
+      <div className="flex items-center justify-between">
+        <h1 className="text-sm font-medium text-muted-foreground">Seus temas</h1>
+      </div>
+      <div className="space-y-3">
       {tracks.map((t) => (
         <Card key={t.id} onClick={() => navigate(`/t/${encodeURIComponent(t.id)}`)} className="cursor-pointer p-4 transition hover:border-primary/50">
           <div className="flex items-start gap-3">
@@ -65,6 +91,7 @@ export function Home() {
           </div>
         </Card>
       ))}
+      </div>
     </div>
   );
 }

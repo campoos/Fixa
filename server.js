@@ -86,6 +86,29 @@ function seedReview(s, id, fromDay) {
   s.review[id] = { box: 0, last: day, next: addDays(day, REVIEW_LADDER[0]) };
 }
 
+// ---- atividade / streak (dias em que estudou/revisou) ----
+let activity = new Set((await kv.get("theme:activity")) || []);
+const markActive = () => { activity.add(spDay()); kv.set("theme:activity", [...activity]).catch((e) => console.error("[activity]", e.message)); };
+function computeStreak() {
+  let s = 0, d = spDay();
+  if (!activity.has(d)) d = addDays(d, -1); // hoje ainda não estudou? conta a partir de ontem
+  while (activity.has(d)) { s++; d = addDays(d, -1); }
+  return s;
+}
+function computeStats() {
+  let tasksDone = 0, mastered = 0, tasksTotal = 0;
+  for (const id of Object.keys(tracks)) {
+    const s = tState(id);
+    for (const e of tracks[id].epics) for (const st of e.stories) for (const t of st.tasks) {
+      tasksTotal++;
+      if (s.done[t.id]) tasksDone++;
+      const rv = s.review[t.id];
+      if (rv && isGraduated(rv)) mastered++;
+    }
+  }
+  return { streak: computeStreak(), dueToday: globalReview().due.length, themes: Object.keys(tracks).length, tasksDone, tasksTotal, mastered };
+}
+
 // ---- montagem ----
 function taskWithState(t, s, epicTitle, storyTitle, today, dueBucket, trackId) {
   const done = !!s.done[t.id];
@@ -222,6 +245,7 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
     if (path === "/api/review") return json(res, 200, globalReview());
+    if (path === "/api/stats") return json(res, 200, computeStats());
 
     // ações por task (validam trackId + taskId)
     if (path.startsWith("/api/task/") && req.method === "POST") {
@@ -250,6 +274,7 @@ const server = createServer(async (req, res) => {
         if (body.result === "fail") { rv.box = 0; rv.last = today; rv.next = addDays(today, REVIEW_LADDER[0]); }
         else { const nb = rv.box + 1; rv.last = today; if (nb >= REVIEW_LADDER.length) { rv.box = REVIEW_LADDER.length; rv.next = null; } else { rv.box = nb; rv.next = addDays(today, REVIEW_LADDER[nb]); } }
       } else return json(res, 404, { error: "rota inválida" });
+      if (path === "/api/task/done" || path === "/api/task/review") markActive(); // conta o dia pro streak
       await saveState();
       return json(res, 200, { ok: true });
     }

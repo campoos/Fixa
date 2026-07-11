@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { BookOpen, LogOut, Moon, Plus, Sun } from "lucide-react";
+import { LogOut, Moon, Plus, Sun } from "lucide-react";
 import { getMe, getReview, login, logout, type Me } from "@/lib/api";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { useApi } from "@/lib/useApi";
@@ -7,12 +7,24 @@ import { Home } from "@/screens/Home";
 import { NewTheme } from "@/screens/NewTheme";
 import { Track } from "@/screens/Track";
 import { Review } from "@/screens/Review";
+import { Ajuda } from "@/screens/Ajuda";
 
-type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "track"; id: string };
+// marca Fixa: um "loop" que fecha (o ciclo do método) com o ponto de recall
+function Logo({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M16 3a13 13 0 1 0 11.5 7" stroke="var(--primary)" strokeWidth="3.4" strokeLinecap="round" />
+      <circle cx="27" cy="6.5" r="3.6" fill="#f4b740" />
+    </svg>
+  );
+}
+
+type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "track"; id: string };
 function parseRoute(): Route {
   const p = window.location.pathname.replace(/^\/+|\/+$/g, "");
   if (p === "novo") return { name: "novo" };
   if (p === "revisar") return { name: "revisar" };
+  if (p === "ajuda") return { name: "ajuda" };
   if (p.startsWith("t/")) return { name: "track", id: decodeURIComponent(p.slice(2)) };
   return { name: "home" };
 }
@@ -48,14 +60,15 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
     <div className="min-h-full">
       <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-4xl items-center gap-2 px-4">
-          <button onClick={() => navigate("/")} className="mr-2 flex items-center gap-2 font-semibold">
-            <BookOpen className="h-5 w-5 text-emerald-500" /> theme studies
+          <button onClick={() => navigate("/")} className="mr-2 flex items-center gap-2 text-[19px] font-extrabold tracking-tight">
+            <Logo /> Fixa
           </button>
           <nav className="flex items-center gap-1">
             <NavBtn to="/" active={route.name === "home" || route.name === "track"}>Temas</NavBtn>
             <NavBtn to="/revisar" active={route.name === "revisar"}>
               Revisar{dueCount > 0 && <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 text-[11px] font-medium text-amber-500">{dueCount}</span>}
             </NavBtn>
+            <NavBtn to="/ajuda" active={route.name === "ajuda"}>Ajuda</NavBtn>
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => navigate("/novo")} className="hidden items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:flex">
@@ -71,6 +84,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
         {route.name === "home" && <Home />}
         {route.name === "novo" && <NewTheme />}
         {route.name === "revisar" && <Review />}
+        {route.name === "ajuda" && <Ajuda />}
         {route.name === "track" && <Track id={route.id} me={me} />}
       </main>
     </div>
@@ -89,7 +103,7 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
   return (
     <div className="grid min-h-full place-items-center px-4">
       <form onSubmit={submit} className="w-full max-w-xs space-y-3 rounded-xl border border-border bg-card p-6">
-        <div className="flex items-center gap-2 text-lg font-semibold"><BookOpen className="h-5 w-5 text-emerald-500" /> theme studies</div>
+        <div className="flex items-center gap-2 text-lg font-extrabold tracking-tight"><Logo size={22} /> Fixa</div>
         <input type="password" autoFocus value={pass} onChange={(e) => setPass(e.target.value)} placeholder="senha" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
         {err && <p className="text-sm text-destructive">{err}</p>}
         <button disabled={busy || !pass} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">entrar</button>
