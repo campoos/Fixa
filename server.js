@@ -2,10 +2,10 @@ import { createServer } from "node:http";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, extname, normalize } from "node:path";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, scrypt, randomBytes } from "node:crypto";
 import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
-import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, clampNext, seedEntry, gradeEntry } from "./review-engine.js";
+import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry } from "./review-engine.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -28,8 +28,10 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEN_ENABLED = Boolean(GEMINI_API_KEY);
 const SSO_SECRET = process.env.SSO_SECRET || "dev-secret-troca-em-prod";
-const APP_PASS = process.env.APP_PASS || "estudar";
-const APP_USER = process.env.APP_USER || "João";
+const APP_PASS = process.env.APP_PASS || "estudar";       // senha da conta fundadora (bootstrap)
+const APP_USER = process.env.APP_USER || "João";           // nome da conta fundadora
+const FOUNDER_EMAIL = (process.env.FOUNDER_EMAIL || "joao@fixa.app").toLowerCase();
+const FREE_THEME_LIMIT = Number(process.env.FREE_THEME_LIMIT || 2); // plano free: nº máx de temas
 const DIST = join(__dirname, "web", "dist");
 
 // ---- KV (Upstash REST ou arquivo local) ----
@@ -59,16 +61,61 @@ const kv = {
   },
 };
 
-// ---- estado em memória (persistido no KV) ----
-let tracks = (await kv.get("theme:tracks")) || {}; // id -> conteúdo do tema
-let state = (await kv.get("theme:state")) || {};   // trackId -> { done, comments, review }
-let trash = (await kv.get("theme:trash")) || {};   // id -> { track, state, deletedAt } (lixeira reversível)
-const saveTracks = () => kv.set("theme:tracks", tracks).catch((e) => console.error("[tracks]", e.message));
-const saveState = () => kv.set("theme:state", state).catch((e) => console.error("[state]", e.message));
-const saveTrash = () => kv.set("theme:trash", trash).catch((e) => console.error("[trash]", e.message));
-const freeId = (base) => { let id = base, n = 2; while (tracks[id]) id = `${base}-${n++}`; return id; };
-function tState(id) {
-  const s = state[id] || (state[id] = { done: {}, comments: {}, review: {} });
+// ---- usuários (multiusuário; senha com scrypt nativo) ----
+let users = (await kv.get("users")) || {}; // emailLower -> { id, email, name, hash, salt, plan, createdAt }
+const saveUsers = () => kv.set("users", users).catch((e) => console.error("[users]", e.message));
+const userById = (id) => Object.values(users).find((u) => u.id === id) || null;
+const hashPass = (pass, salt) => new Promise((resolve, reject) => scrypt(String(pass), salt, 64, (e, k) => (e ? reject(e) : resolve(k.toString("hex")))));
+const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+async function createUser(email, name, pass, plan = "free") {
+  const salt = randomBytes(16).toString("hex");
+  const hash = await hashPass(pass, salt);
+  const u = { id: "u_" + randomBytes(8).toString("hex"), email, name, hash, salt, plan, createdAt: new Date().toISOString() };
+  users[email] = u;
+  await saveUsers();
+  return u;
+}
+async function checkPass(u, pass) {
+  const h = await hashPass(pass, u.salt);
+  try { return timingSafeEqual(Buffer.from(h), Buffer.from(u.hash)); } catch { return false; }
+}
+
+// ---- dados por usuário (tracks/state/trash/activity) ----
+const dataCache = new Map(); // uid -> { tracks, state, trash, activity }
+async function udata(uid) {
+  if (!dataCache.has(uid)) {
+    const [tracks, state, trash, activity] = await Promise.all([
+      kv.get(`u:${uid}:tracks`), kv.get(`u:${uid}:state`), kv.get(`u:${uid}:trash`), kv.get(`u:${uid}:activity`),
+    ]);
+    let act = activity || {};
+    if (Array.isArray(act)) act = Object.fromEntries(act.map((d) => [d, 1])); // formato antigo
+    dataCache.set(uid, { tracks: tracks || {}, state: state || {}, trash: trash || {}, activity: act });
+  }
+  return dataCache.get(uid);
+}
+const saveU = (uid, part) => kv.set(`u:${uid}:${part}`, dataCache.get(uid)[part]).catch((e) => console.error(`[u:${part}]`, e.message));
+
+// ---- bootstrap: conta fundadora + migração do estado single-user antigo ----
+if (!Object.keys(users).length) {
+  const founder = await createUser(FOUNDER_EMAIL, APP_USER, APP_PASS, "pro");
+  const legacy = await kv.get("theme:tracks");
+  if (legacy && Object.keys(legacy).length) {
+    const [st, tr, ac] = await Promise.all([kv.get("theme:state"), kv.get("theme:trash"), kv.get("theme:activity")]);
+    await Promise.all([
+      kv.set(`u:${founder.id}:tracks`, legacy),
+      kv.set(`u:${founder.id}:state`, st || {}),
+      kv.set(`u:${founder.id}:trash`, tr || {}),
+      kv.set(`u:${founder.id}:activity`, Array.isArray(ac) ? Object.fromEntries(ac.map((d) => [d, 1])) : (ac || {})),
+    ]);
+    console.log(`[bootstrap] estado single-user migrado pra conta fundadora ${FOUNDER_EMAIL}`);
+  }
+  console.log(`[bootstrap] conta fundadora criada: ${FOUNDER_EMAIL} (plano pro)`);
+}
+
+// ---- helpers de domínio (operam no ud do usuário) ----
+const freeId = (ud, base) => { let id = base, n = 2; while (ud.tracks[id]) id = `${base}-${n++}`; return id; };
+function tState(ud, id) {
+  const s = ud.state[id] || (ud.state[id] = { done: {}, comments: {}, review: {} });
   s.done ||= {}; s.comments ||= {}; s.review ||= {};
   return s;
 }
@@ -77,28 +124,25 @@ const taskIdsOf = (track) => {
   for (const e of track.epics) for (const st of e.stories) for (const t of st.tasks) set.add(t.id);
   return set;
 };
-
-// ---- repetição espaçada (Leitner) — motor puro em review-engine.js ----
 function seedReview(s, id, fromDay, targetDate) {
   s.review[id] = seedEntry(fromDay, targetDate);
 }
-
-// ---- atividade / streak (contagem de ações de estudo por dia) ----
-let activityRaw = (await kv.get("theme:activity")) || {};
-if (Array.isArray(activityRaw)) activityRaw = Object.fromEntries(activityRaw.map((d) => [d, 1])); // migra formato antigo (set de dias)
-let activity = activityRaw; // { "YYYY-MM-DD": count }
-const markActive = () => { const d = spDay(); activity[d] = (activity[d] || 0) + 1; kv.set("theme:activity", activity).catch((e) => console.error("[activity]", e.message)); };
-function computeStreak() {
+function markActive(ud, uid) {
+  const d = spDay();
+  ud.activity[d] = (ud.activity[d] || 0) + 1;
+  saveU(uid, "activity");
+}
+function computeStreak(ud) {
   let s = 0, d = spDay();
-  if (!activity[d]) d = addDays(d, -1); // hoje ainda não estudou? conta a partir de ontem
-  while (activity[d]) { s++; d = addDays(d, -1); }
+  if (!ud.activity[d]) d = addDays(d, -1); // hoje ainda não estudou? conta a partir de ontem
+  while (ud.activity[d]) { s++; d = addDays(d, -1); }
   return s;
 }
-function computeStats() {
+function computeStats(ud) {
   let tasksDone = 0, mastered = 0, tasksTotal = 0;
-  for (const id of Object.keys(tracks)) {
-    const s = tState(id);
-    for (const e of tracks[id].epics) for (const st of e.stories) for (const t of st.tasks) {
+  for (const id of Object.keys(ud.tracks)) {
+    const s = tState(ud, id);
+    for (const e of ud.tracks[id].epics) for (const st of e.stories) for (const t of st.tasks) {
       tasksTotal++;
       if (s.done[t.id]) tasksDone++;
       const rv = s.review[t.id];
@@ -108,8 +152,8 @@ function computeStats() {
   // heatmap: últimos 119 dias (17 semanas)
   const days = [];
   let d = addDays(spDay(), -118);
-  for (let i = 0; i < 119; i++) { days.push({ day: d, count: activity[d] || 0 }); d = addDays(d, 1); }
-  return { streak: computeStreak(), dueToday: globalReview().due.length, themes: Object.keys(tracks).length, tasksDone, tasksTotal, mastered, days };
+  for (let i = 0; i < 119; i++) { days.push({ day: d, count: ud.activity[d] || 0 }); d = addDays(d, 1); }
+  return { streak: computeStreak(ud), dueToday: globalReview(ud).due.length, themes: Object.keys(ud.tracks).length, tasksDone, tasksTotal, mastered, days };
 }
 
 // ---- montagem ----
@@ -125,10 +169,10 @@ function taskWithState(t, s, epicTitle, storyTitle, today, dueBucket, trackId) {
   }
   return { ...t, done, completedAt: s.done[t.id] || null, comments: s.comments[t.id] || [], review };
 }
-function buildTrack(id) {
-  const track = tracks[id];
+function buildTrack(ud, id) {
+  const track = ud.tracks[id];
   if (!track) return null;
-  const s = tState(id);
+  const s = tState(ud, id);
   const today = spDay();
   const due = [];
   const epics = track.epics.map((e) => {
@@ -153,30 +197,30 @@ function buildTrack(id) {
   const dailyGoal = targetDate && daysLeft && daysLeft > 0 ? Math.ceil(remaining / daysLeft) : null;
   return { id, title: track.title, summary: track.summary, epics, progress: { done: dn, total }, mastery, targetDate, daysLeft, dailyGoal, review: { due, ladder: REVIEW_LADDER } };
 }
-function trackSummary(id) {
-  const t = buildTrack(id);
-  return { id, title: t.title, summary: t.summary, progress: t.progress, mastery: t.mastery, due: t.review.due.length, targetDate: t.targetDate, daysLeft: t.daysLeft, counts: trackCounts(tracks[id]) };
+function trackSummary(ud, id) {
+  const t = buildTrack(ud, id);
+  return { id, title: t.title, summary: t.summary, progress: t.progress, mastery: t.mastery, due: t.review.due.length, targetDate: t.targetDate, daysLeft: t.daysLeft, counts: trackCounts(ud.tracks[id]) };
 }
-function globalReview() {
+function globalReview(ud) {
   const today = spDay();
   const due = [];
-  for (const id of Object.keys(tracks)) {
-    const s = tState(id);
-    for (const e of tracks[id].epics) for (const st of e.stories) for (const t of st.tasks) {
+  for (const id of Object.keys(ud.tracks)) {
+    const s = tState(ud, id);
+    for (const e of ud.tracks[id].epics) for (const st of e.stories) for (const t of st.tasks) {
       const rv = s.review[t.id];
       if (rv && !isGraduated(rv) && rv.next && rv.next <= today)
-        due.push({ trackId: id, trackTitle: tracks[id].title, id: t.id, title: t.title, sample: t.sample, type: t.type, epic: e.title, story: st.title, box: rv.box, next: rv.next });
+        due.push({ trackId: id, trackTitle: ud.tracks[id].title, id: t.id, title: t.title, sample: t.sample, type: t.type, epic: e.title, story: st.title, box: rv.box, next: rv.next });
     }
   }
   due.sort((a, b) => (a.next < b.next ? -1 : a.next > b.next ? 1 : 0));
   return { due, ladder: REVIEW_LADDER };
 }
 
-// ---- sessão (cookie assinado) ----
+// ---- sessão (cookie assinado; payload = id do usuário) ----
 const b64u = (s) => Buffer.from(s).toString("base64url");
 const TTL = 30 * 86400 * 1000;
-function sign() {
-  const p = b64u(JSON.stringify({ u: APP_USER, e: Date.now() + TTL }));
+function sign(uid) {
+  const p = b64u(JSON.stringify({ u: uid, e: Date.now() + TTL }));
   return p + "." + createHmac("sha256", SSO_SECRET).update(p).digest("base64url");
 }
 function verify(token) {
@@ -185,16 +229,26 @@ function verify(token) {
   const exp = createHmac("sha256", SSO_SECRET).update(p).digest("base64url");
   try { if (sig.length !== exp.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(exp))) return null; } catch { return null; }
   let d; try { d = JSON.parse(Buffer.from(p, "base64url").toString()); } catch { return null; }
-  if (!d || !d.e || Date.now() > d.e) return null;
+  if (!d || !d.u || !d.e || Date.now() > d.e) return null;
   return d.u;
 }
-const userOf = (req) => { const m = (req.headers.cookie || "").match(/(?:^|;\s*)ts_sess=([^;]+)/); return m ? verify(m[1]) : null; };
+function sessionUser(req) {
+  const m = (req.headers.cookie || "").match(/(?:^|;\s*)ts_sess=([^;]+)/);
+  const uid = m ? verify(m[1]) : null;
+  return uid ? userById(uid) : null;
+}
+const setSession = (res, code, uid, body) => {
+  res.writeHead(code, { "Content-Type": "application/json", "Set-Cookie": `ts_sess=${sign(uid)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000` });
+  res.end(JSON.stringify(body));
+};
 const readBody = (req) => new Promise((res) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { try { res(JSON.parse(b || "{}")); } catch { res({}); } }); });
 
-// ---- estático (SPA) ----
+// ---- estático (SPA + landing pública na raiz) ----
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2" };
-async function serveStatic(url, res) {
+async function serveStatic(url, res, authed) {
   let p = normalize(url.pathname).replace(/^(\.\.[/\\])+/, "");
+  // visitante deslogado na raiz vê a landing; logado cai no app
+  if (p === "/" && !authed) p = "/fixa.html";
   let file = join(DIST, p === "/" ? "index.html" : p);
   if (!file.startsWith(DIST)) file = join(DIST, "index.html");
   try {
@@ -213,26 +267,53 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const path = url.pathname;
-    if (!path.startsWith("/api/")) return serveStatic(url, res);
+    if (!path.startsWith("/api/")) return serveStatic(url, res, Boolean(sessionUser(req)));
 
     if (path === "/api/health") return json(res, 200, { ok: true });
+    if (path === "/api/signup" && req.method === "POST") {
+      const { name, email, pass } = await readBody(req);
+      const em = String(email || "").trim().toLowerCase();
+      if (!String(name || "").trim()) return json(res, 400, { error: "nome obrigatório" });
+      if (!validEmail(em)) return json(res, 400, { error: "e-mail inválido" });
+      if (String(pass || "").length < 6) return json(res, 400, { error: "senha precisa de 6+ caracteres" });
+      if (users[em]) return json(res, 409, { error: "já existe conta com esse e-mail — faça login" });
+      const u = await createUser(em, String(name).trim(), pass, "free");
+      return setSession(res, 200, u.id, { name: u.name, email: u.email, plan: u.plan });
+    }
     if (path === "/api/login" && req.method === "POST") {
-      const { pass } = await readBody(req);
-      if (pass !== APP_PASS) return json(res, 401, { error: "senha inválida" });
-      res.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": `ts_sess=${sign()}; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000` });
-      return res.end(JSON.stringify({ name: APP_USER }));
+      const { email, pass } = await readBody(req);
+      const em = String(email || "").trim().toLowerCase();
+      const u = users[em];
+      if (!u || !(await checkPass(u, pass || ""))) return json(res, 401, { error: "e-mail ou senha inválidos" });
+      return setSession(res, 200, u.id, { name: u.name, email: u.email, plan: u.plan });
     }
     if (path === "/api/logout") { res.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "ts_sess=; HttpOnly; Path=/; Max-Age=0" }); return res.end("{}"); }
+    // waitlist pública da landing
+    if (path === "/api/waitlist" && req.method === "POST") {
+      const { email } = await readBody(req);
+      const em = String(email || "").trim().toLowerCase();
+      if (!validEmail(em)) return json(res, 400, { error: "e-mail inválido" });
+      const list = (await kv.get("waitlist")) || [];
+      if (!list.some((x) => x.email === em)) {
+        if (list.length >= 5000) return json(res, 429, { error: "lista cheia" });
+        list.push({ email: em, at: new Date().toISOString() });
+        await kv.set("waitlist", list);
+      }
+      return json(res, 200, { ok: true });
+    }
 
     // daqui pra baixo exige sessão
-    const me = userOf(req);
+    const me = sessionUser(req);
     if (!me) return json(res, 401, { error: "login requerido" });
+    const ud = await udata(me.id);
+    const isPro = me.plan === "pro";
 
-    if (path === "/api/me") return json(res, 200, { name: me });
-    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED });
-    // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
+    if (path === "/api/me") return json(res, 200, { name: me.name, email: me.email, plan: me.plan });
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length });
+    // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique (Pro)
     if (path === "/api/generate" && req.method === "POST") {
       if (!GEN_ENABLED) return json(res, 400, { error: "geração direta não configurada (GEMINI_API_KEY)" });
+      if (!isPro) return json(res, 402, { error: "geração direta é do plano Pro — use o fluxo manual (grátis) abaixo" });
       const { theme, level, mode, depth } = await readBody(req);
       if (!theme || !String(theme).trim()) return json(res, 400, { error: "tema obrigatório" });
       const prompt = buildPrompt({ theme, level, mode, depth });
@@ -261,14 +342,13 @@ const server = createServer(async (req, res) => {
       const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
       const v = validateTrack(cleaned);
       if (!v.ok) return json(res, 422, { error: "o conteúdo gerado veio fora do formato — tenta de novo ou usa o fluxo manual", errors: v.errors.slice(0, 8) });
-      let id = v.track.id, n = 2;
-      while (tracks[id]) id = `${v.track.id}-${n++}`;
+      const id = freeId(ud, v.track.id);
       v.track.id = id;
       v.track.createdAt = new Date().toISOString();
       v.track.generatedBy = GEMINI_MODEL;
-      tracks[id] = v.track;
-      tState(id);
-      await Promise.all([saveTracks(), saveState()]);
+      ud.tracks[id] = v.track;
+      tState(ud, id);
+      await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state")]);
       return json(res, 200, { ok: true, id, title: v.track.title, counts: trackCounts(v.track) });
     }
     if (path === "/api/import/prompt") {
@@ -276,73 +356,74 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { prompt });
     }
     if (path === "/api/import" && req.method === "POST") {
+      if (!isPro && Object.keys(ud.tracks).length >= FREE_THEME_LIMIT)
+        return json(res, 402, { error: `plano free vai até ${FREE_THEME_LIMIT} temas — exclua um tema ou aguarde o Pro` });
       const { json: raw } = await readBody(req);
       const v = validateTrack(raw);
       if (!v.ok) return json(res, 400, { ok: false, errors: v.errors });
-      let id = v.track.id, n = 2;
-      while (tracks[id]) id = `${v.track.id}-${n++}`; // não sobrescreve tema existente
+      const id = freeId(ud, v.track.id);
       v.track.id = id;
       v.track.createdAt = new Date().toISOString();
-      tracks[id] = v.track;
-      tState(id);
-      await Promise.all([saveTracks(), saveState()]);
+      ud.tracks[id] = v.track;
+      tState(ud, id);
+      await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state")]);
       return json(res, 200, { ok: true, id, title: v.track.title, counts: trackCounts(v.track) });
     }
-    if (path === "/api/tracks") return json(res, 200, { tracks: Object.keys(tracks).map(trackSummary) });
-    if (path === "/api/track") { const t = buildTrack(url.searchParams.get("id")); return t ? json(res, 200, t) : json(res, 404, { error: "tema não encontrado" }); }
+    if (path === "/api/tracks") return json(res, 200, { tracks: Object.keys(ud.tracks).map((id) => trackSummary(ud, id)) });
+    if (path === "/api/track") { const t = buildTrack(ud, url.searchParams.get("id")); return t ? json(res, 200, t) : json(res, 404, { error: "tema não encontrado" }); }
     if (path === "/api/track/delete" && req.method === "POST") {
       const { id } = await readBody(req);
-      if (!tracks[id]) return json(res, 404, { error: "tema não encontrado" });
+      if (!ud.tracks[id]) return json(res, 404, { error: "tema não encontrado" });
       // soft-delete: vai pra lixeira (reversível), não some
-      trash[id] = { track: tracks[id], state: state[id] || { done: {}, comments: {}, review: {} }, deletedAt: new Date().toISOString() };
-      delete tracks[id]; delete state[id];
-      await Promise.all([saveTracks(), saveState(), saveTrash()]);
+      ud.trash[id] = { track: ud.tracks[id], state: ud.state[id] || { done: {}, comments: {}, review: {} }, deletedAt: new Date().toISOString() };
+      delete ud.tracks[id]; delete ud.state[id];
+      await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state"), saveU(me.id, "trash")]);
       return json(res, 200, { ok: true });
     }
     if (path === "/api/trash") {
-      const items = Object.entries(trash).map(([id, t]) => ({ id, title: t.track.title, deletedAt: t.deletedAt, counts: trackCounts(t.track) }))
+      const items = Object.entries(ud.trash).map(([id, t]) => ({ id, title: t.track.title, deletedAt: t.deletedAt, counts: trackCounts(t.track) }))
         .sort((a, b) => (a.deletedAt < b.deletedAt ? 1 : -1));
       return json(res, 200, { items });
     }
     if (path === "/api/track/restore" && req.method === "POST") {
       const { id } = await readBody(req);
-      const t = trash[id];
+      const t = ud.trash[id];
       if (!t) return json(res, 404, { error: "não está na lixeira" });
-      const newId = tracks[id] ? freeId(id) : id; // se recriaram um tema com o mesmo id, restaura com sufixo
+      const newId = ud.tracks[id] ? freeId(ud, id) : id; // se recriaram um tema com o mesmo id, restaura com sufixo
       t.track.id = newId;
-      tracks[newId] = t.track; state[newId] = t.state || { done: {}, comments: {}, review: {} };
-      delete trash[id];
-      await Promise.all([saveTracks(), saveState(), saveTrash()]);
+      ud.tracks[newId] = t.track; ud.state[newId] = t.state || { done: {}, comments: {}, review: {} };
+      delete ud.trash[id];
+      await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state"), saveU(me.id, "trash")]);
       return json(res, 200, { ok: true, id: newId });
     }
     if (path === "/api/trash/purge" && req.method === "POST") {
       const { id } = await readBody(req);
-      if (id) delete trash[id]; else trash = {};
-      await saveTrash();
+      if (id) delete ud.trash[id]; else ud.trash = {};
+      await saveU(me.id, "trash");
       return json(res, 200, { ok: true });
     }
-    if (path === "/api/review") return json(res, 200, globalReview());
-    if (path === "/api/stats") return json(res, 200, computeStats());
+    if (path === "/api/review") return json(res, 200, globalReview(ud));
+    if (path === "/api/stats") return json(res, 200, computeStats(ud));
     if (path === "/api/track/target" && req.method === "POST") {
       const { id, date } = await readBody(req);
-      if (!tracks[id]) return json(res, 404, { error: "tema não encontrado" });
+      if (!ud.tracks[id]) return json(res, 404, { error: "tema não encontrado" });
       if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return json(res, 400, { error: "data inválida (use YYYY-MM-DD)" });
-      if (date) tracks[id].targetDate = date; else delete tracks[id].targetDate;
-      await saveTracks();
+      if (date) ud.tracks[id].targetDate = date; else delete ud.tracks[id].targetDate;
+      await saveU(me.id, "tracks");
       return json(res, 200, { ok: true });
     }
     if (path === "/api/track/rename" && req.method === "POST") {
       const { id, title, summary } = await readBody(req);
-      if (!tracks[id]) return json(res, 404, { error: "tema não encontrado" });
-      if (title && String(title).trim()) tracks[id].title = String(title).trim();
-      if (summary !== undefined) tracks[id].summary = String(summary || "").trim();
-      await saveTracks();
+      if (!ud.tracks[id]) return json(res, 404, { error: "tema não encontrado" });
+      if (title && String(title).trim()) ud.tracks[id].title = String(title).trim();
+      if (summary !== undefined) ud.tracks[id].summary = String(summary || "").trim();
+      await saveU(me.id, "tracks");
       return json(res, 200, { ok: true });
     }
     // edita campos de uma task (whitelist por tipo)
     if (path === "/api/task/edit" && req.method === "POST") {
       const { trackId, taskId, patch } = await readBody(req);
-      const track = tracks[trackId];
+      const track = ud.tracks[trackId];
       if (!track) return json(res, 404, { error: "tema não encontrado" });
       let target = null;
       for (const e of track.epics) for (const st of e.stories) for (const t of st.tasks) if (t.id === taskId) target = t;
@@ -359,13 +440,13 @@ const server = createServer(async (req, res) => {
         if (Array.isArray(p.steps)) { const st = p.steps.map((s) => String(s).trim()).filter(Boolean); if (st.length) target.steps = st; }
         setStr("expected"); setStrOpt("hint"); setStrOpt("snippet"); setStrOpt("language");
       }
-      await saveTracks();
+      await saveU(me.id, "tracks");
       return json(res, 200, { ok: true });
     }
     // remove uma task (ids das demais ficam estáveis; estado da task some junto)
     if (path === "/api/task/remove" && req.method === "POST") {
       const { trackId, taskId } = await readBody(req);
-      const track = tracks[trackId];
+      const track = ud.tracks[trackId];
       if (!track) return json(res, 404, { error: "tema não encontrado" });
       let removed = false;
       for (const e of track.epics) for (const st of e.stories) {
@@ -377,15 +458,15 @@ const server = createServer(async (req, res) => {
       for (const e of track.epics) e.stories = e.stories.filter((st) => st.tasks.length);
       track.epics = track.epics.filter((e) => e.stories.length);
       if (!track.epics.length) return json(res, 400, { error: "não dá pra remover a última task do tema — exclua o tema" });
-      const s = tState(trackId);
+      const s = tState(ud, trackId);
       delete s.done[taskId]; delete s.comments[taskId]; delete s.review[taskId];
-      await Promise.all([saveTracks(), saveState()]);
+      await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state")]);
       return json(res, 200, { ok: true });
     }
     // anexa epics novos (JSON no mesmo shape do import, só a parte de epics) — renumera a partir do fim
     if (path === "/api/track/append" && req.method === "POST") {
       const { id, json: raw } = await readBody(req);
-      const track = tracks[id];
+      const track = ud.tracks[id];
       if (!track) return json(res, 404, { error: "tema não encontrado" });
       let data = raw;
       if (typeof data === "string") { try { data = JSON.parse(data); } catch (e) { return json(res, 400, { ok: false, errors: [`JSON inválido: ${e.message}`] }); } }
@@ -398,7 +479,7 @@ const server = createServer(async (req, res) => {
         return { ...e, id: `${en}`, stories: e.stories.map((st, si) => ({ ...st, id: `${en}.${si + 1}`, tasks: st.tasks.map((t, ti) => ({ ...t, id: `${en}.${si + 1}.${ti + 1}` })) })) };
       });
       track.epics.push(...renumbered);
-      await saveTracks();
+      await saveU(me.id, "tracks");
       return json(res, 200, { ok: true, added: trackCounts({ epics: renumbered }) });
     }
 
@@ -406,16 +487,16 @@ const server = createServer(async (req, res) => {
     if (path.startsWith("/api/task/") && req.method === "POST") {
       const body = await readBody(req);
       const { trackId, taskId } = body;
-      const track = tracks[trackId];
+      const track = ud.tracks[trackId];
       if (!track || !taskIdsOf(track).has(taskId)) return json(res, 400, { error: "trackId/taskId inválido" });
-      const s = tState(trackId);
+      const s = tState(ud, trackId);
       if (path === "/api/task/done") {
         if (body.done) { s.done[taskId] = new Date().toISOString(); if (!s.review[taskId]) seedReview(s, taskId, null, track.targetDate); }
         else { delete s.done[taskId]; delete s.review[taskId]; }
       } else if (path === "/api/task/comment") {
         const text = (body.text || "").trim();
         if (!text) return json(res, 400, { error: "texto obrigatório" });
-        (s.comments[taskId] ||= []).push({ text, at: new Date().toISOString(), author: me });
+        (s.comments[taskId] ||= []).push({ text, at: new Date().toISOString(), author: me.name });
       } else if (path === "/api/task/comment/delete") {
         const arr = s.comments[taskId] || [];
         const c = arr[body.index];
@@ -427,8 +508,8 @@ const server = createServer(async (req, res) => {
         if (body.result !== "pass" && body.result !== "fail") return json(res, 400, { error: "result pass|fail" });
         s.review[taskId] = gradeEntry(rv, body.result, spDay(), track.targetDate);
       } else return json(res, 404, { error: "rota inválida" });
-      if (path === "/api/task/done" || path === "/api/task/review") markActive(); // conta o dia pro streak
-      await saveState();
+      if (path === "/api/task/done" || path === "/api/task/review") markActive(ud, me.id); // conta o dia pro streak
+      await saveU(me.id, "state");
       return json(res, 200, { ok: true });
     }
 
@@ -438,4 +519,4 @@ const server = createServer(async (req, res) => {
     return json(res, 500, { error: "erro interno" });
   }
 });
-server.listen(PORT, HOST, () => console.log(`theme-studies em http://${HOST}:${PORT}`));
+server.listen(PORT, HOST, () => console.log(`fixa em http://${HOST}:${PORT}`));

@@ -168,6 +168,7 @@
       <a href="#metodo" class="hide-sm">Método</a>
       <a href="#recursos" class="hide-sm">Recursos</a>
       <a href="#duvidas">Dúvidas</a>
+      <a href="/temas">Entrar</a>
       <button class="icon-btn" id="themeBtn" aria-label="alternar tema" title="tema">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
@@ -183,7 +184,7 @@
     <h1>Estude de um jeito que <span class="hl">fixa</span> — e volta na hora certa.</h1>
     <p class="lead">A Fixa transforma qualquer tema numa trilha guiada e te faz revisar no intervalo exato em que você está prestes a esquecer. Teoria e prática, mão na massa.</p>
     <div class="hero-cta">
-      <a href="#cta" class="btn">Começar de graça</a>
+      <a href="/temas" class="btn">Começar de graça</a>
       <a href="#metodo" class="btn ghost">Ver o método</a>
     </div>
     <p class="hero-note">// sem cartão · feito por quem estava estudando pra uma prova e cansou de esquecer</p>
@@ -313,10 +314,11 @@
       <span class="eyebrow">Beta fechado</span>
       <h2>Pare de reestudar. Comece a lembrar.</h2>
       <p>A Fixa está em construção. Entre na lista e seja dos primeiros a testar — e a nunca mais esquecer o que estudou.</p>
-      <form class="waitlist" onsubmit="event.preventDefault();this.querySelector('input').value='';this.querySelector('button').textContent='Na lista ✓'">
+      <form class="waitlist" id="wl">
         <input type="email" placeholder="seu@email.com" aria-label="seu e-mail" required>
         <button class="btn" type="submit">Entrar na lista</button>
       </form>
+      <p id="wl-msg" style="margin-top:10px;font-size:13px;color:var(--muted)"></p>
     </div>
   </div>
 </section>
@@ -333,6 +335,24 @@
 </footer>
 
 <script>
+  // waitlist: grava no servidor
+  (function () {
+    var f = document.getElementById('wl');
+    if (!f) return;
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var input = f.querySelector('input'), btn = f.querySelector('button'), msg = document.getElementById('wl-msg');
+      btn.disabled = true;
+      fetch('/api/waitlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: input.value }) })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (x) {
+          if (x.ok) { btn.textContent = 'Na lista ✓'; msg.textContent = 'Valeu! Te aviso quando abrir.'; input.value = ''; }
+          else { btn.disabled = false; msg.textContent = x.d.error || 'não deu — tenta de novo'; }
+        })
+        .catch(function () { btn.disabled = false; msg.textContent = 'sem conexão — tenta de novo'; });
+    });
+  })();
+
   // tema: prefers-color-scheme + toggle que carimba data-theme
   var root = document.documentElement, tb = document.getElementById('themeBtn');
   function cur() {

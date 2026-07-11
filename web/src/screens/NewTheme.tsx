@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Check, ClipboardCopy, Loader2, Sparkles, Upload, Wand2 } from "lucide-react";
-import { ApiError, generateTrack, getConfig, getImportPrompt, importTrack } from "@/lib/api";
+import { ApiError, generateTrack, getConfig, getImportPrompt, importTrack, type Config } from "@/lib/api";
 import { navigate } from "@/App";
 import { Card } from "@/components/ui/card";
 
@@ -37,10 +37,11 @@ export function NewTheme() {
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [genBusy, setGenBusy] = useState(false);
-  const [genEnabled, setGenEnabled] = useState(false);
+  const [cfg, setCfg] = useState<Config | null>(null);
+  const genEnabled = Boolean(cfg?.genEnabled && cfg?.plan === "pro");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  useEffect(() => { getConfig().then((c) => setGenEnabled(c.genEnabled)).catch(() => {}); }, []);
+  useEffect(() => { getConfig().then(setCfg).catch(() => {}); }, []);
 
   const gen = async () => {
     if (!theme.trim()) return;
@@ -74,6 +75,11 @@ export function NewTheme() {
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">Novo tema</h1>
+      {cfg?.plan === "free" && (
+        <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Plano free: <b>{cfg.themes}/{cfg.freeLimit} temas</b> · geração direta por IA é do Pro (em breve) — o fluxo manual abaixo é grátis.
+        </p>
+      )}
 
       {/* passo 1: configurar + gerar prompt */}
       <Card className="space-y-3 p-4">

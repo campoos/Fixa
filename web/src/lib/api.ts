@@ -25,7 +25,7 @@ const api = {
 };
 
 // ---- tipos ----
-export interface Me { name: string }
+export interface Me { name: string; email: string; plan: "free" | "pro" }
 export interface Counts { epics: number; stories: number; tasks: number; practice: number; theory: number }
 export interface Progress { done: number; total: number }
 export interface TrackSummary { id: string; title: string; summary: string; progress: Progress; mastery: number; due: number; targetDate: string | null; daysLeft: number | null; counts: Counts }
@@ -59,7 +59,8 @@ export interface ReviewList { due: Due[]; ladder: number[] }
 
 // ---- auth ----
 export const getMe = () => api.get<Me>("/api/me");
-export const login = (pass: string) => api.post<Me>("/api/login", { pass });
+export const login = (email: string, pass: string) => api.post<Me>("/api/login", { email, pass });
+export const signup = (name: string, email: string, pass: string) => api.post<Me>("/api/signup", { name, email, pass });
 export const logout = () => api.post("/api/logout");
 
 // ---- temas ----
@@ -80,7 +81,8 @@ export const appendTrack = (id: string, jsonStr: string) => {
   return api.post<{ ok: true; added: Counts }>("/api/track/append", { id, json: parsed });
 };
 // geração direta (Gemini) — disponível quando o server tem GEMINI_API_KEY
-export const getConfig = () => api.get<{ genEnabled: boolean }>("/api/config");
+export interface Config { genEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number }
+export const getConfig = () => api.get<Config>("/api/config");
 export const generateTrack = (p: PromptParams) =>
   api.post<{ ok: true; id: string; title: string; counts: Counts }>("/api/generate", p);
 export const purgeTrash = (id?: string) => api.post("/api/trash/purge", id ? { id } : {});

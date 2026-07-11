@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { LogOut, Moon, Plus, Sun } from "lucide-react";
-import { getMe, getReview, login, logout, type Me } from "@/lib/api";
+import { ApiError, getMe, getReview, login, logout, signup, type Me } from "@/lib/api";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { useApi } from "@/lib/useApi";
 import { Home } from "@/screens/Home";
@@ -98,21 +98,40 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
 }
 
 function Login({ onLogin }: { onLogin: (me: Me) => void }) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const inputCls = "w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary";
+  const canSubmit = mode === "login" ? email.trim() && pass : name.trim() && email.trim() && pass.length >= 6;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true); setErr(null);
-    try { onLogin(await login(pass)); } catch { setErr("senha inválida"); } finally { setBusy(false); }
+    try {
+      onLogin(mode === "login" ? await login(email, pass) : await signup(name, email, pass));
+    } catch (ex) {
+      setErr(ex instanceof ApiError ? ex.message : "algo deu errado — tenta de novo");
+    } finally { setBusy(false); }
   };
   return (
     <div className="grid min-h-full place-items-center px-4">
       <form onSubmit={submit} className="w-full max-w-xs space-y-3 rounded-xl border border-border bg-card p-6">
         <div className="flex items-center gap-2 text-lg font-extrabold tracking-tight"><Logo size={22} /> Fixa</div>
-        <input type="password" autoFocus value={pass} onChange={(e) => setPass(e.target.value)} placeholder="senha" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
+        <p className="text-xs text-muted-foreground">{mode === "login" ? "Entre pra continuar estudando." : "Crie sua conta — leva 10 segundos."}</p>
+        {mode === "signup" && (
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="seu nome" className={inputCls} />
+        )}
+        <input type="email" autoFocus={mode === "login"} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail" className={inputCls} />
+        <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={mode === "signup" ? "senha (6+ caracteres)" : "senha"} className={inputCls} />
         {err && <p className="text-sm text-destructive">{err}</p>}
-        <button disabled={busy || !pass} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">entrar</button>
+        <button disabled={busy || !canSubmit} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          {busy ? "…" : mode === "login" ? "entrar" : "criar conta"}
+        </button>
+        <button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(null); }} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">
+          {mode === "login" ? "não tem conta? criar agora" : "já tem conta? entrar"}
+        </button>
       </form>
     </div>
   );
