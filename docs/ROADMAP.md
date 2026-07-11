@@ -26,6 +26,14 @@ MVP funcional · método (Frio→Corrige→Generaliza→Espaça) · revisão esp
 import por JSON (prompt+validador) · tasks teóricas e práticas · identidade **Fixa** (cor+logo) ·
 Home dashboard (streak/stats) · página Ajuda · landing/mockup em `/fixa.html` · fix KV concorrente.
 
+## ✅ M0–M5 — FEITOS (11/07/2026)
+- **M0** lixeira/restaurar (exclusão reversível) · **M1** recall forçado + domínio≠done + "por que funciona" ·
+- **M2** data-alvo + countdown + meta diária + clamp de revisão à prova ·
+- **M3** edição in-app (edit/remove/rename/append) + **geração direta Gemini Flash** (opcional via GEMINI_API_KEY; manual = fallback) ·
+- **M4** atividade por dia + heatmap de consistência · **M5** revisão em sessão (interleaving round-robin, atalhos espaço/1/2, placar).
+- Extra: favicon/título da marca.
+**Próximo:** Fase 0 (separação de IP) → M6 (contas+DB) → M7 (landing pública) → M8 (monetização) → M9 (sandbox/PWA).
+
 ---
 
 ## 🎯 Milestones (ordem de execução)
