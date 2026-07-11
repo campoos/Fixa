@@ -31,7 +31,8 @@ Home dashboard (streak/stats) · página Ajuda · landing/mockup em `/fixa.html`
 - **M2** data-alvo + countdown + meta diária + clamp de revisão à prova ·
 - **M3** edição in-app (edit/remove/rename/append) + **geração direta Gemini Flash** (opcional via GEMINI_API_KEY; manual = fallback) ·
 - **M4** atividade por dia + heatmap de consistência · **M5** revisão em sessão (interleaving round-robin, atalhos espaço/1/2, placar).
-- Extra: favicon/título da marca.
+- Extras: favicon/título da marca · card "Continuar" no Home · badge Revisar em tempo real ·
+  motor Leitner extraído (`review-engine.js`) · **suíte de testes (11 casos, `npm test`)** · consistência da régua na copy.
 **Próximo:** Fase 0 (separação de IP) → M6 (contas+DB) → M7 (landing pública) → M8 (monetização) → M9 (sandbox/PWA).
 
 ---
