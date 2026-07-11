@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Fixa — aprenda de um jeito que fixa</title></head><body>
+<style>
+  :root {
+    --bg: #0d0a1a; --bg-2: #141026; --card: #171231; --line: #2a2246;
+    --ink: #ece9f7; --muted: #a79fc7; --faint: #6f6690;
+    --brand: #7c5cfc; --brand-2: #9d7bff; --brand-ink: #fff;
+    --recall: #f4b740; --domain: #35d6a4; --err: #ff6b8a;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --r: 16px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f3fa; --bg-2: #efebf8; --card: #fff; --line: #e4def3;
+      --ink: #1c1533; --muted: #5c5480; --faint: #8b83ab;
+      --brand: #6c47f0; --brand-2: #7c5cfc; --brand-ink: #fff;
+      --recall: #c88410; --domain: #12996e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0a1a; --bg-2: #141026; --card: #171231; --line: #2a2246;
+    --ink: #ece9f7; --muted: #a79fc7; --faint: #6f6690;
+    --brand: #7c5cfc; --brand-2: #9d7bff; --recall: #f4b740; --domain: #35d6a4;
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f3fa; --bg-2: #efebf8; --card: #fff; --line: #e4def3;
+    --ink: #1c1533; --muted: #5c5480; --faint: #8b83ab;
+    --brand: #6c47f0; --brand-2: #7c5cfc; --recall: #c88410; --domain: #12996e;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+    line-height: 1.6; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3 { text-wrap: balance; letter-spacing: -0.02em; margin: 0; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--brand-2); }
+
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--line); }
+  .nav-in { display: flex; align-items: center; gap: 16px; height: 62px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -0.03em; }
+  .mark { width: 26px; height: 26px; flex: none; }
+  .nav-links { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .nav-links a { color: var(--muted); font-size: 14px; padding: 7px 12px; border-radius: 9px; }
+  .nav-links a:hover { color: var(--ink); background: var(--bg-2); }
+  .btn { font-family: var(--sans); font-size: 14px; font-weight: 600; border: 0; cursor: pointer;
+    padding: 10px 18px; border-radius: 11px; background: var(--brand); color: var(--brand-ink);
+    display: inline-flex; align-items: center; gap: 8px; transition: transform .12s, box-shadow .12s; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px -8px var(--brand); }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn.ghost:hover { border-color: var(--brand); box-shadow: none; }
+  .icon-btn { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px;
+    border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+  .icon-btn:hover { color: var(--ink); }
+
+  /* hero */
+  .hero { position: relative; padding: 84px 0 72px; overflow: hidden; }
+  #memcanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .55; }
+  .hero .wrap { position: relative; z-index: 2; }
+  .hero-tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--card) 60%, transparent); padding: 6px 12px; border-radius: 999px; }
+  .hero h1 { font-size: clamp(38px, 6.4vw, 68px); font-weight: 800; line-height: 1.02; margin: 22px 0 0; max-width: 15ch; }
+  .hero h1 .hl { color: var(--brand-2); position: relative; }
+  .hero p.lead { font-size: clamp(17px, 2.2vw, 21px); color: var(--muted); max-width: 46ch; margin: 22px 0 0; }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+  .hero-note { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-top: 16px; letter-spacing: .04em; }
+
+  /* interval strip */
+  .ladder { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 40px; align-items: center; }
+  .ladder .lab { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin-right: 6px; }
+  .chip { font-family: var(--mono); font-size: 13px; padding: 5px 11px; border-radius: 8px;
+    border: 1px solid var(--line); color: var(--muted); background: var(--card); }
+  .chip.on { color: var(--recall); border-color: color-mix(in srgb, var(--recall) 45%, var(--line)); }
+
+  /* sections */
+  section { padding: 74px 0; }
+  .sec-head { max-width: 60ch; }
+  .sec-head h2 { font-size: clamp(26px, 3.6vw, 38px); font-weight: 800; margin-top: 12px; }
+  .sec-head p { color: var(--muted); font-size: 17px; margin: 14px 0 0; }
+
+  /* method loop */
+  .loop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 42px; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; position: relative; }
+  .step .n { font-family: var(--mono); font-size: 12px; color: var(--brand-2); letter-spacing: .1em; }
+  .step h3 { font-size: 17px; margin: 12px 0 6px; }
+  .step p { font-size: 14px; color: var(--muted); margin: 0; }
+  .step .tag { position: absolute; top: 18px; right: 18px; font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: .1em; color: var(--faint); }
+  .loop-foot { display: flex; align-items: center; gap: 10px; margin-top: 20px; font-family: var(--mono);
+    font-size: 13px; color: var(--recall); }
+
+  /* features */
+  .feat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 42px; }
+  .fcard { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 24px;
+    transition: transform .14s, border-color .14s; }
+  .fcard:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); }
+  .fcard .ic { width: 34px; height: 34px; color: var(--brand-2); }
+  .fcard h3 { font-size: 17px; margin: 16px 0 8px; }
+  .fcard p { font-size: 14.5px; color: var(--muted); margin: 0; }
+  .fcard.practice .ic { color: var(--domain); }
+  .fcard.review .ic { color: var(--recall); }
+
+  /* import steps */
+  .imp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 42px;
+    border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--card); }
+  .istep { padding: 26px; border-right: 1px solid var(--line); }
+  .istep:last-child { border-right: 0; }
+  .istep .num { font-family: var(--mono); font-weight: 700; color: var(--brand); font-size: 22px; }
+  .istep h3 { font-size: 16px; margin: 12px 0 6px; }
+  .istep p { font-size: 14px; color: var(--muted); margin: 0; }
+  .codeline { font-family: var(--mono); font-size: 12px; color: var(--domain); background: var(--bg-2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-top: 12px; overflow-x: auto; white-space: nowrap; }
+
+  /* faq */
+  .faq { margin-top: 40px; display: flex; flex-direction: column; gap: 10px; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 13px; overflow: hidden; }
+  details[open] { border-color: color-mix(in srgb, var(--brand) 35%, var(--line)); }
+  summary { cursor: pointer; padding: 18px 20px; font-weight: 600; font-size: 16px; list-style: none;
+    display: flex; align-items: center; gap: 12px; }
+  summary::-webkit-details-marker { display: none; }
+  summary .plus { margin-left: auto; color: var(--brand-2); font-family: var(--mono); font-size: 20px; transition: transform .2s; }
+  details[open] summary .plus { transform: rotate(45deg); }
+  details .ans { padding: 0 20px 20px; color: var(--muted); font-size: 15px; }
+  details .ans code { font-family: var(--mono); font-size: 13px; background: var(--bg-2); padding: 2px 6px; border-radius: 6px; color: var(--ink); }
+
+  /* cta */
+  .cta { text-align: center; background: linear-gradient(180deg, var(--bg-2), var(--bg));
+    border: 1px solid var(--line); border-radius: 24px; padding: 56px 24px; margin-top: 20px; }
+  .cta h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; }
+  .cta p { color: var(--muted); max-width: 44ch; margin: 14px auto 26px; }
+  .waitlist { display: flex; gap: 10px; max-width: 420px; margin: 0 auto; }
+  .waitlist input { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 11px;
+    padding: 12px 14px; color: var(--ink); font-size: 15px; font-family: var(--sans); outline: none; }
+  .waitlist input:focus { border-color: var(--brand); }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0; color: var(--faint); font-size: 13px; }
+  .foot-in { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .foot-in .brand { font-size: 16px; }
+  .disc { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-left: auto; letter-spacing: .03em; }
+
+  @media (max-width: 820px) {
+    .loop, .feat { grid-template-columns: 1fr 1fr; }
+    .imp { grid-template-columns: 1fr; }
+    .istep { border-right: 0; border-bottom: 1px solid var(--line); }
+    .istep:last-child { border-bottom: 0; }
+    .nav-links a.hide-sm { display: none; }
+  }
+  @media (max-width: 560px) { .loop, .feat { grid-template-columns: 1fr; } .waitlist { flex-direction: column; } }
+  @media (prefers-reduced-motion: reduce) { #memcanvas { display: none; } .btn:hover { transform: none; } }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+</style>
+
+<nav>
+  <div class="wrap nav-in">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M16 3a13 13 0 1 0 11.5 7" stroke="var(--brand)" stroke-width="3.4" stroke-linecap="round"/>
+        <circle cx="27" cy="6.5" r="3.6" fill="var(--recall)"/>
+      </svg>
+      Fixa
+    </div>
+    <div class="nav-links">
+      <a href="#metodo" class="hide-sm">Método</a>
+      <a href="#recursos" class="hide-sm">Recursos</a>
+      <a href="#duvidas">Dúvidas</a>
+      <button class="icon-btn" id="themeBtn" aria-label="alternar tema" title="tema">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <a href="#cta" class="btn">Entrar na lista</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <canvas id="memcanvas" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <span class="hero-tag">Aprendizado por repetição espaçada</span>
+    <h1>Estude de um jeito que <span class="hl">fixa</span> — e volta na hora certa.</h1>
+    <p class="lead">A Fixa transforma qualquer tema numa trilha guiada e te faz revisar no intervalo exato em que você está prestes a esquecer. Teoria e prática, mão na massa.</p>
+    <div class="hero-cta">
+      <a href="#cta" class="btn">Começar de graça</a>
+      <a href="#metodo" class="btn ghost">Ver o método</a>
+    </div>
+    <p class="hero-note">// sem cartão · feito por quem estava estudando pra uma prova e cansou de esquecer</p>
+    <div class="ladder" aria-label="intervalos de revisão em dias">
+      <span class="lab">revisa em</span>
+      <span class="chip on">1d</span><span class="chip on">2d</span><span class="chip">4d</span>
+      <span class="chip">7d</span><span class="chip">15d</span><span class="chip">30d</span>
+      <span class="chip" style="border-style:dashed">graduou</span>
+    </div>
+  </div>
+</header>
+
+<section id="metodo">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">O método</span>
+      <h2>Não é releitura. É esforço de lembrar.</h2>
+      <p>Reler dá a ilusão de que aprendeu. O que gruda é tentar puxar da memória antes de ver a resposta — e depois espaçar. Cada task roda esse loop.</p>
+    </div>
+    <div class="loop">
+      <div class="step"><span class="tag">frio</span><div class="n">01</div><h3>Tenta de cabeça</h3><p>Responde sem olhar a resposta. O esforço de recuperar é o que cria a trilha.</p></div>
+      <div class="step"><span class="tag">corrige</span><div class="n">02</div><h3>Compara e corrige</h3><p>Revela, vê o que faltou, anota o erro com a sua palavra. Erro consciente fixa mais.</p></div>
+      <div class="step"><span class="tag">generaliza</span><div class="n">03</div><h3>Comprime</h3><p>Resume o tópico em 2–4 frases. O cérebro esmaga o conteúdo no mínimo revisável.</p></div>
+      <div class="step"><span class="tag">espaça</span><div class="n">04</div><h3>Revisa no tempo certo</h3><p>A task volta em intervalos crescentes. Acertou, espaça mais; errou, volta amanhã.</p></div>
+    </div>
+    <div class="loop-foot">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      o ciclo se repete — e o intervalo cresce a cada acerto
+    </div>
+  </div>
+</section>
+
+<section id="recursos" style="background:var(--bg-2);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">O que você recebe</span>
+      <h2>Qualquer tema vira uma trilha que você conclui.</h2>
+    </div>
+    <div class="feat">
+      <div class="fcard">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+        <h3>Epic → Story → Task</h3>
+        <p>O assunto é quebrado em unidades atômicas, do básico ao avançado, cada uma preparando a próxima.</p>
+      </div>
+      <div class="fcard practice">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg>
+        <h3>Teoria e mão na massa</h3>
+        <p>Tasks teóricas com pontos-chave e questão-modelo; tasks práticas com passos, dica e resultado esperado.</p>
+      </div>
+      <div class="fcard review">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+        <h3>Revisar hoje</h3>
+        <p>Uma fila diária junta tudo que está prestes a ser esquecido — de todos os seus temas, no ponto certo.</p>
+      </div>
+      <div class="fcard">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20v-6M6 20v-4M18 20V8M3 20h18"/></svg>
+        <h3>Progresso que puxa</h3>
+        <p>Streak, domínio por tema e caixas de revisão subindo. Motivação que vem de ver a coisa acontecer.</p>
+      </div>
+      <div class="fcard">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v12H4zM8 20h8M12 16v4"/></svg>
+        <h3>Feito pra prova</h3>
+        <p>Nasceu preparando uma certificação. Ideal pra quem tem um objetivo com data e não pode esquecer no dia.</p>
+      </div>
+      <div class="fcard">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M11 18h2"/></svg>
+        <h3>No bolso</h3>
+        <p>Mobile-first e sincronizado. Limpe a fila de revisão na fila do banco, do ônibus, onde der.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="importar">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Como cria um tema</span>
+      <h2>Do assunto à trilha em três passos.</h2>
+      <p>Você diz o tema; a Fixa monta o prompt; a IA gera; você importa. Sem digitar tudo na mão.</p>
+    </div>
+    <div class="imp">
+      <div class="istep"><div class="num">1</div><h3>Descreve o tema</h3><p>“Consumo de API no front”, “teoria dos grafos”, a cert que você vai fazer. Escolhe nível e profundidade.</p></div>
+      <div class="istep"><div class="num">2</div><h3>Gera o conteúdo</h3><p>A Fixa te dá um prompt pronto pra colar no seu assistente. Ele devolve a trilha estruturada.</p><div class="codeline">→ epics · stories · tasks (teoria + prática)</div></div>
+      <div class="istep"><div class="num">3</div><h3>Importa e estuda</h3><p>Cola de volta, a Fixa valida e monta a árvore. No plano Pro, a geração é automática, sem copiar nada.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="duvidas" style="background:var(--bg-2);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Dúvidas</span>
+      <h2>O que costuma perguntar.</h2>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>O que é revisão espaçada? <span class="plus">+</span></summary>
+        <div class="ans">É revisar cada coisa no intervalo em que você está quase esquecendo — não antes (perda de tempo), nem depois (já esqueceu). A Fixa usa o sistema Leitner: acertou uma task, ela volta mais longe (1 → 2 → 4 → 7 → 15 → 30 dias); errou, volta amanhã. O que você domina se espaça; o que escorrega insiste.</div>
+      </details>
+      <details>
+        <summary>Preciso saber programar pra usar? <span class="plus">+</span></summary>
+        <div class="ans">Não. Serve pra qualquer assunto — teórico ou prático. As tasks práticas de código são um tipo entre vários; você estuda direito, história, idiomas, o que for.</div>
+      </details>
+      <details>
+        <summary>De onde vem o conteúdo dos temas? <span class="plus">+</span></summary>
+        <div class="ans">De você + IA. A Fixa gera um prompt pronto, você cola no ChatGPT ou Gemini, ele devolve a trilha e você importa. No plano Pro a geração é direta, sem copiar e colar. Tudo é editável depois.</div>
+      </details>
+      <details>
+        <summary>Serve pra passar numa certificação? <span class="plus">+</span></summary>
+        <div class="ans">É exatamente pra isso que nasceu. Você monta a trilha da prova, estuda com o método, e a fila de revisão garante que o conteúdo esteja fresco no dia — em vez de decorar tudo na véspera.</div>
+      </details>
+      <details>
+        <summary>Funciona no celular? <span class="plus">+</span></summary>
+        <div class="ans">Sim, é mobile-first e sincroniza entre dispositivos. Uma task concluída no computador aparece pra revisar no celular no dia certo.</div>
+      </details>
+      <details>
+        <summary>E se o import der erro? <span class="plus">+</span></summary>
+        <div class="ans">A Fixa valida o conteúdo e aponta o que ajustar. O tropeço mais comum é o chat “linkificar” uma URL ao copiar — por isso a gente pede pro modelo não usar links crus. Se acontecer, é só apagar o trecho <code>[...](...)</code> e importar de novo.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section id="cta">
+  <div class="wrap">
+    <div class="cta">
+      <span class="eyebrow">Beta fechado</span>
+      <h2>Pare de reestudar. Comece a lembrar.</h2>
+      <p>A Fixa está em construção. Entre na lista e seja dos primeiros a testar — e a nunca mais esquecer o que estudou.</p>
+      <form class="waitlist" onsubmit="event.preventDefault();this.querySelector('input').value='';this.querySelector('button').textContent='Na lista ✓'">
+        <input type="email" placeholder="seu@email.com" aria-label="seu e-mail" required>
+        <button class="btn" type="submit">Entrar na lista</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <div class="brand" style="font-weight:800">
+      <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="width:22px;height:22px"><path d="M16 3a13 13 0 1 0 11.5 7" stroke="var(--brand)" stroke-width="3.4" stroke-linecap="round"/><circle cx="27" cy="6.5" r="3.6" fill="var(--recall)"/></svg>
+      Fixa
+    </div>
+    <span style="color:var(--faint)">aprenda de um jeito que fixa</span>
+    <span class="disc">mockup de identidade · nome de trabalho</span>
+  </div>
+</footer>
+
+<script>
+  // tema: prefers-color-scheme + toggle que carimba data-theme
+  var root = document.documentElement, tb = document.getElementById('themeBtn');
+  function cur() {
+    var t = root.getAttribute('data-theme');
+    if (t) return t;
+    return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  tb.addEventListener('click', function () {
+    root.setAttribute('data-theme', cur() === 'dark' ? 'light' : 'dark');
+  });
+
+  // hero: linha do tempo da memória — um item ressurge em intervalos crescentes,
+  // a curva de retenção cai e é "resgatada" a cada revisão.
+  (function () {
+    var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    var c = document.getElementById('memcanvas'), x = c.getContext('2d'), W, H, dpr;
+    function size() {
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      W = c.clientWidth; H = c.clientHeight;
+      c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    size(); addEventListener('resize', size);
+    function css(v){ return getComputedStyle(root).getPropertyValue(v).trim(); }
+    var reviews = [0.08, 0.18, 0.31, 0.47, 0.66, 0.86]; // pontos de revisão (fração da largura)
+    var t = 0;
+    function loop() {
+      t += 0.006; if (t > 1.25) t = 0;
+      x.clearRect(0, 0, W, H);
+      var brand = css('--brand'), recall = css('--recall');
+      var baseY = H * 0.62, amp = H * 0.16;
+      // curva de retenção: sobe na revisão, decai até a próxima
+      x.beginPath();
+      for (var px = 0; px <= W; px += 6) {
+        var f = px / W, seg = 1;
+        for (var i = 0; i < reviews.length; i++) if (f >= reviews[i]) seg = i + 1;
+        var prev = reviews[seg - 1] || 0, next = reviews[seg] || 1;
+        var local = (f - prev) / Math.max(0.001, (next - prev));
+        var decay = Math.exp(-local * 2.2); // esquece entre revisões
+        var y = baseY - amp * decay;
+        px === 0 ? x.moveTo(px, y) : x.lineTo(px, y);
+      }
+      x.strokeStyle = brand; x.globalAlpha = 0.5; x.lineWidth = 2; x.stroke(); x.globalAlpha = 1;
+      // pontos de revisão pulsando conforme o "tempo" passa
+      for (var j = 0; j < reviews.length; j++) {
+        var rx = reviews[j] * W, ry = baseY - amp;
+        var d = Math.abs(t - reviews[j]);
+        var pulse = d < 0.06 ? (1 - d / 0.06) : 0;
+        x.beginPath(); x.arc(rx, ry, 3 + pulse * 6, 0, 7);
+        x.fillStyle = recall; x.globalAlpha = 0.35 + pulse * 0.65; x.fill(); x.globalAlpha = 1;
+      }
+      // cabeça do tempo
+      var hx = t * W, hf = t, hseg = 1;
+      for (var k = 0; k < reviews.length; k++) if (hf >= reviews[k]) hseg = k + 1;
+      var hp = reviews[hseg - 1] || 0, hn = reviews[hseg] || 1;
+      var hl = (hf - hp) / Math.max(0.001, (hn - hp)), hy = baseY - amp * Math.exp(-hl * 2.2);
+      if (t <= 1) { x.beginPath(); x.arc(hx, hy, 4, 0, 7); x.fillStyle = brand; x.fill(); }
+      requestAnimationFrame(loop);
+    }
+    loop();
+  })();
+</script>
+</body></html>
