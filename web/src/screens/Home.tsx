@@ -119,9 +119,20 @@ export function Home() {
         <div className="mx-auto mt-6 max-w-md text-left"><Trash key={rev} onChange={bump} /></div>
       </div>
     );
+  const next = tracks.find((t) => t.progress.done < t.progress.total);
   return (
     <div className="space-y-4">
       <StatStrip />
+      {next && (
+        <button onClick={() => navigate(`/t/${encodeURIComponent(next.id)}`)} className="flex w-full items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3.5 text-left transition hover:bg-primary/10">
+          <BookOpen className="h-5 w-5 shrink-0 text-primary" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Continuar: {next.title}</span>
+            <span className="block text-xs text-muted-foreground">{next.progress.done}/{next.progress.total} tasks · próxima te espera</span>
+          </span>
+          <span className="shrink-0 text-primary">→</span>
+        </button>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-sm font-medium text-muted-foreground">Seus temas</h1>
       </div>
