@@ -1,0 +1,23 @@
+# Render Blueprint — theme-studies
+services:
+  - type: web
+    name: theme-studies
+    runtime: node
+    plan: free
+    buildCommand: cd web && npm ci && npm run build
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: APP_USER
+        value: João
+      - key: SSO_SECRET
+        sync: false
+      - key: APP_PASS
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
