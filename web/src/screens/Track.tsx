@@ -244,6 +244,9 @@ function StoryBlock({ trackId, story, meName, defaultOpen, onChanged }: { trackI
             <RotateCcw className="h-3 w-3 text-recall" /><span className="font-mono text-[10px] tabular-nums text-recall">{due}</span>
           </span>
         )}
+        {story.progress.done === story.progress.total && story.progress.total > 0 && (
+          <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-domain/15 text-domain" title="concluída"><Check className="h-3 w-3" /></span>
+        )}
         <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{story.progress.done}/{story.progress.total}</span>
         {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" />}
       </button>
@@ -261,6 +264,9 @@ function EpicCard({ trackId, epic, meName, defaultOpen, openStoryId, onChanged }
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-muted-foreground">Epic {epic.id}</span>
             <span className="min-w-0 flex-1 truncate text-base font-semibold">{epic.title}</span>
+            {epic.progress.done === epic.progress.total && epic.progress.total > 0 && (
+              <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-domain/15 text-domain" title="concluído"><Check className="h-3 w-3" /></span>
+            )}
             <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{epic.progress.done}/{epic.progress.total}</span>
             {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" />}
           </div>
