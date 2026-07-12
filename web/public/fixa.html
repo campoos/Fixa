@@ -128,6 +128,39 @@
   details .ans { padding: 0 20px 20px; color: var(--muted); font-size: 15px; }
   details .ans code { font-family: var(--mono); font-size: 13px; background: var(--bg-2); padding: 2px 6px; border-radius: 6px; color: var(--ink); }
 
+  /* plans */
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 42px; }
+  .pcard { position: relative; display: flex; flex-direction: column; background: var(--card);
+    border: 1px solid var(--line); border-radius: var(--r); padding: 26px; }
+  .pcard.pro { border-color: color-mix(in srgb, var(--brand) 55%, var(--line));
+    box-shadow: 0 12px 40px -28px var(--brand); }
+  .plan-name { font-size: 17px; font-weight: 700; }
+  .soon { position: absolute; top: 22px; right: 22px; font-family: var(--mono); font-size: 10px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--brand-2);
+    border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); border-radius: 999px; padding: 4px 9px; }
+  .price { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; }
+  .price b { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .price span { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .price-alt { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-top: 8px; }
+  .pfeat { list-style: none; margin: 20px 0 22px; padding: 0; display: grid; gap: 10px;
+    font-size: 14.5px; color: var(--muted); flex: 1; align-content: start; }
+  .pfeat li { display: flex; align-items: flex-start; gap: 10px; }
+  .pfeat svg { flex: none; margin-top: 4px; color: var(--domain); }
+  .pfeat b { color: var(--ink); font-weight: 600; }
+  .founder { border: 1px dashed color-mix(in srgb, var(--recall) 50%, var(--line));
+    background: color-mix(in srgb, var(--recall) 9%, transparent);
+    border-radius: 11px; padding: 12px 14px; margin-bottom: 16px; font-size: 13.5px; }
+  .founder b { color: var(--recall); }
+  .founder p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+  .pcard .btn { justify-content: center; }
+  .pnote { font-family: var(--mono); font-size: 11px; color: var(--faint); text-align: center;
+    margin-top: 10px; letter-spacing: .03em; }
+  .plans-foot { margin-top: 24px; display: flex; flex-direction: column; gap: 8px;
+    align-items: center; text-align: center; }
+  .plans-foot .cost { font-family: var(--mono); font-size: 13px; color: var(--recall); }
+  .plans-foot .g { color: var(--muted); font-size: 14px; max-width: 62ch; margin: 0; }
+  @media (max-width: 700px) { .plans { grid-template-columns: 1fr; } }
+
   /* cta */
   .cta { text-align: center; background: linear-gradient(180deg, var(--bg-2), var(--bg));
     border: 1px solid var(--line); border-radius: 24px; padding: 56px 24px; margin-top: 20px; }
@@ -167,6 +200,7 @@
     <div class="nav-links">
       <a href="#metodo" class="hide-sm">Método</a>
       <a href="#recursos" class="hide-sm">Recursos</a>
+      <a href="#planos" class="hide-sm">Planos</a>
       <a href="#duvidas">Dúvidas</a>
       <a href="/temas">Entrar</a>
       <button class="icon-btn" id="themeBtn" aria-label="alternar tema" title="tema">
@@ -273,7 +307,55 @@
   </div>
 </section>
 
-<section id="duvidas" style="background:var(--bg-2);border-block:1px solid var(--line)">
+<section id="planos" style="background:var(--bg-2);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Planos</span>
+      <h2>O método é grátis. O Pro tira o teto.</h2>
+      <p>Revisar todo dia não custa nada — é o hábito que faz fixar. O Pro é pra quem quer a trilha pronta em 1 clique, por menos de R$ 0,85 por dia.</p>
+    </div>
+    <div class="plans">
+      <div class="pcard">
+        <div class="plan-name">Grátis</div>
+        <div class="price"><b>R$ 0</b><span>pra sempre</span></div>
+        <div class="price-alt">sem cartão · sem teste que expira</div>
+        <ul class="pfeat">
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span><b>método completo</b> — recall + revisão espaçada</span></li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span>revisões diárias <b>ilimitadas, pra sempre</b></span></li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span>até <b>2 temas</b> ativos</span></li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span>criação manual — prompt pronto + importar JSON</span></li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span><b>1 geração por IA</b> de degustação</span></li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span>export dos seus dados, sempre</span></li>
+        </ul>
+        <a href="/temas" class="btn ghost">Começar grátis</a>
+      </div>
+      <div class="pcard pro">
+        <span class="soon">assinatura em breve</span>
+        <div class="plan-name">Pro</div>
+        <div class="price"><b>R$ 19,90</b><span>/mês</span></div>
+        <div class="price-alt">ou R$ 149/ano — sai a R$ 12,42/mês (~2,5 meses grátis)</div>
+        <ul class="pfeat">
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span>tudo do Grátis, sem teto</span></li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span><b>temas ilimitados</b></span></li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span>geração por IA em <b>1 clique</b> — a trilha nasce pronta, sem copiar e colar</span></li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span><b>30 gerações/mês</b> — fair use: máx. 10/dia, e revisar nunca conta</span></li>
+        </ul>
+        <div class="founder">
+          <b>Preço de fundador: R$ 14,90/mês, pra sempre.</b>
+          <p>Pros primeiros 100 da lista. Sem contador de vagas — não temos um de verdade e não vamos inventar. Enquanto este aviso existir, vale.</p>
+        </div>
+        <a href="#cta" class="btn">Garantir preço de fundador</a>
+        <div class="pnote">// ainda não cobramos nada — o e-mail só guarda seu lugar</div>
+      </div>
+    </div>
+    <div class="plans-foot">
+      <span class="cost">reprovar numa certificação de US$ 100+ custa mais que 3 anos de Fixa</span>
+      <p class="g">Cancele quando quiser, em 2 cliques. Não fixou em 30 dias? Reembolso integral. E seus dados são seus — exporte tudo a qualquer momento, inclusive no grátis.</p>
+    </div>
+  </div>
+</section>
+
+<section id="duvidas">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Dúvidas</span>
@@ -297,6 +379,10 @@
         <div class="ans">É exatamente pra isso que nasceu. Você monta a trilha da prova, estuda com o método, e a fila de revisão garante que o conteúdo esteja fresco no dia — em vez de decorar tudo na véspera.</div>
       </details>
       <details>
+        <summary>Quanto custa? O grátis expira? <span class="plus">+</span></summary>
+        <div class="ans">O grátis não expira: método completo, revisões diárias ilimitadas pra sempre e até 2 temas ativos — sem cartão. O Pro custa R$ 19,90/mês (ou R$ 149/ano) e libera temas ilimitados e 30 gerações de tema por IA por mês. Cancele quando quiser, em 2 cliques; não fixou em 30 dias, reembolso integral. E seus dados são exportáveis a qualquer momento, em qualquer plano.</div>
+      </details>
+      <details>
         <summary>Funciona no celular? <span class="plus">+</span></summary>
         <div class="ans">Sim, é mobile-first e sincroniza entre dispositivos. Uma task concluída no computador aparece pra revisar no celular no dia certo.</div>
       </details>
@@ -313,11 +399,11 @@
     <div class="cta">
       <span class="eyebrow">Grátis pra começar</span>
       <h2>Pare de reestudar. Comece a lembrar.</h2>
-      <p>Crie sua conta grátis e comece agora — e se quiser ser avisado quando o plano Pro (geração automática por IA e temas ilimitados) sair, deixa teu e-mail.</p>
+      <p>Crie sua conta grátis e comece agora. Quer o Pro? Deixa teu e-mail — os primeiros 100 da lista travam o preço de fundador: R$ 14,90/mês pra sempre.</p>
       <p style="margin-bottom:26px"><a href="/temas" class="btn">Criar conta grátis</a></p>
       <form class="waitlist" id="wl">
         <input type="email" placeholder="seu@email.com" aria-label="seu e-mail" required>
-        <button class="btn ghost" type="submit" style="border:1px solid var(--line)">Avisar do Pro</button>
+        <button class="btn ghost" type="submit" style="border:1px solid var(--line)">Entrar na lista do Pro</button>
       </form>
       <p id="wl-msg" style="margin-top:10px;font-size:13px;color:var(--muted)"></p>
     </div>

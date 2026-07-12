@@ -32,6 +32,10 @@ const APP_PASS = process.env.APP_PASS || "estudar";       // senha da conta fund
 const APP_USER = process.env.APP_USER || "João";           // nome da conta fundadora
 const FOUNDER_EMAIL = (process.env.FOUNDER_EMAIL || "joao@fixa.app").toLowerCase();
 const FREE_THEME_LIMIT = Number(process.env.FREE_THEME_LIMIT || 2); // plano free: nº máx de temas
+// limites de geração por IA (PRICING.md): free = 1 degustação lifetime; pro = fair use 30/mês, máx 10/dia
+const GEN_FREE_LIFETIME = Number(process.env.GEN_FREE_LIFETIME || 1);
+const GEN_PRO_MONTH = Number(process.env.GEN_PRO_MONTH || 30);
+const GEN_PRO_DAY = Number(process.env.GEN_PRO_DAY || 10);
 const DIST = join(__dirname, "web", "dist");
 
 // ---- KV (Upstash REST ou arquivo local) ----
@@ -110,6 +114,25 @@ if (!Object.keys(users).length) {
     console.log(`[bootstrap] estado single-user migrado pra conta fundadora ${FOUNDER_EMAIL}`);
   }
   console.log(`[bootstrap] conta fundadora criada: ${FOUNDER_EMAIL} (plano pro)`);
+}
+
+// ---- geração por IA: uso e limites por usuário ----
+function genUsage(u) {
+  if (u.plan === "pro") {
+    const day = spDay(), ym = day.slice(0, 7);
+    const used = u.genMonth && u.genMonth.ym === ym ? u.genMonth.count : 0;
+    const dayUsed = u.genDay && u.genDay.day === day ? u.genDay.count : 0;
+    return { used, limit: GEN_PRO_MONTH, dayUsed, dayLimit: GEN_PRO_DAY };
+  }
+  return { used: u.genTotal || 0, limit: GEN_FREE_LIFETIME };
+}
+// incrementa contadores — chamar SÓ quando a geração importou um tema com sucesso
+function bumpGen(u) {
+  const day = spDay(), ym = day.slice(0, 7);
+  u.genTotal = (u.genTotal || 0) + 1;
+  u.genMonth = u.genMonth && u.genMonth.ym === ym ? { ym, count: u.genMonth.count + 1 } : { ym, count: 1 };
+  u.genDay = u.genDay && u.genDay.day === day ? { day, count: u.genDay.count + 1 } : { day, count: 1 };
+  saveUsers();
 }
 
 // ---- helpers de domínio (operam no ud do usuário) ----
@@ -311,11 +334,23 @@ const server = createServer(async (req, res) => {
     const isPro = me.plan === "pro";
 
     if (path === "/api/me") return json(res, 200, { name: me.name, email: me.email, plan: me.plan });
-    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length });
-    // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique (Pro)
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me) });
+    // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
+    // free: 1 degustação lifetime · pro: fair use 30/mês + máx 10/dia (PRICING.md)
     if (path === "/api/generate" && req.method === "POST") {
       if (!GEN_ENABLED) return json(res, 400, { error: "geração direta não configurada (GEMINI_API_KEY)" });
-      if (!isPro) return json(res, 402, { error: "geração direta é do plano Pro — use o fluxo manual (grátis) abaixo" });
+      const usage = genUsage(me);
+      if (!isPro) {
+        if (usage.used >= usage.limit)
+          return json(res, 402, { error: "sua geração de degustação já foi usada — o fluxo manual continua grátis e sem limite, e o Pro (em breve) libera 30 gerações por mês" });
+        if (Object.keys(ud.tracks).length >= FREE_THEME_LIMIT)
+          return json(res, 402, { error: `plano free vai até ${FREE_THEME_LIMIT} temas — exclua um tema pra usar sua geração de degustação` });
+      } else {
+        if (usage.used >= usage.limit)
+          return json(res, 429, { error: `você já usou as ${GEN_PRO_MONTH} gerações deste mês — renova no dia 1º do mês que vem; até lá, o fluxo manual segue liberado` });
+        if (usage.dayUsed >= usage.dayLimit)
+          return json(res, 429, { error: `você já usou as ${GEN_PRO_DAY} gerações de hoje — amanhã renova; o fluxo manual segue liberado` });
+      }
       const { theme, level, mode, depth } = await readBody(req);
       if (!theme || !String(theme).trim()) return json(res, 400, { error: "tema obrigatório" });
       const prompt = buildPrompt({ theme, level, mode, depth });
@@ -351,6 +386,7 @@ const server = createServer(async (req, res) => {
       ud.tracks[id] = v.track;
       tState(ud, id);
       await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state")]);
+      bumpGen(me); // conta só quando o tema de fato entrou
       return json(res, 200, { ok: true, id, title: v.track.title, counts: trackCounts(v.track) });
     }
     if (path === "/api/import/prompt") {

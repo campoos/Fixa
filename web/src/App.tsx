@@ -8,6 +8,7 @@ import { NewTheme } from "@/screens/NewTheme";
 import { Track } from "@/screens/Track";
 import { Review } from "@/screens/Review";
 import { Ajuda } from "@/screens/Ajuda";
+import { Pro } from "@/screens/Pro";
 
 // anel de foco padrão de todo interativo do app (spec §3)
 export const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -22,12 +23,13 @@ export function Logo({ size = 24 }: { size?: number }) {
   );
 }
 
-type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "track"; id: string };
+type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "pro" } | { name: "track"; id: string };
 function parseRoute(): Route {
   const p = window.location.pathname.replace(/^\/+|\/+$/g, "");
   if (p === "novo") return { name: "novo" };
   if (p === "revisar") return { name: "revisar" };
   if (p === "ajuda") return { name: "ajuda" };
+  if (p === "pro") return { name: "pro" };
   if (p.startsWith("t/")) return { name: "track", id: decodeURIComponent(p.slice(2)) };
   return { name: "home" };
 }
@@ -60,11 +62,11 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
     window.addEventListener("fx-review-changed", on);
     return () => window.removeEventListener("fx-review-changed", on);
   }, [refetchReview]);
-  const NavBtn = ({ to, active, children }: { to: string; active: boolean; children: ReactNode }) => (
+  const NavBtn = ({ to, active, children, display = "inline-flex" }: { to: string; active: boolean; children: ReactNode; display?: string }) => (
     <button
       onClick={() => navigate(to)}
       aria-current={active ? "page" : undefined}
-      className={`inline-flex h-8 items-center rounded-lg px-3 text-sm transition-colors ${active ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"} ${FOCUS}`}
+      className={`${display} h-8 items-center rounded-lg px-3 text-sm transition-colors ${active ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"} ${FOCUS}`}
     >
       {children}
     </button>
@@ -88,6 +90,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
               )}
             </NavBtn>
             <NavBtn to="/ajuda" active={route.name === "ajuda"}>Ajuda</NavBtn>
+            <NavBtn to="/pro" active={route.name === "pro"} display="hidden sm:inline-flex">Pro</NavBtn>
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => navigate("/novo")} className={`hidden h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:inline-flex ${FOCUS}`}>
@@ -104,6 +107,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
         {route.name === "novo" && <NewTheme />}
         {route.name === "revisar" && <Review />}
         {route.name === "ajuda" && <Ajuda />}
+        {route.name === "pro" && <Pro me={me} />}
         {route.name === "track" && <Track id={route.id} me={me} />}
       </main>
     </div>

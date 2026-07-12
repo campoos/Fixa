@@ -81,8 +81,12 @@ export const appendTrack = (id: string, jsonStr: string) => {
   return api.post<{ ok: true; added: Counts }>("/api/track/append", { id, json: parsed });
 };
 // geração direta (Gemini) — disponível quando o server tem GEMINI_API_KEY
-export interface Config { genEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number }
+// gen: uso real da geração por IA — free: used/limit lifetime (degustação); pro: used/limit no mês + dayUsed/dayLimit no dia
+export interface GenUsage { used: number; limit: number; dayUsed?: number; dayLimit?: number }
+export interface Config { genEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage }
 export const getConfig = () => api.get<Config>("/api/config");
+// lista do Pro (pré-billing) — guarda o e-mail pra avisar quando abrir
+export const joinWaitlist = (email: string) => api.post<{ ok: true }>("/api/waitlist", { email });
 export const generateTrack = (p: PromptParams) =>
   api.post<{ ok: true; id: string; title: string; counts: Counts }>("/api/generate", p);
 export const purgeTrash = (id?: string) => api.post("/api/trash/purge", id ? { id } : {});
