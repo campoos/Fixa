@@ -1,43 +1,69 @@
-import { useState } from "react";
-import { Check, Crown, Loader2, ShieldCheck, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Check, Crown, Loader2 } from "lucide-react";
 import { getConfig, joinWaitlist, type Me } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { FOCUS } from "@/App";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// chave da persistência do "já entrei na lista" (spec §2.5)
+// chave da persistência do "já entrei na lista" (spec §2.6)
 const WAITLIST_KEY = "fx-pro-waitlist";
 
-// tabela comparativa — números são lei do PRICING.md
-const ROWS: { label: string; free: string | boolean; pro: string | boolean }[] = [
-  { label: "Método completo (recall + revisão espaçada)", free: true, pro: true },
-  { label: "Revisões diárias", free: "ilimitadas", pro: "ilimitadas" },
-  { label: "Temas ativos", free: "até 2", pro: "ilimitados" },
-  { label: "Criar tema manual (prompt pronto + JSON)", free: true, pro: true },
-  { label: "Geração por IA em 1 clique", free: "1 degustação", pro: "30/mês" },
-  { label: "Data da prova + meta diária", free: true, pro: true },
-  { label: "Streak + heatmap de consistência", free: true, pro: true },
-  { label: "Export dos seus dados", free: "sempre", pro: "sempre" },
-];
+/* ── peças da anatomia comum dos cards (spec §2.3) ── */
 
-function Cell({ v }: { v: string | boolean }) {
-  if (v === true) return <Check className="mx-auto h-4 w-4 text-domain" aria-label="incluído" />;
-  if (v === false) return <X className="mx-auto h-4 w-4 text-muted-foreground/50" aria-label="não incluído" />;
-  return <span className="font-mono text-xs tabular-nums">{v}</span>;
-}
-
-// preço na anatomia comum aos dois cards (valor grande mono + sufixo)
+// preço grande mono + sufixo na mesma baseline — a assinatura visual da página
 function Price({ value, suffix }: { value: string; suffix: string }) {
   return (
-    <div className="mt-2 flex items-baseline gap-1.5">
-      <span className="font-mono text-[28px] font-semibold leading-none tabular-nums tracking-tight">{value}</span>
-      <span className="text-xs text-muted-foreground">{suffix}</span>
+    <div className="mt-3 flex items-baseline gap-2">
+      <span className="font-mono text-[34px] font-bold leading-none tracking-[-0.03em] tabular-nums md:text-[40px]">{value}</span>
+      <span className="font-mono text-[13px] text-muted-foreground">{suffix}</span>
     </div>
   );
 }
 
-// CTA do card Pro com os 4 estados da spec: idle → busy → enviado (persistido) · erro reabilita
+// lista de features com ✓ — a comparação vive dentro do card
+function Features({ items }: { items: ReactNode[] }) {
+  return (
+    <ul className="mt-5 space-y-2.5 border-t border-border pt-4 text-[13px]">
+      {items.map((item, i) => (
+        <li key={i} className="flex items-start gap-2.5">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-domain" aria-hidden="true" />
+          <span className="text-muted-foreground">{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const B = ({ children }: { children: ReactNode }) => <b className="font-medium text-foreground">{children}</b>;
+
+// features — números são lei do PRICING.md
+const FREE_FEATURES: ReactNode[] = [
+  <><B>método completo</B> — revisões no tempo certo</>,
+  <>revisões diárias <B>ilimitadas, pra sempre</B></>,
+  <>até <B>2 temas</B> ativos</>,
+  <>criação manual — prompt pronto + JSON</>,
+  <><B>1 geração por IA</B> de degustação</>,
+  <>data da prova + meta diária</>,
+  <>export dos seus dados, sempre</>,
+];
+
+const PRO_FEATURES: ReactNode[] = [
+  <><B>temas ilimitados</B> — o grátis para em 2</>,
+  <><B>geração por IA em 1 clique</B></>,
+  <><B>30 gerações/mês</B> (máx. 10/dia)</>,
+  <>tudo do Grátis incluso</>,
+];
+
+// chip estático que ocupa o slot do CTA ("Seu plano atual" / "plano ativo na sua conta")
+function StaticSlot({ tone, children }: { tone: "muted" | "domain"; children: ReactNode }) {
+  const cls = tone === "domain"
+    ? "border border-domain/40 bg-domain/10 text-sm font-medium text-domain"
+    : "border border-border bg-muted/60 text-sm font-medium text-muted-foreground";
+  return <div className={`mt-4 flex h-11 w-full select-none items-center justify-center gap-1.5 rounded-lg ${cls}`}>{children}</div>;
+}
+
+// CTA do Pro com os 4 estados da spec: idle → busy → enviado (persistido) · erro reabilita
 function WaitlistCta({ email }: { email: string }) {
   const [sent, setSent] = useState(() => localStorage.getItem(WAITLIST_KEY) === "1");
   const [busy, setBusy] = useState(false);
@@ -55,96 +81,75 @@ function WaitlistCta({ email }: { email: string }) {
       setBusy(false);
     }
   };
-  if (sent) {
-    return (
-      <div className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-domain/40 bg-domain/10 text-sm font-medium text-domain">
-        <Check className="h-4 w-4" /> Na lista — te aviso em {email}
-      </div>
-    );
-  }
+  if (sent) return <StaticSlot tone="domain"><Check className="h-4 w-4" /> Na lista — te aviso em {email}</StaticSlot>;
   return (
     <>
       <button
         onClick={join}
         disabled={busy}
-        className={`mt-3 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 ${FOCUS}`}
+        className={`mt-4 inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 ${FOCUS}`}
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crown className="h-4 w-4" />} Garantir preço de fundador
       </button>
       {err
-        ? <p className="mt-1.5 text-center text-xs text-destructive">não deu — tenta de novo</p>
-        : <p className="mt-1.5 text-center text-[11px] text-muted-foreground">sem cobrança agora — o e-mail só guarda seu lugar</p>}
+        ? <p className="mt-2 text-center text-xs text-destructive">não deu — tenta de novo</p>
+        : <p className="mt-2 text-center text-[11px] text-muted-foreground">sem cobrança agora — o e-mail só guarda seu lugar</p>}
     </>
   );
 }
 
-function PriceCards({ me }: { me: Me }) {
-  const isPro = me.plan === "pro";
+/* ── os dois cards (spec §2.4 e §2.5) ── */
+
+function FreeCard({ isPro }: { isPro: boolean }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <Card className="gap-0 p-4">
-        <div className="flex items-center">
-          <span className="text-sm font-semibold">Grátis</span>
-          {!isPro && <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">seu plano</span>}
-        </div>
-        <Price value="R$ 0" suffix="pra sempre" />
-        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">método completo, revisões ilimitadas, até 2 temas. Sem cartão, sem teste que expira.</p>
-      </Card>
-      <Card className="relative gap-0 border-primary/45 p-4 shadow-sm">
-        <span className="absolute right-4 top-4 rounded-full bg-primary/12 px-2 py-0.5 font-mono text-[10px] font-medium text-primary">em breve</span>
-        <span className="text-sm font-semibold">Pro</span>
-        <Price value="R$ 19,90" suffix="/mês" />
-        <p className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground">ou R$ 149/ano — sai a R$ 12,42/mês (~2,5 meses grátis)</p>
-        <p className="mt-1.5 text-xs text-muted-foreground">menos de R$ 0,85 por dia.</p>
-        {isPro ? (
-          <div className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-domain/40 bg-domain/10 text-sm font-medium text-domain">
-            <Check className="h-4 w-4" /> plano ativo na sua conta
-          </div>
-        ) : (
-          <>
-            <div className="mt-3 rounded-lg border border-dashed border-recall/45 bg-recall/8 px-3 py-2.5">
-              <p className="text-xs font-semibold text-recall">Preço de fundador: R$ 14,90/mês, pra sempre</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">pros primeiros 100 e-mails da lista. Sem contador de vagas aqui — não temos um de verdade e não vamos inventar. Enquanto este aviso existir, vale.</p>
-            </div>
-            <WaitlistCta email={me.email} />
-          </>
-        )}
-      </Card>
-    </div>
+    <Card className="gap-0 p-6">
+      <p className="text-sm font-semibold">Grátis</p>
+      <Price value="R$ 0" suffix="pra sempre" />
+      <p className="mt-2 font-mono text-[12px] text-muted-foreground/80">sem cartão · sem teste que expira</p>
+      <p className="mt-2 min-h-[2.5rem] text-[13px] text-muted-foreground">tudo que faz fixar: revisões no tempo certo, todo dia.</p>
+      {!isPro && <StaticSlot tone="muted">Seu plano atual</StaticSlot>}
+      <Features items={FREE_FEATURES} />
+    </Card>
   );
 }
 
-function CompareTable() {
+function ProCard({ me }: { me: Me }) {
+  const isPro = me.plan === "pro";
   return (
-    <div>
-      <Card className="gap-0 overflow-hidden p-0">
-        <div className="grid grid-cols-[1fr_5.25rem_5.25rem] items-center border-b border-border bg-muted/40 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          <span>o que tem</span><span className="text-center font-mono">free</span><span className="text-center font-mono text-primary">pro</span>
-        </div>
-        {ROWS.map((r) => (
-          <div key={r.label} className="grid grid-cols-[1fr_5.25rem_5.25rem] items-center border-b border-border/60 px-4 py-3 text-sm last:border-0">
-            <span className="pr-2">{r.label}</span>
-            <span className="text-center text-muted-foreground"><Cell v={r.free} /></span>
-            <span className="text-center"><Cell v={r.pro} /></span>
-          </div>
-        ))}
-      </Card>
-      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">fair use da geração: 30 por mês, no máximo 10 por dia — quem estuda normal usa de 3 a 10. Revisar nunca conta.</p>
-    </div>
+    <Card className="relative gap-0 border-primary/50 p-6 shadow-xl shadow-primary/10 max-md:order-first">
+      <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-primary-foreground">
+        {isPro ? "seu plano" : "preço de fundador"}
+      </span>
+      <p className="text-sm font-semibold">Pro</p>
+      <Price value="R$ 19,90" suffix="/mês" />
+      <p className="mt-2 font-mono text-[12px] tabular-nums text-muted-foreground">ou R$ 149/ano — R$ 12,42/mês (~2,5 meses grátis)</p>
+      <p className="mt-2 min-h-[2.5rem] text-[13px] text-muted-foreground">sem teto de temas, trilha pronta em 1 clique — menos de R$ 0,85 por dia.</p>
+      {isPro ? (
+        <StaticSlot tone="domain"><Check className="h-4 w-4" /> plano ativo na sua conta</StaticSlot>
+      ) : (
+        <>
+          <p className="mt-3 text-[13px] leading-relaxed"><b className="font-semibold text-recall">Primeiros 100 da lista: R$ 14,90/mês, pra sempre.</b></p>
+          <WaitlistCta email={me.email} />
+        </>
+      )}
+      <Features items={PRO_FEATURES} />
+    </Card>
   );
 }
+
+/* ── estados da página ── */
 
 function ProSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-xl">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="mt-2 h-7 w-40" />
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <Skeleton className="h-[150px] rounded-xl" />
-        <Skeleton className="h-[150px] rounded-xl" />
+    <div className="mx-auto w-full max-w-3xl">
+      <Skeleton className="mx-auto h-4 w-16" />
+      <Skeleton className="mx-auto mt-3 h-8 w-72" />
+      <Skeleton className="mx-auto mt-3 h-4 w-96 max-w-full" />
+      <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <Skeleton className="h-[480px] rounded-xl" />
+        <Skeleton className="h-[480px] rounded-xl" />
       </div>
-      <Skeleton className="mt-5 h-[340px] rounded-xl" />
-      <Skeleton className="mt-5 h-[84px] rounded-xl" />
+      <Skeleton className="mx-auto mt-8 h-4 w-80" />
     </div>
   );
 }
@@ -153,34 +158,36 @@ export function Pro({ me }: { me: Me }) {
   const { data: cfg, loading, error } = useApi(getConfig, []);
   const isPro = me.plan === "pro";
   if (loading && !cfg) return <ProSkeleton />;
-  if (error && !cfg) return <div className="mx-auto w-full max-w-xl"><Card className="p-4 text-sm text-destructive">erro: {error}</Card></div>;
+  if (error && !cfg) return <div className="mx-auto w-full max-w-3xl"><Card className="p-4 text-sm text-destructive">erro: {error}</Card></div>;
   return (
-    <div className="mx-auto w-full max-w-xl space-y-5">
-      <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">plano</p>
-        <div className="mt-1 flex items-center gap-2.5">
-          <h1 className="text-lg font-semibold">{isPro ? "Você é Pro" : "Fixa Pro"}</h1>
-          {isPro
-            ? <span className="inline-flex items-center gap-1 rounded-full bg-primary/12 px-2 py-0.5 font-mono text-[11px] font-medium text-primary"><Crown className="h-3 w-3" /> pro</span>
-            : <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[11px] font-medium tabular-nums text-muted-foreground">free · {cfg?.themes ?? 0}/{cfg?.freeLimit ?? 2} temas</span>}
-        </div>
-        <p className="mt-1.5 text-sm text-muted-foreground">
+    <div className="mx-auto w-full max-w-3xl">
+      <div className="text-center">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">planos</p>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-[28px]">
+          {isPro ? "Você é Pro" : "O método é grátis. O Pro tira o teto."}
+        </h1>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           {isPro
             ? "Temas ilimitados e geração direta por IA liberados na sua conta."
-            : "O método inteiro é grátis, pra sempre. O Pro tira o teto de temas e gera a trilha por IA em 1 clique — a assinatura ainda não abriu, mas dá pra travar o preço de fundador abaixo."}
+            : "Revisar todo dia é grátis, pra sempre. O Pro é a trilha pronta em 1 clique."}
         </p>
+        {isPro ? (
+          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-primary/12 px-2.5 py-0.5 font-mono text-[11px] font-medium text-primary"><Crown className="h-3 w-3" /> pro</span>
+        ) : (
+          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 font-mono text-[11px] font-medium tabular-nums text-muted-foreground">
+            free · {cfg?.themes ?? 0}/{cfg?.freeLimit ?? 2} temas ativos
+          </span>
+        )}
       </div>
 
-      <PriceCards me={me} />
-      <CompareTable />
+      <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <FreeCard isPro={isPro} />
+        <ProCard me={me} />
+      </div>
 
-      <Card className="flex-row items-start gap-3 p-4">
-        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-domain" />
-        <div>
-          <p className="text-sm font-medium">Garantia</p>
-          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">Cancele quando quiser, em 2 cliques. Não fixou em 30 dias? Reembolso integral. E seus dados são seus — exporte tudo a qualquer momento, inclusive no grátis.</p>
-        </div>
-      </Card>
+      <p className="mx-auto mt-8 max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
+        Cancele quando quiser. Reembolso em até 30 dias. Seus dados são exportáveis, sempre.
+      </p>
     </div>
   );
 }
