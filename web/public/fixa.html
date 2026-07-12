@@ -211,7 +211,7 @@
   @media (max-width: 560px) { .loop, .feat { grid-template-columns: 1fr; } .waitlist { flex-direction: column; } .nav-links a[href="#duvidas"] { display: none; }
     .hero-tag { font-size: 10.5px; letter-spacing: .07em; }
     /* hero de tela cheia: conteúdo no topo, CTAs ancorados no pé */
-    .hero { min-height: 100svh; padding-top: 40px; padding-bottom: max(32px, env(safe-area-inset-bottom)); display: flex; }
+    .hero { min-height: 100svh; padding-top: 40px; padding-bottom: calc(88px + env(safe-area-inset-bottom)); display: flex; }
     .hero .wrap { display: flex; flex-direction: column; width: 100%; }
     .hero-note, .ladder { display: none; }  /* mobile: hero enxuto — tag, título, lead, CTAs */
     .hero-cta { margin-top: auto; padding-top: 32px; }
