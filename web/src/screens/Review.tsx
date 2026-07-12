@@ -67,7 +67,7 @@ function LeitnerLadder({ box, ladder }: { box: number; ladder: number[] }) {
 
 function ReviewSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-xl">
+    <div className="mx-auto flex min-h-[calc(100dvh-8.5rem)] w-full max-w-xl flex-col justify-center">
       <Skeleton className="h-4 w-32" />
       <Skeleton className="mt-3 h-1.5 w-full rounded-full" />
       <Skeleton className="mt-5 h-[280px] rounded-xl" />
@@ -211,7 +211,7 @@ export function Review() {
     : undefined;
 
   return (
-    <div className="mx-auto w-full max-w-xl">
+    <div className="mx-auto flex min-h-[calc(100dvh-8.5rem)] w-full max-w-xl flex-col justify-center">
       <h1 className="sr-only">Revisar hoje</h1>
       <div aria-live="polite" className="sr-only">{live}</div>
 
