@@ -59,7 +59,10 @@
 
   /* hero */
   .hero { position: relative; padding: 84px 0 72px; overflow: hidden; }
-  #memcanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .55; }
+  #memcanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; }
+  /* overlay entre o gráfico e o texto: apaga a curva atrás do bloco de leitura */
+  .hero::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(100deg, var(--bg) 8%, color-mix(in srgb, var(--bg) 72%, transparent) 42%, transparent 68%); }
   .hero .wrap { position: relative; z-index: 2; }
   .hero-tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px;
     letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line);
@@ -471,7 +474,7 @@
 
     // revisões em intervalos CRESCENTES (a régua do método) e decaimento que achata a cada acerto
     var reviews = [0.05, 0.13, 0.24, 0.39, 0.58, 0.81];
-    var K0 = 26, FLAT = 1.75; // K0 = esquecimento inicial; a cada revisão k /= FLAT
+    var K0 = 9, FLAT = 1.6; // K0 = esquecimento inicial (suave); a cada revisão k /= FLAT
 
     // retenção 0..1 na fração f do tempo — única fonte de verdade da geometria
     function retention(f) {
@@ -482,7 +485,7 @@
       return Math.exp(-k * (f - start));
     }
     function yAt(f) {
-      var top = H * 0.30, bottom = H * 0.78; // retenção 1 → top; 0 → bottom
+      var top = H * 0.38, bottom = H * 0.86; // retenção 1 → top; 0 → bottom (banda mais baixa, longe do título)
       return bottom - (bottom - top) * retention(f);
     }
     var fx = function (f) { return f * W; };
