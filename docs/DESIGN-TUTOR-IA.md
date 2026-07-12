@@ -78,10 +78,39 @@ Errei pra rever amanhã?" — sugestão, nunca automático.)
 | /pro + PRICING | nova linha de feature + limites |
 | Ajuda | FAQ "o que é a correção por IA?" |
 
-## 9. Decisões abertas (pro João bater o martelo)
+## 9. Feedback do João sobre o mock (12/07) — incorporado ao plano
 
-- **D1 — Gatilho:** corrigir automático no Done (mágico, mas gasta em task que ele nem quer
-  correção) vs botão "Corrigir com IA" (explícito; recomendo v1 = botão + destaque visual).
+**9.1 — UI/lugar: a correção NÃO entra inline na árvore.** A tela de estudo já é densa
+("meio confusa, poluída" — dono); enfiar um card cheio de informação dentro da task piora.
+Direção a explorar na implementação real: a correção como um MOMENTO FOCADO, separado do
+fluxo da árvore — candidatos: (a) sheet/overlay limpo que abre ao pedir correção (a árvore
+some, só a correção na tela, padrão do player do Revisar); (b) pós-Done, um convite discreto
+("ver correção do Tutor →") que leva pra essa superfície; (c) rota própria. O card denso do
+mock vira o CONTEÚDO dessa superfície, não um bloco na árvore. **Decisão final = do fluxo
+completo de design.**
+
+**9.2 — Pipeline completo na implementação real:** UX designer (papel NOVO no time — criar o
+agente), designer visual, marketing (copy/posicionamento da feature), frontend. Nada de
+implementar direto.
+
+**9.3 — QUANDO rodar a IA: só no FINAL da task (estudado, decidido).** Análise:
+- **Pedagogia (o fator decisivo):** o método vive de *dificuldade desejável* — o esforço
+  solitário do frio→gaps é ONDE a memória se forma. IA corrigindo a cada passo vira muleta:
+  o usuário para de se esforçar e espera o feedback (mata o recall). A literatura de testing
+  effect aponta que feedback APÓS a tentativa completa é igual ou mais eficaz que feedback
+  imediato — e preserva o esforço. Corrigir no final = ciência a favor.
+- **Qualidade da correção:** no final o Tutor vê a jornada INTEIRA (resposta fria + resposta
+  pós-pontos-chave + anotações) e corrige com contexto rico. Por passo, vê fragmentos.
+- **Custo:** 1 chamada vs 2-3 por task (livre de multiplicar o gasto por nada).
+- **UX:** cada chamada = 3-8s de espera; no meio do loop quebra o ritmo, no final é o momento
+  natural de pausa.
+- **Válvula de escape (v2, talvez):** um "pedir ajuda ao Tutor" EXPLÍCITO no meio da task
+  (o usuário escolhe gastar o momento de aprendizado) — nunca automático por passo.
+
+## 10. Decisões abertas (pro João bater o martelo)
+
+- **D1 — Gatilho:** DEFINIDO que roda só no final (§9.3). Resta: automático no Done vs botão
+  explícito pós-Done (recomendo botão/convite — coerente com §9.1).
 - **D2 — Nota:** 0–10 (escolar BR, familiar) vs conceito (A/B/C…) vs sem nota (só feedback).
   Recomendo 0–10 — a Gabriela falou "dando nota e tal" 😄.
 - **D3 — Resposta escrita obrigatória** pra marcar Done? (força o método, mas adiciona atrito)
