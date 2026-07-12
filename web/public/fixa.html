@@ -473,17 +473,21 @@
     function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
     var reviews = [0.05, 0.13, 0.24, 0.39, 0.58, 0.81];
-    var K0 = 9, FLAT = 1.6;
+    // profundidade do vale de cada trecho: o 1º esquecimento vai LÁ EMBAIXO,
+    // e cada revisão deixa o próximo vale mais raso — a história do método.
+    var floors = [0.06, 0.16, 0.30, 0.46, 0.62, 0.76, 0.86];
 
     function retention(f) {
       var seg = 0;
       for (var i = 0; i < reviews.length; i++) if (f >= reviews[i]) seg = i + 1;
       var start = seg === 0 ? 0 : reviews[seg - 1];
-      var k = K0 / Math.pow(FLAT, seg);
-      return Math.exp(-k * (f - start));
+      var end = seg < reviews.length ? reviews[seg] : 1.0001;
+      var u = (f - start) / (end - start);          // posição normalizada no trecho (0..1)
+      var k = -Math.log(floors[seg]);               // decai até EXATAMENTE o fundo do trecho no resgate
+      return Math.exp(-k * u);
     }
     function yBase(f) {
-      var top = H * 0.38, bottom = H * 0.86;
+      var top = H * 0.36, bottom = H * 0.88;
       return bottom - (bottom - top) * retention(f);
     }
     // wobble: logo após um resgate, o trecho novo assenta com oscilação amortecida (sutil)
