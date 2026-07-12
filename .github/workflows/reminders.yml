@@ -1,0 +1,12 @@
+name: lembretes diários
+on:
+  schedule:
+    - cron: "23 11 * * *"   # ~08h23 em São Paulo
+  workflow_dispatch: {}      # permite disparar manual pra testar
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: chama o cron de lembretes (e acorda o Render)
+        run: |
+          curl -fsS --max-time 120 "https://fixa-hbn1.onrender.com/api/cron/reminders?key=${{ secrets.CRON_SECRET }}"

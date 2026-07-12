@@ -84,7 +84,11 @@ Home dashboard (streak/stats) · página Ajuda · landing/mockup em `/fixa.html`
 - **Packs de certificação** (one-time). Billing.
 - **Pronto quando:** dá pra cobrar.
 
-### M9 — Profundidade
+### M9 — Profundidade (⚠️ DÉBITO CONSCIENTE — decisão do João, 12/07)
+> **Sandbox de código fica como débito, sem prazo.** Ressalva explícita do dono: o Fixa é AMPLO
+> (qualquer tema — teoria, idioma, cert, culinária); um sandbox de código não pode empurrar o produto
+> pra "app de programador". Se um dia entrar, é como enhancement opcional de tasks practice de código,
+> nunca como identidade do produto.
 - Sandbox de código JS/TS (Monaco + worker) pras práticas · PWA/offline · analytics de aprendizagem.
 
 ### 🔒 Fase 0 — Separação de IP *(pré-requisito de M7/M8 — QUALQUER venda)*

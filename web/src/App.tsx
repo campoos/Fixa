@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CircleHelp, Gem, Layers, Library, LogOut, Moon, Plus, Sun } from "lucide-react";
-import { ApiError, getMe, getReview, login, logout, signup, type Me } from "@/lib/api";
+import { ApiError, forgotPass, getMe, getReview, login, logout, resetPass, signup, type Me } from "@/lib/api";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { useApi } from "@/lib/useApi";
 import { Home } from "@/screens/Home";
@@ -23,13 +23,14 @@ export function Logo({ size = 24 }: { size?: number }) {
   );
 }
 
-type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "pro" } | { name: "track"; id: string };
+type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "pro" } | { name: "track"; id: string } | { name: "redefinir" };
 function parseRoute(): Route {
   const p = window.location.pathname.replace(/^\/+|\/+$/g, "");
   if (p === "novo") return { name: "novo" };
   if (p === "revisar") return { name: "revisar" };
   if (p === "ajuda") return { name: "ajuda" };
   if (p === "pro") return { name: "pro" };
+  if (p === "redefinir") return { name: "redefinir" };
   if (p.startsWith("t/")) return { name: "track", id: decodeURIComponent(p.slice(2)) };
   return { name: "home" };
 }
@@ -122,7 +123,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
         </div>
       </header>
       <main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" ? "pb-6" : "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
-        {route.name === "home" && <Home />}
+        {(route.name === "home" || route.name === "redefinir") && <Home />}
         {route.name === "novo" && <NewTheme />}
         {route.name === "revisar" && <Review />}
         {route.name === "ajuda" && <Ajuda />}
@@ -145,19 +146,21 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
 }
 
 function Login({ onLogin }: { onLogin: (me: Me) => void }) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
+  const [sent, setSent] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inputCls = "w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary";
-  const canSubmit = mode === "login" ? email.trim() && pass : name.trim() && email.trim() && pass.length >= 6;
+  const canSubmit = mode === "login" ? email.trim() && pass : mode === "forgot" ? email.trim() : name.trim() && email.trim() && pass.length >= 6;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      onLogin(mode === "login" ? await login(email, pass) : await signup(name, email, pass));
+      if (mode === "forgot") { await forgotPass(email); setSent(true); }
+      else onLogin(mode === "login" ? await login(email, pass) : await signup(name, email, pass));
     } catch (ex) {
       setErr(ex instanceof ApiError ? ex.message : "algo deu errado — tenta de novo");
     } finally { setBusy(false); }
@@ -166,18 +169,57 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
     <div className="grid min-h-full place-items-center px-4">
       <form onSubmit={submit} className="w-full max-w-xs space-y-3 rounded-xl border border-border bg-card p-6">
         <div className="flex items-center gap-2 text-lg font-extrabold tracking-tight"><Logo size={22} /> Fixa</div>
-        <p className="text-xs text-muted-foreground">{mode === "login" ? "Entre pra continuar estudando." : "Crie sua conta — leva 10 segundos."}</p>
+        <p className="text-xs text-muted-foreground">{mode === "login" ? "Entre pra continuar estudando." : mode === "forgot" ? "Digite seu e-mail — enviamos um link pra criar uma senha nova." : "Crie sua conta — leva 10 segundos."}</p>
         {mode === "signup" && (
           <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="seu nome" className={inputCls} />
         )}
         <input type="email" autoFocus={mode === "login"} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail" className={inputCls} />
-        <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={mode === "signup" ? "senha (6+ caracteres)" : "senha"} className={inputCls} />
+        {mode !== "forgot" && (
+          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={mode === "signup" ? "senha (6+ caracteres)" : "senha"} className={inputCls} />
+        )}
+        {mode === "forgot" && sent && <p className="text-xs text-domain">Se existir conta com esse e-mail, o link chegou. Vale por 1 hora.</p>}
         {err && <p className="text-sm text-destructive">{err}</p>}
-        <button disabled={busy || !canSubmit} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-          {busy ? "…" : mode === "login" ? "entrar" : "criar conta"}
+        <button disabled={busy || !canSubmit || (mode === "forgot" && sent)} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          {busy ? "…" : mode === "login" ? "entrar" : mode === "forgot" ? (sent ? "link enviado" : "enviar link") : "criar conta"}
         </button>
-        <button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(null); }} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">
+        <button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(null); setSent(false); }} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">
           {mode === "login" ? "não tem conta? criar agora" : "já tem conta? entrar"}
+        </button>
+        {mode === "login" && (
+          <button type="button" onClick={() => { setMode("forgot"); setErr(null); setSent(false); }} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">
+            esqueci minha senha
+          </button>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function ResetScreen({ onLogin }: { onLogin: (me: Me) => void }) {
+  const token = new URLSearchParams(window.location.search).get("token") ?? "";
+  const [pass, setPass] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    try {
+      const me = await resetPass(token, pass);
+      onLogin(me);
+      navigate("/");
+    } catch (ex) {
+      setErr(ex instanceof ApiError ? ex.message : "algo deu errado — tenta de novo");
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="grid min-h-full place-items-center px-4">
+      <form onSubmit={submit} className="w-full max-w-xs space-y-3 rounded-xl border border-border bg-card p-6">
+        <div className="flex items-center gap-2 text-lg font-extrabold tracking-tight"><Logo size={22} /> Fixa</div>
+        <p className="text-xs text-muted-foreground">Crie sua nova senha.</p>
+        <input type="password" autoFocus value={pass} onChange={(e) => setPass(e.target.value)} placeholder="nova senha (6+ caracteres)" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
+        {err && <p className="text-sm text-destructive">{err}</p>}
+        <button disabled={busy || pass.length < 6} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          {busy ? "…" : "salvar e entrar"}
         </button>
       </form>
     </div>
@@ -192,6 +234,7 @@ export default function App() {
   return (
     <ThemeProvider>
       {booting ? <div className="grid min-h-full place-items-center text-sm text-muted-foreground">carregando…</div>
+        : parseRoute().name === "redefinir" && !me ? <ResetScreen onLogin={setMe} />
         : me ? <Shell me={me} onLogout={doLogout} /> : <Login onLogin={setMe} />}
     </ThemeProvider>
   );

@@ -62,6 +62,9 @@ export const getMe = () => api.get<Me>("/api/me");
 export const login = (email: string, pass: string) => api.post<Me>("/api/login", { email, pass });
 export const signup = (name: string, email: string, pass: string) => api.post<Me>("/api/signup", { name, email, pass });
 export const logout = () => api.post("/api/logout");
+export const forgotPass = (email: string) => api.post<{ ok: true }>("/api/forgot", { email });
+export const resetPass = (token: string, pass: string) => api.post<Me>("/api/reset", { token, pass });
+export const billingCheckout = () => api.post<{ ok: true; url: string }>("/api/billing/checkout");
 
 // ---- temas ----
 export const getTracks = () => api.get<{ tracks: TrackSummary[] }>("/api/tracks").then((r) => r.tracks);
@@ -83,7 +86,7 @@ export const appendTrack = (id: string, jsonStr: string) => {
 // geração direta (Gemini) — disponível quando o server tem GEMINI_API_KEY
 // gen: uso real da geração por IA — free: used/limit lifetime (degustação); pro: used/limit no mês + dayUsed/dayLimit no dia
 export interface GenUsage { used: number; limit: number; dayUsed?: number; dayLimit?: number }
-export interface Config { genEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage }
+export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage }
 export const getConfig = () => api.get<Config>("/api/config");
 // lista do Pro (pré-billing) — guarda o e-mail pra avisar quando abrir
 export const joinWaitlist = (email: string) => api.post<{ ok: true }>("/api/waitlist", { email });

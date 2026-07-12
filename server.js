@@ -6,6 +6,7 @@ import { createHmac, timingSafeEqual, scrypt, randomBytes } from "node:crypto";
 import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
 import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry } from "./review-engine.js";
+import { emailEnabled, sendEmail, emailShell } from "./email.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -32,6 +33,12 @@ const APP_PASS = process.env.APP_PASS || "estudar";       // senha da conta fund
 const APP_USER = process.env.APP_USER || "João";           // nome da conta fundadora
 const FOUNDER_EMAIL = (process.env.FOUNDER_EMAIL || "joao@fixa.app").toLowerCase();
 const FREE_THEME_LIMIT = Number(process.env.FREE_THEME_LIMIT || 2); // plano free: nº máx de temas
+const BASE_URL = (process.env.PUBLIC_URL || process.env.BASE_URL || "https://fixa-hbn1.onrender.com").replace(/\/+$/, "");
+// billing (Mercado Pago Assinaturas) — env-gated: sem credenciais, o /pro segue com a lista de espera
+const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || "";
+const MP_PLAN_ID = process.env.MP_PLAN_ID || "";
+const BILLING_ENABLED = Boolean(MP_ACCESS_TOKEN && MP_PLAN_ID);
+const CRON_SECRET = process.env.CRON_SECRET || "";
 // limites de geração por IA (PRICING.md): free = 1 degustação lifetime; pro = fair use 30/mês, máx 10/dia
 const GEN_FREE_LIFETIME = Number(process.env.GEN_FREE_LIFETIME || 1);
 const GEN_PRO_MONTH = Number(process.env.GEN_PRO_MONTH || 30);
@@ -257,6 +264,7 @@ function verify(token) {
   if (!d || !d.u || !d.e || Date.now() > d.e) return null;
   return d.u;
 }
+const signUid = (uid) => createHmac("sha256", SSO_SECRET).update(`rem:${uid}`).digest("base64url").slice(0, 22);
 function sessionUser(req) {
   const m = (req.headers.cookie || "").match(/(?:^|;\s*)ts_sess=([^;]+)/);
   const uid = m ? verify(m[1]) : null;
@@ -326,6 +334,96 @@ const server = createServer(async (req, res) => {
       }
       return json(res, 200, { ok: true });
     }
+    // recuperação de senha (pública; nunca revela se o e-mail existe)
+    if (path === "/api/forgot" && req.method === "POST") {
+      if (!emailEnabled()) return json(res, 503, { error: "recuperação por e-mail indisponível no momento" });
+      const { email } = await readBody(req);
+      const em = String(email || "").trim().toLowerCase();
+      const u = users[em];
+      if (u) {
+        const token = randomBytes(24).toString("base64url");
+        await kv.set(`reset:${token}`, { email: em, exp: Date.now() + 3600_000 }); // 1h
+        const link = `${BASE_URL}/redefinir?token=${token}`;
+        const r = await sendEmail({
+          to: em,
+          subject: "Redefinir sua senha — Fixa",
+          html: emailShell("Redefinir senha", `<p style="font-size:14px;line-height:1.6;color:#5c5480">Alguém (provavelmente você) pediu pra redefinir a senha desta conta. O link vale por 1 hora.</p>
+            <p style="margin:20px 0"><a href="${link}" style="background:#6c47f0;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600">Criar nova senha</a></p>
+            <p style="font-size:12px;color:#8b83ab">Se não foi você, ignore este e-mail — nada muda.</p>`),
+        });
+        if (!r.ok) console.error("[forgot] envio falhou:", r.reason, "| link:", link);
+      }
+      return json(res, 200, { ok: true }); // resposta idêntica com ou sem conta
+    }
+    if (path === "/api/reset" && req.method === "POST") {
+      const { token, pass } = await readBody(req);
+      if (String(pass || "").length < 6) return json(res, 400, { error: "senha precisa de 6+ caracteres" });
+      const t = token ? await kv.get(`reset:${token}`) : null;
+      if (!t || Date.now() > t.exp || !users[t.email]) return json(res, 400, { error: "link inválido ou expirado — peça outro" });
+      const u = users[t.email];
+      u.salt = randomBytes(16).toString("hex");
+      u.hash = await hashPass(pass, u.salt);
+      await saveUsers();
+      await kv.set(`reset:${token}`, { exp: 0 }); // invalida
+      return setSession(res, 200, u.id, { name: u.name, email: u.email, plan: u.plan });
+    }
+    // webhook do Mercado Pago: confirma/cancela assinatura → plan pro/free
+    if (path === "/api/billing/webhook" && req.method === "POST") {
+      const body = await readBody(req);
+      const preId = body?.data?.id;
+      const type = body?.type || body?.action || "";
+      if (BILLING_ENABLED && preId && String(type).includes("preapproval")) {
+        try {
+          const r = await fetch(`https://api.mercadopago.com/preapproval/${preId}`, { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } });
+          if (r.ok) {
+            const pre = await r.json();
+            const u = userById(pre.external_reference) || users[String(pre.payer_email || "").toLowerCase()];
+            if (u) {
+              const newPlan = pre.status === "authorized" ? "pro" : (["cancelled", "paused"].includes(pre.status) ? "free" : u.plan);
+              if (newPlan !== u.plan) {
+                u.plan = newPlan;
+                u.mpPreapprovalId = pre.id;
+                await saveUsers();
+                console.log(`[billing] ${u.email} → ${newPlan} (preapproval ${pre.status})`);
+              }
+            }
+          }
+        } catch (e) { console.error("[billing] webhook:", e.message); }
+      }
+      return json(res, 200, { ok: true }); // MP exige 200 sempre
+    }
+    // cron de lembretes (GitHub Action diária): ?key=CRON_SECRET
+    if (path === "/api/cron/reminders") {
+      if (!CRON_SECRET || url.searchParams.get("key") !== CRON_SECRET) return json(res, 401, { error: "não autorizado" });
+      if (!emailEnabled()) return json(res, 200, { ok: true, sent: 0, reason: "e-mail não configurado" });
+      let sent = 0, skipped = 0;
+      for (const u of Object.values(users)) {
+        if (u.remindersOff) { skipped++; continue; }
+        const ud = await udata(u.id);
+        const due = globalReview(ud).due.length;
+        if (!due) continue;
+        const offLink = `${BASE_URL}/api/reminders/off?u=${u.id}&sig=${signUid(u.id)}`;
+        const r = await sendEmail({
+          to: u.email,
+          subject: `${due} ${due === 1 ? "revisão te espera" : "revisões te esperam"} hoje — Fixa`,
+          html: emailShell(`${due} pra revisar hoje`, `<p style="font-size:14px;line-height:1.6;color:#5c5480">Suas tasks voltaram no tempo certo — revisar agora é o que faz fixar. Leva poucos minutos.</p>
+            <p style="margin:20px 0"><a href="${BASE_URL}/revisar" style="background:#6c47f0;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600">Revisar agora</a></p>
+            <p style="font-size:12px;color:#8b83ab"><a href="${offLink}" style="color:#8b83ab">Parar de receber lembretes</a></p>`),
+        });
+        if (r.ok) sent++;
+      }
+      return json(res, 200, { ok: true, sent, skipped });
+    }
+    // opt-out de lembretes (link assinado do e-mail)
+    if (path === "/api/reminders/off") {
+      const uid = url.searchParams.get("u"), sig = url.searchParams.get("sig");
+      const u = uid && sig === signUid(uid) ? userById(uid) : null;
+      if (!u) return json(res, 400, { error: "link inválido" });
+      u.remindersOff = true;
+      await saveUsers();
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f5f3fa;color:#1c1533"><div style="text-align:center"><p style="font-weight:600">Lembretes desligados.</p><p style="font-size:14px;color:#5c5480">Você pode continuar revisando em <a href="${BASE_URL}/revisar" style="color:#6c47f0">${BASE_URL.replace("https://", "")}/revisar</a></p></div>`);
+    }
 
     // daqui pra baixo exige sessão
     const me = sessionUser(req);
@@ -334,7 +432,7 @@ const server = createServer(async (req, res) => {
     const isPro = me.plan === "pro";
 
     if (path === "/api/me") return json(res, 200, { name: me.name, email: me.email, plan: me.plan });
-    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me) });
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me) });
     // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
     // free: 1 degustação lifetime · pro: fair use 30/mês + máx 10/dia (PRICING.md)
     if (path === "/api/generate" && req.method === "POST") {
@@ -442,6 +540,32 @@ const server = createServer(async (req, res) => {
     }
     if (path === "/api/review") return json(res, 200, globalReview(ud));
     if (path === "/api/stats") return json(res, 200, computeStats(ud));
+    // billing: cria a assinatura no Mercado Pago e devolve a URL de checkout
+    if (path === "/api/billing/checkout" && req.method === "POST") {
+      if (!BILLING_ENABLED) return json(res, 400, { error: "assinatura ainda não está aberta" });
+      if (me.plan === "pro") return json(res, 400, { error: "sua conta já é Pro" });
+      try {
+        const r = await fetch("https://api.mercadopago.com/preapproval", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            preapproval_plan_id: MP_PLAN_ID,
+            payer_email: me.email,
+            external_reference: me.id,
+            back_url: `${BASE_URL}/pro`,
+          }),
+        });
+        const pre = await r.json();
+        if (!r.ok || !pre.init_point) {
+          console.error("[billing] checkout:", r.status, JSON.stringify(pre).slice(0, 200));
+          return json(res, 502, { error: "não deu pra iniciar o checkout — tenta de novo" });
+        }
+        return json(res, 200, { ok: true, url: pre.init_point });
+      } catch (e) {
+        console.error("[billing] checkout:", e.message);
+        return json(res, 502, { error: "não deu pra iniciar o checkout — tenta de novo" });
+      }
+    }
     // export completo dos dados do usuário (a promessa "seus dados são exportáveis, sempre")
     if (path === "/api/export") {
       const payload = {

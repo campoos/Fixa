@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Check, Crown, Loader2 } from "lucide-react";
-import { getConfig, joinWaitlist, type Me } from "@/lib/api";
+import { ApiError, billingCheckout, getConfig, joinWaitlist, type Me } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { FOCUS } from "@/App";
 import { Card } from "@/components/ui/card";
@@ -64,6 +64,32 @@ function StaticSlot({ tone, children }: { tone: "muted" | "domain"; children: Re
 }
 
 // CTA do Pro com os 4 estados da spec: idle → busy → enviado (persistido) · erro reabilita
+// CTA real de assinatura (só quando o billing está configurado no server)
+function SubscribeCta() {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const go = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await billingCheckout();
+      window.location.href = r.url; // checkout do Mercado Pago
+    } catch (ex) {
+      setErr(ex instanceof ApiError ? ex.message : "não deu — tenta de novo");
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button onClick={go} disabled={busy} className={`mt-3 inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 ${FOCUS}`}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crown className="h-4 w-4" />} Assinar o Pro
+      </button>
+      {err
+        ? <p className="mt-1.5 text-center text-xs text-destructive">{err}</p>
+        : <p className="mt-1.5 text-center text-[11px] text-muted-foreground">pagamento pelo Mercado Pago — cancele quando quiser</p>}
+    </>
+  );
+}
+
 function WaitlistCta({ email }: { email: string }) {
   const [sent, setSent] = useState(() => localStorage.getItem(WAITLIST_KEY) === "1");
   const [busy, setBusy] = useState(false);
@@ -113,7 +139,7 @@ function FreeCard({ isPro }: { isPro: boolean }) {
   );
 }
 
-function ProCard({ me }: { me: Me }) {
+function ProCard({ me, billing }: { me: Me; billing: boolean }) {
   const isPro = me.plan === "pro";
   return (
     <Card className="relative gap-0 border-primary/50 p-6 shadow-xl shadow-primary/10 max-md:order-first">
@@ -128,8 +154,8 @@ function ProCard({ me }: { me: Me }) {
         <StaticSlot tone="domain"><Check className="h-4 w-4" /> plano ativo na sua conta</StaticSlot>
       ) : (
         <>
-          <p className="mt-3 text-[13px] leading-relaxed"><b className="font-semibold text-recall">Primeiros 100 da lista: R$ 14,90/mês, pra sempre.</b></p>
-          <WaitlistCta email={me.email} />
+          <p className="mt-3 text-[13px] leading-relaxed"><b className="font-semibold text-recall">Primeiros 100: R$ 14,90/mês, pra sempre.</b></p>
+          {billing ? <SubscribeCta /> : <WaitlistCta email={me.email} />}
         </>
       )}
       <Features items={PRO_FEATURES} />
@@ -182,7 +208,7 @@ export function Pro({ me }: { me: Me }) {
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         <FreeCard isPro={isPro} />
-        <ProCard me={me} />
+        <ProCard me={me} billing={cfg?.billingEnabled ?? false} />
       </div>
 
       <p className="mx-auto mt-8 max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
