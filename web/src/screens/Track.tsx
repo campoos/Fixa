@@ -206,11 +206,6 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
           {task.type === "practice" && <span className="shrink-0" title="prática"><FlaskConical className="h-3.5 w-3.5 text-muted-foreground" aria-label="prática" /></span>}
           <span className={cn("min-w-0 flex-1 truncate text-sm", task.done && "text-muted-foreground line-through")}>{task.title}</span>
           {task.review?.graduated && <span className="shrink-0 text-domain" title="dominada"><GraduationCap className="h-3.5 w-3.5" aria-label="dominada" /></span>}
-          {task.review?.due && (
-            <span className="inline-flex h-[18px] shrink-0 items-center gap-1 rounded-full bg-recall/12 px-1.5 text-[10px] font-medium text-recall" title="pra revisar hoje">
-              <RotateCcw className="h-3 w-3" /><span className="hidden sm:inline">revisar</span>
-            </span>
-          )}
           {task.comments.length > 0 && (
             <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground" title="anotações">
               <MessageSquare className="h-3.5 w-3.5" /><span className="font-mono text-[11px] tabular-nums">{task.comments.length}</span>
@@ -233,7 +228,6 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
 
 function StoryBlock({ trackId, story, meName, defaultOpen, onChanged }: { trackId: string; story: Story; meName: string; defaultOpen: boolean; onChanged: () => void }) {
   const [open, setOpen] = useState(defaultOpen);
-  const due = story.tasks.filter((t) => t.review?.due).length;
   return (
     <div className="rounded-lg border border-border bg-muted/30">
       <button onClick={() => setOpen(!open)} className={`flex w-full items-center gap-2 rounded-lg p-2.5 text-left ${FOCUS}`}>
@@ -242,11 +236,6 @@ function StoryBlock({ trackId, story, meName, defaultOpen, onChanged }: { trackI
         )}
         <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{story.id}</span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{story.title}</span>
-        {due > 0 && (
-          <span className="inline-flex shrink-0 items-center gap-1" title="pra revisar hoje">
-            <RotateCcw className="h-3 w-3 text-recall" /><span className="font-mono text-[10px] tabular-nums text-recall">{due}</span>
-          </span>
-        )}
         <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{story.progress.done}/{story.progress.total}</span>
         {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" />}
       </button>
@@ -395,11 +384,6 @@ export function Track({ id, me }: { id: string; me: Me }) {
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           <span className="text-muted-foreground"><span className="font-mono tabular-nums">{data.progress.done}</span> concluídas</span>
           <span className="inline-flex items-center gap-1 text-domain"><GraduationCap className="h-3.5 w-3.5" /><span className="font-mono tabular-nums">{data.mastery}</span> dominadas</span>
-          {data.review.due.length > 0 && (
-            <button onClick={() => navigate("/revisar")} className={`rounded-sm text-recall underline-offset-2 hover:underline ${FOCUS}`}>
-              <span className="font-mono tabular-nums">{data.review.due.length}</span> pra revisar hoje
-            </button>
-          )}
         </div>
         {data.mastery === 0 && <p className="mt-1 text-[11px] text-muted-foreground/70">Dominar ≠ concluir: uma task vira “dominada” quando você acerta ela nas revisões espaçadas até graduar.</p>}
         <TargetControl track={data} onChange={changed} />
