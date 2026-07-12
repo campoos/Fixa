@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Eye, EyeOff, PenLine, RotateCcw } from "lucide-react";
 import { FOCUS } from "@/App";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -16,10 +16,10 @@ const Mono = ({ children }: { children: ReactNode }) => <span className="font-mo
 /* ── O MÉTODO — o loop frio → corrige → generaliza → espaça ── */
 
 const METHOD = [
-  { n: "01", tag: "frio", t: "Tenta de cabeça", d: "Responda a questão sem olhar nada. O esforço de puxar da memória — mesmo errando — é o que grava." },
-  { n: "02", tag: "corrige", t: "Confere em dois tempos", d: "Revele primeiro só os pontos-chave e ache o que faltou; responda de novo e só então confira a resposta. Erro percebido fixa mais que acerto fácil." },
-  { n: "03", tag: "generaliza", t: "Comprime com a sua palavra", d: "Anote nas Anotações da task, em 2–4 frases, o que entendeu e onde errou. O cérebro esmaga o conteúdo no mínimo revisável." },
-  { n: "04", tag: "espaça", t: "Revisa no tempo certo", d: "A task volta em intervalos crescentes: acertou, espaça mais; errou, volta amanhã. Acertou até a última caixa, ela está dominada." },
+  { n: "01", tag: "frio", icon: EyeOff, t: "Tenta de cabeça", d: "Responda a questão sem olhar nada. O esforço de puxar da memória — mesmo errando — é o que grava." },
+  { n: "02", tag: "corrige", icon: Eye, t: "Confere em dois tempos", d: "Revele primeiro só os pontos-chave e ache o que faltou; responda de novo e só então confira a resposta. Erro percebido fixa mais que acerto fácil." },
+  { n: "03", tag: "generaliza", icon: PenLine, t: "Comprime com a sua palavra", d: "Anote nas Anotações da task, em 2–4 frases, o que entendeu e onde errou. O cérebro esmaga o conteúdo no mínimo revisável." },
+  { n: "04", tag: "espaça", icon: RotateCcw, t: "Revisa no tempo certo", d: "A task volta em intervalos crescentes: acertou, espaça mais; errou, volta amanhã. Acertou até a última caixa, ela está dominada." },
 ];
 
 /* ── PERGUNTAS — 10 FAQs em 3 grupos (auditoria DESIGN-AJUDA §2.2/§4) ── */
@@ -152,6 +152,7 @@ export function Ajuda() {
           {METHOD.map((m) => (
             <Card key={m.n} className="p-4">
               <div className="flex items-center gap-2">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/12 text-primary"><m.icon className="h-4 w-4" /></span>
                 <span className="font-mono text-xs tabular-nums text-primary">{m.n}</span>
                 <span className={OVERLINE}>{m.tag}</span>
               </div>
