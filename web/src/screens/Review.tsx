@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { BookOpen, Check, Eye, EyeOff, FlaskConical, Loader2, RotateCcw, Shuffle } from "lucide-react";
+import { BookOpen, Check, Eye, EyeOff, FlaskConical, Loader2, RotateCcw, Shuffle, X } from "lucide-react";
 import { getReview, taskReview, type Due } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { usePersistentState } from "@/lib/usePersistentState";
@@ -218,7 +218,16 @@ export function Review() {
       {/* cabeçalho da sessão (§3) — some no vazio (não há sessão) */}
       {total > 0 && (
         <>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {/* saída da sessão — no mobile a tab bar some nesta rota; padrão de player: X no topo */}
+            <button
+              onClick={() => navigate("/")}
+              aria-label="sair da sessão"
+              title="sair da sessão"
+              className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground", FOCUS)}
+            >
+              <X className="h-4 w-4" />
+            </button>
             <h2 className={EYEBROW}>revisão de hoje</h2>
             {trackCount > 1 && (
               <button
@@ -226,7 +235,7 @@ export function Review() {
                 aria-pressed={mix}
                 title="misturar os temas na sessão — fixa mais (reinicia a sessão)"
                 className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
+                  "ml-auto inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
                   mix ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
                   FOCUS,
                 )}
