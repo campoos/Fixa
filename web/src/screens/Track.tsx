@@ -56,9 +56,16 @@ function Comments({ list, meName, onAdd, onDelete }: { list: Comment[]; meName: 
 }
 
 function TaskDetail({ task, meName, onComment, onDeleteComment }: { task: Task; meName: string; onComment: (t: string) => Promise<void>; onDeleteComment: (i: number, at: string) => Promise<void> }) {
-  // recall forçado: a resposta (e os pontos-chave, na teórica) ficam ocultos até você tentar de cabeça
-  const [reveal, setReveal] = useState(false);
+  // recall em DOIS estágios (o método): frio → revela PONTOS-CHAVE (gaps) → responde de novo → revela RESPOSTA.
+  // teórica: 0 → 1 (pontos-chave) → 2 (resposta). prática (sem pontos-chave): 0 → 2 direto.
+  const [stage, setStage] = useState(0);
   const isPractice = task.type === "practice";
+  const hasKeys = !isPractice && !!task.keyPoints?.length;
+  const revealBtn = (label: string, onClick: () => void) => (
+    <button onClick={onClick} className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium hover:bg-accent ${FOCUS}`}>
+      <Eye className="h-3.5 w-3.5" /> {label}
+    </button>
+  );
   return (
     <div className="space-y-3 border-t border-border px-3 py-3">
       <Section title="Objetivo"><p className="text-sm leading-relaxed">{task.objective}</p></Section>
@@ -77,25 +84,40 @@ function TaskDetail({ task, meName, onComment, onDeleteComment }: { task: Task; 
       <Section title="Questão-modelo">
         <div className="rounded-lg border border-border bg-background p-3 text-sm">
           <p className="font-medium">{task.sample.q}</p>
-          {reveal ? (
-            /* slot do player do Revisar em escala menor — mesma linguagem visual */
-            <div className="mt-2 space-y-2 rounded-lg border border-domain/25 bg-domain/5 p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-domain">resposta</p>
-              {!isPractice && !!task.keyPoints?.length && (
-                <ul className="space-y-1">{task.keyPoints.map((k, i) => <li key={i} className="flex gap-2 text-muted-foreground"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /><span>{k}</span></li>)}</ul>
-              )}
-              {isPractice && task.expected && <p className="rounded-md border border-domain/25 bg-domain/5 p-2"><span className="font-medium text-domain">esperado: </span>{task.expected}</p>}
-              <p className="text-muted-foreground">{task.sample.a}</p>
-            </div>
-          ) : (
+
+          {/* estágio 0: tudo oculto — tenta de cabeça */}
+          {stage === 0 && (
             <div className="mt-2 grid min-h-[72px] place-items-center rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2.5">
               <div className="flex flex-col items-center gap-1.5 text-center">
                 <EyeOff className="h-4 w-4 text-muted-foreground/60" />
                 <p className="text-xs text-muted-foreground/70">responda de cabeça — depois revela</p>
-                <button onClick={() => setReveal(true)} title={isPractice ? "revela a resposta" : "revela resposta e pontos-chave"} className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium hover:bg-accent ${FOCUS}`}>
-                  <Eye className="h-3.5 w-3.5" /> tentei — revelar
-                </button>
+                {revealBtn(hasKeys ? "tentei — ver pontos-chave" : "tentei — revelar", () => setStage(hasKeys ? 1 : 2))}
               </div>
+            </div>
+          )}
+
+          {/* estágio 1 (só teórica): pontos-chave revelados — acha os gaps e responde de novo */}
+          {stage >= 1 && hasKeys && (
+            <div className="mt-2 space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">pontos-chave</p>
+              <ul className="space-y-1">{task.keyPoints!.map((k, i) => <li key={i} className="flex gap-2 text-muted-foreground"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /><span>{k}</span></li>)}</ul>
+            </div>
+          )}
+          {stage === 1 && (
+            <div className="mt-2 grid place-items-center rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2.5">
+              <div className="flex flex-col items-center gap-1.5 text-center">
+                <p className="text-xs text-muted-foreground/70">achou os gaps? responde de novo — depois confere</p>
+                {revealBtn("revelar resposta", () => setStage(2))}
+              </div>
+            </div>
+          )}
+
+          {/* estágio 2: a resposta — confere e generaliza */}
+          {stage === 2 && (
+            <div className="mt-2 space-y-2 rounded-lg border border-domain/25 bg-domain/5 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-domain">resposta</p>
+              {isPractice && task.expected && <p className="rounded-md border border-domain/25 bg-domain/5 p-2"><span className="font-medium text-domain">esperado: </span>{task.expected}</p>}
+              <p className="text-muted-foreground">{task.sample.a}</p>
             </div>
           )}
         </div>
