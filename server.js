@@ -442,6 +442,19 @@ const server = createServer(async (req, res) => {
     }
     if (path === "/api/review") return json(res, 200, globalReview(ud));
     if (path === "/api/stats") return json(res, 200, computeStats(ud));
+    // export completo dos dados do usuário (a promessa "seus dados são exportáveis, sempre")
+    if (path === "/api/export") {
+      const payload = {
+        app: "fixa", exportedAt: new Date().toISOString(),
+        account: { name: me.name, email: me.email, plan: me.plan, createdAt: me.createdAt },
+        tracks: ud.tracks, state: ud.state, trash: ud.trash, activity: ud.activity,
+      };
+      res.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Disposition": `attachment; filename="fixa-export-${spDay()}.json"`,
+      });
+      return res.end(JSON.stringify(payload, null, 2));
+    }
     if (path === "/api/track/target" && req.method === "POST") {
       const { id, date } = await readBody(req);
       if (!ud.tracks[id]) return json(res, 404, { error: "tema não encontrado" });

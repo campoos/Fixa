@@ -186,7 +186,8 @@ export function Pro({ me }: { me: Me }) {
       </div>
 
       <p className="mx-auto mt-8 max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
-        Cancele quando quiser. Reembolso em até 30 dias. Seus dados são exportáveis, sempre.
+        Cancele quando quiser. Reembolso em até 30 dias. Seus dados são{" "}
+        <a href="/api/export" download className={`underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-foreground ${FOCUS}`}>exportáveis</a>, sempre.
       </p>
     </div>
   );
