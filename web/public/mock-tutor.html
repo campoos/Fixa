@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOCK — Tutor IA · Fixa</title>
+<style>
+  :root {
+    --bg: #12101b; --card: #1b1726; --line: #2c2740; --ink: #ece9f7; --muted: #a79fc7; --faint: #6f6690;
+    --primary: #7c5cfc; --primary-2: #9d7bff; --recall: #f4b740; --domain: #35d6a4; --destructive: #ff6b8a;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.55; }
+  .mockbar { position: sticky; top: 0; z-index: 10; background: var(--recall); color: #221a04; font-family: var(--mono);
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase; text-align: center; padding: 6px 12px; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 80px; }
+  .crumb { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-bottom: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  .eyebrow { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
+
+  .task { padding: 16px; }
+  .task-head { display: flex; align-items: center; gap: 8px; }
+  .task-id { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .task-title { font-size: 15px; font-weight: 600; flex: 1; }
+  .done { width: 26px; height: 26px; border-radius: 8px; background: var(--domain); display: grid; place-items: center; color: #06281c; font-weight: 800; }
+
+  .sec { margin-top: 16px; }
+  .sec .eyebrow { display: block; margin-bottom: 6px; }
+  .q { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; font-size: 14px; }
+  .q b { display: block; margin-bottom: 10px; }
+
+  /* campo de resposta escrita (o novo pré-requisito do método) */
+  .answer { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; color: var(--ink);
+    font-size: 14px; font-family: inherit; padding: 10px 12px; min-height: 84px; resize: vertical; margin-top: 8px; }
+  .answer:focus { outline: none; border-color: var(--primary); }
+  .hintline { font-size: 11px; color: var(--faint); margin-top: 6px; }
+
+  .revealed { border: 1px solid rgba(53,214,164,.25); background: rgba(53,214,164,.05); border-radius: 12px; padding: 12px 14px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+  .revealed .eyebrow { color: var(--domain); }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; font-weight: 600; font-size: 14px;
+    border-radius: 11px; padding: 12px 18px; background: var(--primary); color: #fff; width: 100%; justify-content: center; margin-top: 14px; }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .usage { font-family: var(--mono); font-size: 11px; color: var(--faint); text-align: center; margin-top: 8px; }
+
+  /* card do TUTOR */
+  .tutor { border: 1px solid rgba(124,92,252,.45); background: linear-gradient(180deg, rgba(124,92,252,.10), rgba(124,92,252,.03));
+    border-radius: 14px; padding: 16px; margin-top: 16px; display: none; animation: pop .35s cubic-bezier(.2,1.3,.4,1); }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+  .tutor-head { display: flex; align-items: center; gap: 10px; }
+  .tutor-ava { width: 30px; height: 30px; border-radius: 10px; background: var(--primary); display: grid; place-items: center; font-size: 15px; }
+  .tutor-name { font-size: 13px; font-weight: 700; }
+  .tutor-name span { display: block; font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--faint); text-transform: uppercase; letter-spacing: .1em; }
+  .nota { margin-left: auto; text-align: right; }
+  .nota b { font-family: var(--mono); font-size: 26px; letter-spacing: -.03em; color: var(--primary-2); }
+  .nota span { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .verdict { margin-top: 10px; font-size: 14px; font-weight: 600; }
+  .fb { margin-top: 12px; display: grid; gap: 8px; }
+  .fb-item { display: flex; gap: 10px; font-size: 13.5px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .fb-item .ic { flex: none; }
+  .fb-item.ok .ic { color: var(--domain); } .fb-item.gap .ic { color: var(--recall); } .fb-item.dica .ic { color: var(--primary-2); }
+  .fb-item b { color: var(--ink); font-weight: 600; }
+  .tutor-foot { margin-top: 12px; font-size: 11px; color: var(--faint); }
+  .tutor-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .ta { flex: 1; border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 10px; padding: 9px; font-size: 12.5px; text-align: center; cursor: pointer; }
+  .ta:hover { color: var(--ink); }
+  .ta.chat { border-style: dashed; }
+  .ta .k { font-family: var(--mono); font-size: 10px; color: var(--faint); display: block; }
+
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+</style>
+</head>
+<body>
+<div class="mockbar">mock navegável — tutor ia (nada disso está no app ainda)</div>
+<div class="wrap">
+  <div class="crumb">Consumo de API front · Epic 1 · Story 1.1 · <b style="color:var(--muted)">task 1.1.1</b></div>
+
+  <div class="card task">
+    <div class="task-head">
+      <div class="done">✓</div>
+      <span class="task-id">1.1.1</span>
+      <span class="task-title">O que é uma API REST</span>
+    </div>
+
+    <div class="sec">
+      <span class="eyebrow">questão-modelo</span>
+      <div class="q">
+        <b>Qual método HTTP normalmente é usado para buscar uma lista de produtos?</b>
+        <span class="eyebrow">sua resposta (escrita no frio)</span>
+        <textarea class="answer" id="ans">Acho que é o GET, porque ele serve pra buscar dados sem alterar nada no servidor. Ele é "seguro" nesse sentido. Não lembro se precisa de body... acho que GET não leva body.</textarea>
+        <div class="hintline">escrever a resposta é o que permite a correção — e é o que mais fixa</div>
+      </div>
+      <div class="revealed">
+        <span class="eyebrow">resposta</span>
+        GET. É o método de leitura: busca o recurso sem efeito colateral (idempotente e sem body na prática).
+      </div>
+    </div>
+
+    <button class="btn" id="fix" onclick="corrigir()">
+      <span class="spinner" id="sp"></span>
+      <span id="btntxt">✨ Corrigir com IA</span>
+    </button>
+    <div class="usage">correções: 2/5 da degustação · pro: 100/mês</div>
+
+    <!-- CARD DO TUTOR -->
+    <div class="tutor" id="tutor">
+      <div class="tutor-head">
+        <div class="tutor-ava">🎓</div>
+        <div class="tutor-name">Tutor <span>correção por ia</span></div>
+        <div class="nota"><b id="notaval">8,5</b><span>/10</span></div>
+      </div>
+      <p class="verdict">Resposta certa e bem fundamentada — faltou só um detalhe técnico fino.</p>
+      <div class="fb">
+        <div class="fb-item ok"><span class="ic">✓</span><div><b>Acertou o principal:</b> GET como método de leitura, e a justificativa de "não alterar nada" é exatamente o conceito de método seguro.</div></div>
+        <div class="fb-item ok"><span class="ic">✓</span><div><b>Ponto extra:</b> lembrar que GET não leva body na prática mostra atenção ao uso real.</div></div>
+        <div class="fb-item gap"><span class="ic">⚠</span><div><b>Gap:</b> você disse "seguro" mas o termo técnico completo é <b>seguro E idempotente</b> — repetir o mesmo GET N vezes dá o mesmo resultado. Cai em prova.</div></div>
+        <div class="fb-item dica"><span class="ic">💡</span><div><b>Pra fixar:</b> anota na tua generalização: "GET = ler · seguro · idempotente · sem body". Quatro palavras que resolvem qualquer questão dessas.</div></div>
+      </div>
+      <div class="tutor-actions">
+        <div class="ta chat">perguntar de volta ao Tutor <span class="k">v2 · pesquisa complementar</span></div>
+        <div class="ta">salvar dica nas anotações</div>
+      </div>
+      <div class="tutor-foot">correção por IA — pode errar; desconfie, confira, aprenda. O Tutor corrige com base no material da task.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function corrigir() {
+    var b = document.getElementById('fix'), sp = document.getElementById('sp'), t = document.getElementById('btntxt');
+    b.disabled = true; sp.style.display = 'inline-block'; t.textContent = 'corrigindo…';
+    setTimeout(function () {
+      sp.style.display = 'none'; t.textContent = '✨ Corrigir com IA';
+      b.style.display = 'none';
+      document.getElementById('tutor').style.display = 'block';
+    }, 1800);
+  }
+</script>
+</body>
+</html>
