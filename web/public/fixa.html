@@ -457,9 +457,9 @@
     root.setAttribute('data-theme', cur() === 'dark' ? 'light' : 'dark');
   });
 
-  // hero: a curva do esquecimento sendo vencida — a cada revisão a retenção volta ao topo
-  // e o decaimento fica MAIS LENTO (por isso os intervalos crescem). Curva, pontos e cabeça
-  // saem todos da MESMA função yAt(f): nada desalinha.
+  // hero: a curva do esquecimento sendo vencida — geometria de fonte única (yAt),
+  // amostragem fixa (sem jitter) e motion com easing: beat nos resgates, pop elástico
+  // nos pontos, wobble amortecido na curva e fade no loop.
   (function () {
     var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduce) return;
@@ -472,11 +472,9 @@
     size(); addEventListener('resize', size);
     function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
-    // revisões em intervalos CRESCENTES (a régua do método) e decaimento que achata a cada acerto
     var reviews = [0.05, 0.13, 0.24, 0.39, 0.58, 0.81];
-    var K0 = 9, FLAT = 1.6; // K0 = esquecimento inicial (suave); a cada revisão k /= FLAT
+    var K0 = 9, FLAT = 1.6;
 
-    // retenção 0..1 na fração f do tempo — única fonte de verdade da geometria
     function retention(f) {
       var seg = 0;
       for (var i = 0; i < reviews.length; i++) if (f >= reviews[i]) seg = i + 1;
@@ -484,65 +482,108 @@
       var k = K0 / Math.pow(FLAT, seg);
       return Math.exp(-k * (f - start));
     }
-    function yAt(f) {
-      var top = H * 0.38, bottom = H * 0.86; // retenção 1 → top; 0 → bottom (banda mais baixa, longe do título)
+    function yBase(f) {
+      var top = H * 0.38, bottom = H * 0.86;
       return bottom - (bottom - top) * retention(f);
     }
+    // wobble: logo após um resgate, o trecho novo assenta com oscilação amortecida (sutil)
+    function wobble(f, head) {
+      var w = 0;
+      for (var i = 0; i < reviews.length; i++) {
+        var r = reviews[i];
+        if (f < r || head < r) continue;
+        var ageT = head - r;            // idade do resgate no tempo da animação
+        var dist = f - r;               // distância do ponto ao resgate
+        if (ageT > 0.12 || dist > 0.06) continue;
+        var damp = Math.exp(-ageT * 34) * Math.exp(-dist * 55);
+        w += Math.sin(ageT * 95) * 4.5 * damp;
+      }
+      return w;
+    }
+    var yAt = function (f, head) { return yBase(f) + wobble(f, head); };
     var fx = function (f) { return f * W; };
 
-    var t = 0, HOLD = 0.22, SPEED = 0.0028;
-    function loop() {
-      t += SPEED;
-      if (t > 1 + HOLD) t = 0; // desenha até o fim, segura um pouco, recomeça
+    // easings
+    var easeOutBack = function (p) { var s = 1.70158; p -= 1; return p * p * ((s + 1) * p + s) + 1; };
+    var easeOutCubic = function (p) { return 1 - Math.pow(1 - p, 3); };
+
+    // ritmo: a cabeça desacelera num "beat" ao cruzar cada resgate
+    function speedAt(t) {
+      var s = 1;
+      for (var i = 0; i < reviews.length; i++) {
+        var d = t - reviews[i];
+        if (d > -0.005 && d < 0.035) s = Math.min(s, 0.35 + 0.65 * (d < 0 ? 1 : d / 0.035));
+      }
+      return s;
+    }
+
+    var t = 0, PHASE_HOLD = 0.9, PHASE_FADE = 0.5; // segundos de hold e fade no fim
+    var phase = 'draw', phaseT = 0, last = performance.now();
+
+    function loop(now) {
+      var dt = Math.min((now - last) / 1000, 0.05); last = now;
+      var alpha = 1;
+      if (phase === 'draw') {
+        t += dt * 0.16 * speedAt(t);
+        if (t >= 1) { t = 1; phase = 'hold'; phaseT = 0; }
+        if (t < 0.06) alpha = easeOutCubic(t / 0.06); // fade-in do começo
+      } else if (phase === 'hold') {
+        phaseT += dt;
+        if (phaseT >= PHASE_HOLD) { phase = 'fade'; phaseT = 0; }
+      } else { // fade
+        phaseT += dt;
+        alpha = 1 - easeOutCubic(Math.min(phaseT / PHASE_FADE, 1));
+        if (phaseT >= PHASE_FADE) { phase = 'draw'; t = 0; phaseT = 0; }
+      }
       var head = Math.min(t, 1);
       x.clearRect(0, 0, W, H);
+      x.save();
+      x.globalAlpha = alpha;
+
       var brand = css('--brand') || '#7c5cfc';
       var brand2 = css('--brand-2') || brand;
       var recall = css('--recall') || '#f4b740';
 
-      // linha de base (100% de retenção) sutil, tracejada
+      // linha dos 100% (tracejada, sutil)
       x.save();
-      x.strokeStyle = brand; x.globalAlpha = 0.12; x.lineWidth = 1;
+      x.strokeStyle = brand; x.globalAlpha = alpha * 0.12; x.lineWidth = 1;
       x.setLineDash([2, 6]);
-      x.beginPath(); x.moveTo(0, yAt(0)); x.lineTo(W, yAt(0)); x.stroke();
+      x.beginPath(); x.moveTo(0, yBase(0)); x.lineTo(W, yBase(0)); x.stroke();
       x.restore();
 
-      // a curva, desenhada progressivamente até a cabeça
-      // amostragem em GRADE FIXA de pixels (os vértices nunca mudam de lugar entre frames — sem tremida)
+      // curva (grade fixa de 2px)
       x.beginPath();
       var headX = fx(head);
-      x.moveTo(0, yAt(0));
-      for (var px = 2; px <= headX; px += 2) x.lineTo(px, yAt(px / W));
-      x.lineTo(headX, yAt(head));
-      x.strokeStyle = brand2; x.globalAlpha = 0.65; x.lineWidth = 2; x.lineJoin = 'round'; x.stroke();
-      x.globalAlpha = 1;
+      x.moveTo(0, yAt(0, head));
+      for (var px = 2; px <= headX; px += 2) x.lineTo(px, yAt(px / W, head));
+      x.lineTo(headX, yAt(head, head));
+      x.strokeStyle = brand2; x.globalAlpha = alpha * 0.65; x.lineWidth = 2; x.lineJoin = 'round'; x.stroke();
 
-      // pontos de revisão: EXATAMENTE sobre a curva (mesma yAt), acendem quando a cabeça passa
+      // pontos de resgate: pop elástico + anel que expande e some
       for (var j = 0; j < reviews.length; j++) {
         var r = reviews[j];
         if (r > head) break;
-        var rx = fx(r), ry = yAt(r); // topo do salto — retenção volta a 1 aqui
-        var d = head - r;
-        var pulse = d < 0.05 ? (1 - d / 0.05) : 0;
-        // halo do pulso
-        if (pulse > 0) {
-          x.beginPath(); x.arc(rx, ry, 4 + pulse * 9, 0, 7);
-          x.fillStyle = recall; x.globalAlpha = 0.18 * pulse; x.fill();
+        var rx = fx(r), ry = yAt(r, head);
+        var age = head - r;
+        var pop = easeOutBack(Math.min(age / 0.05, 1)); // overshoot e assenta
+        if (age < 0.11) { // anel
+          var rp = easeOutCubic(age / 0.11);
+          x.beginPath(); x.arc(rx, ry, 4 + rp * 16, 0, 7);
+          x.strokeStyle = recall; x.globalAlpha = alpha * 0.35 * (1 - rp); x.lineWidth = 1.5; x.stroke();
         }
-        x.beginPath(); x.arc(rx, ry, 3.2, 0, 7);
-        x.fillStyle = recall; x.globalAlpha = 0.85; x.fill();
-        x.globalAlpha = 1;
+        x.beginPath(); x.arc(rx, ry, 3.2 * pop, 0, 7);
+        x.fillStyle = recall; x.globalAlpha = alpha * 0.85; x.fill();
       }
 
-      // cabeça do tempo, sobre a curva
-      if (t <= 1) {
-        var hx = fx(head), hy = yAt(head);
-        x.beginPath(); x.arc(hx, hy, 3.6, 0, 7);
-        x.fillStyle = brand2; x.fill();
+      // cabeça
+      if (t < 1) {
+        x.beginPath(); x.arc(fx(head), yAt(head, head), 3.6, 0, 7);
+        x.fillStyle = brand2; x.globalAlpha = alpha; x.fill();
       }
+      x.restore();
       requestAnimationFrame(loop);
     }
-    loop();
+    requestAnimationFrame(loop);
   })();
 </script>
 </body></html>
