@@ -505,13 +505,12 @@
       x.restore();
 
       // a curva, desenhada progressivamente até a cabeça
+      // amostragem em GRADE FIXA de pixels (os vértices nunca mudam de lugar entre frames — sem tremida)
       x.beginPath();
-      var steps = Math.max(2, Math.floor(fx(head) / 3));
-      for (var i = 0; i <= steps; i++) {
-        var f = (i / steps) * head;
-        var px = fx(f), py = yAt(f);
-        i === 0 ? x.moveTo(px, py) : x.lineTo(px, py);
-      }
+      var headX = fx(head);
+      x.moveTo(0, yAt(0));
+      for (var px = 2; px <= headX; px += 2) x.lineTo(px, yAt(px / W));
+      x.lineTo(headX, yAt(head));
       x.strokeStyle = brand2; x.globalAlpha = 0.65; x.lineWidth = 2; x.lineJoin = 'round'; x.stroke();
       x.globalAlpha = 1;
 
