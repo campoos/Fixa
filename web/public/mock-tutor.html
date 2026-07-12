@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MOCK — Tutor IA · Fixa</title>
+<title>MOCK — fluxo completo com Tutor IA · Fixa</title>
 <style>
   :root {
     --bg: #12101b; --card: #1b1726; --line: #2c2740; --ink: #ece9f7; --muted: #a79fc7; --faint: #6f6690;
@@ -14,128 +14,226 @@
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.55; }
   .mockbar { position: sticky; top: 0; z-index: 10; background: var(--recall); color: #221a04; font-family: var(--mono);
     font-size: 11px; letter-spacing: .1em; text-transform: uppercase; text-align: center; padding: 6px 12px; }
-  .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 80px; }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 24px 16px 90px; }
   .crumb { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-bottom: 14px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
-  .eyebrow { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .eyebrow { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); display: block; margin-bottom: 6px; }
+  .step { display: none; animation: pop .3s cubic-bezier(.2,1.2,.4,1); }
+  .step.on { display: block; }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
 
-  .task { padding: 16px; }
-  .task-head { display: flex; align-items: center; gap: 8px; }
+  .task-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
   .task-id { font-family: var(--mono); font-size: 11px; color: var(--faint); }
-  .task-title { font-size: 15px; font-weight: 600; flex: 1; }
-  .done { width: 26px; height: 26px; border-radius: 8px; background: var(--domain); display: grid; place-items: center; color: #06281c; font-weight: 800; }
+  .task-title { font-size: 15px; font-weight: 600; }
 
-  .sec { margin-top: 16px; }
-  .sec .eyebrow { display: block; margin-bottom: 6px; }
   .q { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; font-size: 14px; }
-  .q b { display: block; margin-bottom: 10px; }
-
-  /* campo de resposta escrita (o novo pré-requisito do método) */
-  .answer { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; color: var(--ink);
-    font-size: 14px; font-family: inherit; padding: 10px 12px; min-height: 84px; resize: vertical; margin-top: 8px; }
-  .answer:focus { outline: none; border-color: var(--primary); }
+  .q b.perg { display: block; margin-bottom: 10px; font-size: 15px; }
+  textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; color: var(--ink);
+    font-size: 14px; font-family: inherit; padding: 10px 12px; min-height: 92px; resize: vertical; margin-top: 8px; }
+  textarea:focus { outline: none; border-color: var(--primary); }
   .hintline { font-size: 11px; color: var(--faint); margin-top: 6px; }
 
-  .revealed { border: 1px solid rgba(53,214,164,.25); background: rgba(53,214,164,.05); border-radius: 12px; padding: 12px 14px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+  .keys { border: 1px solid rgba(124,92,252,.25); background: rgba(124,92,252,.06); border-radius: 12px; padding: 12px 14px; margin-top: 12px; }
+  .keys .eyebrow { color: var(--primary-2); }
+  .keys li { margin-left: 18px; color: var(--muted); font-size: 13.5px; padding: 2px 0; }
+  .revealed { border: 1px solid rgba(53,214,164,.25); background: rgba(53,214,164,.05); border-radius: 12px; padding: 12px 14px; margin-top: 12px; font-size: 14px; color: var(--muted); }
   .revealed .eyebrow { color: var(--domain); }
 
-  .btn { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; font-weight: 600; font-size: 14px;
-    border-radius: 11px; padding: 12px 18px; background: var(--primary); color: #fff; width: 100%; justify-content: center; margin-top: 14px; }
-  .btn:disabled { opacity: .6; cursor: default; }
-  .usage { font-family: var(--mono); font-size: 11px; color: var(--faint); text-align: center; margin-top: 8px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; cursor: pointer; font-weight: 600;
+    font-size: 14px; border-radius: 11px; padding: 12px 18px; background: var(--primary); color: #fff; width: 100%; margin-top: 14px; }
+  .btn.ghost { background: var(--card); border: 1px solid var(--line); color: var(--muted); }
+  .btn.done { background: var(--domain); color: #06281c; }
+  .btn:disabled { opacity: .55; cursor: default; }
 
-  /* card do TUTOR */
-  .tutor { border: 1px solid rgba(124,92,252,.45); background: linear-gradient(180deg, rgba(124,92,252,.10), rgba(124,92,252,.03));
-    border-radius: 14px; padding: 16px; margin-top: 16px; display: none; animation: pop .35s cubic-bezier(.2,1.3,.4,1); }
-  @keyframes pop { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
-  .tutor-head { display: flex; align-items: center; gap: 10px; }
-  .tutor-ava { width: 30px; height: 30px; border-radius: 10px; background: var(--primary); display: grid; place-items: center; font-size: 15px; }
-  .tutor-name { font-size: 13px; font-weight: 700; }
-  .tutor-name span { display: block; font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--faint); text-transform: uppercase; letter-spacing: .1em; }
-  .nota { margin-left: auto; text-align: right; }
-  .nota b { font-family: var(--mono); font-size: 26px; letter-spacing: -.03em; color: var(--primary-2); }
-  .nota span { font-family: var(--mono); font-size: 11px; color: var(--faint); }
-  .verdict { margin-top: 10px; font-size: 14px; font-weight: 600; }
-  .fb { margin-top: 12px; display: grid; gap: 8px; }
-  .fb-item { display: flex; gap: 10px; font-size: 13.5px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  /* convite do tutor (discreto — a decisão do §9.1) */
+  .invite { display: flex; align-items: center; gap: 12px; border: 1px dashed rgba(124,92,252,.5); background: rgba(124,92,252,.07);
+    border-radius: 12px; padding: 12px 14px; margin-top: 14px; cursor: pointer; }
+  .invite:hover { background: rgba(124,92,252,.12); }
+  .invite .ava { width: 32px; height: 32px; border-radius: 10px; background: var(--primary); display: grid; place-items: center; font-size: 16px; flex: none; }
+  .invite b { font-size: 14px; display: block; }
+  .invite span { font-size: 12px; color: var(--muted); }
+  .invite .go { margin-left: auto; color: var(--primary-2); font-size: 18px; }
+
+  /* SUPERFÍCIE FOCADA da correção (overlay de tela cheia — árvore some) */
+  .sheet { position: fixed; inset: 0; z-index: 50; background: var(--bg); overflow-y: auto; display: none; }
+  .sheet.on { display: block; animation: rise .3s cubic-bezier(.2,1.1,.4,1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: none } }
+  .sheet .wrap { padding-top: 16px; }
+  .sheet-top { display: flex; align-items: center; gap: 10px; padding: 4px 0 14px; }
+  .x { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--muted);
+    display: grid; place-items: center; cursor: pointer; font-size: 16px; }
+  .sheet-title { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
+
+  .grading { text-align: center; padding: 48px 0; }
+  .grading .ava-big { width: 56px; height: 56px; border-radius: 18px; background: var(--primary); display: grid; place-items: center; font-size: 28px; margin: 0 auto 14px; animation: think 1.2s ease-in-out infinite; }
+  @keyframes think { 0%,100% { transform: rotate(-4deg) } 50% { transform: rotate(4deg) } }
+  .grading p { color: var(--muted); font-size: 14px; }
+  .grading .mono { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 6px; }
+
+  .result { display: none; }
+  .result.on { display: block; animation: pop .35s cubic-bezier(.2,1.2,.4,1); }
+  .nota-hero { text-align: center; padding: 18px 0 6px; }
+  .nota-hero b { font-family: var(--mono); font-size: 56px; letter-spacing: -.04em; color: var(--primary-2); }
+  .nota-hero span { font-family: var(--mono); font-size: 14px; color: var(--faint); }
+  .verdict { text-align: center; font-size: 15px; font-weight: 600; max-width: 40ch; margin: 6px auto 18px; }
+  .fb { display: grid; gap: 8px; }
+  .fb-item { display: flex; gap: 10px; font-size: 13.5px; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; }
   .fb-item .ic { flex: none; }
   .fb-item.ok .ic { color: var(--domain); } .fb-item.gap .ic { color: var(--recall); } .fb-item.dica .ic { color: var(--primary-2); }
   .fb-item b { color: var(--ink); font-weight: 600; }
-  .tutor-foot { margin-top: 12px; font-size: 11px; color: var(--faint); }
-  .tutor-actions { display: flex; gap: 8px; margin-top: 12px; }
-  .ta { flex: 1; border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 10px; padding: 9px; font-size: 12.5px; text-align: center; cursor: pointer; }
-  .ta:hover { color: var(--ink); }
-  .ta.chat { border-style: dashed; }
-  .ta .k { font-family: var(--mono); font-size: 10px; color: var(--faint); display: block; }
-
-  .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
-  @keyframes spin { to { transform: rotate(360deg) } }
+  .sua { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; font-size: 13px; color: var(--muted); margin: 14px 0; font-style: italic; }
+  .sua .eyebrow { font-style: normal; }
+  .tutor-foot { text-align: center; font-size: 11px; color: var(--faint); margin-top: 16px; }
+  .sheet-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .sheet-actions .btn { margin-top: 0; }
 </style>
 </head>
 <body>
-<div class="mockbar">mock navegável — tutor ia (nada disso está no app ainda)</div>
+<div class="mockbar">mock navegável — fluxo completo até o tutor (correção simulada localmente)</div>
 <div class="wrap">
-  <div class="crumb">Consumo de API front · Epic 1 · Story 1.1 · <b style="color:var(--muted)">task 1.1.1</b></div>
+  <div class="crumb">Consumo de API front · 1.1 Entendendo APIs REST · <b style="color:var(--muted)">task 1.1.1</b></div>
 
-  <div class="card task">
+  <div class="card">
     <div class="task-head">
-      <div class="done">✓</div>
       <span class="task-id">1.1.1</span>
       <span class="task-title">O que é uma API REST</span>
     </div>
 
-    <div class="sec">
+    <div class="q">
       <span class="eyebrow">questão-modelo</span>
-      <div class="q">
-        <b>Qual método HTTP normalmente é usado para buscar uma lista de produtos?</b>
-        <span class="eyebrow">sua resposta (escrita no frio)</span>
-        <textarea class="answer" id="ans">Acho que é o GET, porque ele serve pra buscar dados sem alterar nada no servidor. Ele é "seguro" nesse sentido. Não lembro se precisa de body... acho que GET não leva body.</textarea>
-        <div class="hintline">escrever a resposta é o que permite a correção — e é o que mais fixa</div>
+      <b class="perg">Qual método HTTP normalmente é usado para buscar uma lista de produtos?</b>
+
+      <!-- PASSO 1: FRIO -->
+      <div class="step on" id="s1">
+        <span class="eyebrow">responda de cabeça — escrevendo (é isso que fixa)</span>
+        <textarea id="ans" placeholder="escreve tua resposta aqui, do jeito que sair…"></textarea>
+        <div class="hintline">dica de teste: fala do GET, se ele altera algo, se leva body… ou erra de propósito 😉</div>
+        <button class="btn" onclick="goStep(2)">tentei — ver pontos-chave</button>
       </div>
-      <div class="revealed">
-        <span class="eyebrow">resposta</span>
-        GET. É o método de leitura: busca o recurso sem efeito colateral (idempotente e sem body na prática).
+
+      <!-- PASSO 2: GAPS -->
+      <div class="step" id="s2">
+        <div class="keys">
+          <span class="eyebrow">pontos-chave</span>
+          <li>Cliente envia requisições HTTP; servidor responde com status e dados</li>
+          <li>Cada método HTTP tem uma finalidade — GET é leitura</li>
+          <li>GET é seguro (não altera) e idempotente (repetir dá no mesmo)</li>
+        </div>
+        <span class="eyebrow" style="margin-top:12px">achou gaps? ajusta tua resposta</span>
+        <textarea id="ans2"></textarea>
+        <button class="btn" onclick="goStep(3)">revelar resposta</button>
+      </div>
+
+      <!-- PASSO 3: CONFERE -->
+      <div class="step" id="s3">
+        <div class="revealed">
+          <span class="eyebrow">resposta</span>
+          GET. É o método de leitura: busca o recurso sem efeito colateral — seguro, idempotente e sem body na prática.
+        </div>
+        <button class="btn done" onclick="goStep(4)">✓ marcar como feita</button>
+      </div>
+
+      <!-- PASSO 4: DONE + CONVITE -->
+      <div class="step" id="s4">
+        <div class="revealed" style="text-align:center">
+          <b style="color:var(--domain)">Task concluída ✓</b><br>
+          <span style="font-size:12px">ela volta pra revisão amanhã — é o espaçamento trabalhando</span>
+        </div>
+        <div class="invite" onclick="openSheet()">
+          <div class="ava">🎓</div>
+          <div><b>Ver correção do Tutor</b><span>nota + o que acertou e o que faltou na sua resposta</span></div>
+          <div class="go">→</div>
+        </div>
+        <div class="hintline" style="text-align:center;margin-top:10px">correções: 2/5 da degustação</div>
       </div>
     </div>
+  </div>
+</div>
 
-    <button class="btn" id="fix" onclick="corrigir()">
-      <span class="spinner" id="sp"></span>
-      <span id="btntxt">✨ Corrigir com IA</span>
-    </button>
-    <div class="usage">correções: 2/5 da degustação · pro: 100/mês</div>
+<!-- SUPERFÍCIE FOCADA DO TUTOR (a árvore some — decisão §9.1 do plano) -->
+<div class="sheet" id="sheet">
+  <div class="wrap">
+    <div class="sheet-top">
+      <div class="x" onclick="closeSheet()">✕</div>
+      <span class="sheet-title">correção do tutor · task 1.1.1</span>
+    </div>
 
-    <!-- CARD DO TUTOR -->
-    <div class="tutor" id="tutor">
-      <div class="tutor-head">
-        <div class="tutor-ava">🎓</div>
-        <div class="tutor-name">Tutor <span>correção por ia</span></div>
-        <div class="nota"><b id="notaval">8,5</b><span>/10</span></div>
+    <div class="grading" id="grading">
+      <div class="ava-big">🎓</div>
+      <p>lendo sua jornada nesta task…</p>
+      <p class="mono">resposta fria + ajuste pós-pontos-chave</p>
+    </div>
+
+    <div class="result" id="result">
+      <div class="nota-hero"><b id="nota">—</b><span>/10</span></div>
+      <p class="verdict" id="verdict"></p>
+      <div class="sua"><span class="eyebrow">sua resposta final</span><span id="suaresp"></span></div>
+      <div class="fb" id="fb"></div>
+      <div class="sheet-actions">
+        <button class="btn ghost" onclick="alert('v1: salva a dica como anotação da task')">salvar dica nas anotações</button>
+        <button class="btn ghost" style="border-style:dashed" onclick="alert('v2: pesquisa complementar — conversa com o Tutor')">perguntar de volta</button>
       </div>
-      <p class="verdict">Resposta certa e bem fundamentada — faltou só um detalhe técnico fino.</p>
-      <div class="fb">
-        <div class="fb-item ok"><span class="ic">✓</span><div><b>Acertou o principal:</b> GET como método de leitura, e a justificativa de "não alterar nada" é exatamente o conceito de método seguro.</div></div>
-        <div class="fb-item ok"><span class="ic">✓</span><div><b>Ponto extra:</b> lembrar que GET não leva body na prática mostra atenção ao uso real.</div></div>
-        <div class="fb-item gap"><span class="ic">⚠</span><div><b>Gap:</b> você disse "seguro" mas o termo técnico completo é <b>seguro E idempotente</b> — repetir o mesmo GET N vezes dá o mesmo resultado. Cai em prova.</div></div>
-        <div class="fb-item dica"><span class="ic">💡</span><div><b>Pra fixar:</b> anota na tua generalização: "GET = ler · seguro · idempotente · sem body". Quatro palavras que resolvem qualquer questão dessas.</div></div>
-      </div>
-      <div class="tutor-actions">
-        <div class="ta chat">perguntar de volta ao Tutor <span class="k">v2 · pesquisa complementar</span></div>
-        <div class="ta">salvar dica nas anotações</div>
-      </div>
-      <div class="tutor-foot">correção por IA — pode errar; desconfie, confira, aprenda. O Tutor corrige com base no material da task.</div>
+      <button class="btn" onclick="closeSheet()">voltar ao estudo</button>
+      <p class="tutor-foot">correção por IA — pode errar; desconfie, confira, aprenda. O Tutor corrige com base no material da task.</p>
     </div>
   </div>
 </div>
 
 <script>
-  function corrigir() {
-    var b = document.getElementById('fix'), sp = document.getElementById('sp'), t = document.getElementById('btntxt');
-    b.disabled = true; sp.style.display = 'inline-block'; t.textContent = 'corrigindo…';
+  function goStep(n) {
+    if (n === 2) document.getElementById('ans2').value = document.getElementById('ans').value; // resposta segue editável
+    for (var i = 1; i <= 4; i++) document.getElementById('s' + i).classList.toggle('on', i === n);
+  }
+  function openSheet() {
+    document.getElementById('sheet').classList.add('on');
+    document.getElementById('grading').style.display = 'block';
+    document.getElementById('result').classList.remove('on');
     setTimeout(function () {
-      sp.style.display = 'none'; t.textContent = '✨ Corrigir com IA';
-      b.style.display = 'none';
-      document.getElementById('tutor').style.display = 'block';
-    }, 1800);
+      document.getElementById('grading').style.display = 'none';
+      corrige();
+      document.getElementById('result').classList.add('on');
+    }, 2200);
+  }
+  function closeSheet() { document.getElementById('sheet').classList.remove('on'); }
+
+  // "correção" local: avalia DE VERDADE o texto digitado (heurística — no produto real é o Gemini)
+  function corrige() {
+    var t = (document.getElementById('ans2').value || document.getElementById('ans').value || '').toLowerCase();
+    var fb = [], nota = 0;
+    var temGet = /\bget\b/.test(t);
+    var temSeguro = /(n[ãa]o (altera|muda|modifica)|seguro|sem efeito|s[óo] busca|s[óo] l[êe]|leitura)/.test(t);
+    var temIdem = /idempotent/.test(t);
+    var temBody = /body|corpo/.test(t);
+    var vazia = t.trim().length < 8;
+
+    if (vazia) {
+      nota = 1;
+      fb.push(['gap', '<b>Sem resposta pra corrigir.</b> O método só funciona se você escrever — mesmo errado. Errar por escrito fixa mais que acertar de cabeça.']);
+      fb.push(['dica', '<b>Pra fixar:</b> volta na task e escreve o que lembrar, uma frase que seja.']);
+    } else {
+      if (temGet) { nota += 5; fb.push(['ok', '<b>Acertou o principal:</b> GET é o método de leitura — era o coração da questão.']); }
+      else { fb.push(['gap', '<b>O principal faltou:</b> a resposta é <b>GET</b> — o método de leitura do HTTP. Sem ele a questão não fecha.']); }
+      if (temSeguro) { nota += 2; fb.push(['ok', '<b>Boa fundamentação:</b> você justificou com a ideia de "não alterar nada" — isso é o conceito de método <b>seguro</b>.']); }
+      else if (temGet) { fb.push(['gap', '<b>Gap:</b> faltou o porquê — GET é <b>seguro</b>: só lê, não altera estado no servidor.']); }
+      if (temIdem) { nota += 2; fb.push(['ok', '<b>Nível prova:</b> citar <b>idempotência</b> (repetir dá no mesmo) é o detalhe que separa nota 7 de nota 10.']); }
+      else { fb.push(['gap', '<b>Detalhe fino que cai em prova:</b> GET também é <b>idempotente</b> — repetir a mesma chamada N vezes dá o mesmo resultado.']); }
+      if (temBody) { nota += 1; fb.push(['ok', '<b>Ponto extra:</b> lembrar que GET não leva body na prática mostra atenção ao uso real.']); }
+      fb.push(['dica', '<b>Pra fixar:</b> generaliza em 4 palavras — "GET = ler · seguro · idempotente · sem body".']);
+    }
+    nota = Math.max(1, Math.min(10, nota));
+    document.getElementById('nota').textContent = String(nota).replace('.', ',');
+    document.getElementById('verdict').textContent =
+      nota >= 9 ? 'Resposta de prova — completa e precisa.' :
+      nota >= 7 ? 'Resposta certa e bem fundamentada — faltou detalhe fino.' :
+      nota >= 4 ? 'No caminho certo, mas com gaps que valem revisão.' :
+      'Essa merece voltar amanhã — e a correção abaixo te diz exatamente o quê.';
+    document.getElementById('suaresp').textContent = '"' + (document.getElementById('ans2').value || document.getElementById('ans').value || '(vazia)') + '"';
+    var html = '';
+    fb.forEach(function (f) {
+      var ic = f[0] === 'ok' ? '✓' : f[0] === 'gap' ? '⚠' : '💡';
+      html += '<div class="fb-item ' + f[0] + '"><span class="ic">' + ic + '</span><div>' + f[1] + '</div></div>';
+    });
+    document.getElementById('fb').innerHTML = html;
   }
 </script>
 </body>
