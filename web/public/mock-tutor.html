@@ -86,6 +86,35 @@
   .tutor-foot { text-align: center; font-size: 11px; color: var(--faint); margin-top: 16px; }
   .sheet-actions { display: flex; gap: 8px; margin-top: 16px; }
   .sheet-actions .btn { margin-top: 0; }
+
+  /* ── visão 2: dentro da tela de estudo real (densidade) ── */
+  .divider { display: flex; align-items: center; gap: 12px; margin: 40px 0 20px; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .divider span { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--recall); }
+  .story { background: rgba(124,92,252,.03); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+  .story-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 13px; font-weight: 600; }
+  .story-head .task-id { font-weight: 400; }
+  .story-head .count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .trow { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; margin-top: 6px; font-size: 13.5px; }
+  .trow .chk { width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--line); flex: none; }
+  .trow .chk.ok { background: var(--domain); border-color: var(--domain); }
+  .trow .chev { margin-left: auto; color: var(--faint); }
+  .trow-open { border-color: rgba(124,92,252,.35); margin-top: 6px; border: 1px solid rgba(124,92,252,.35); border-radius: 10px; background: var(--card); }
+  .trow-open .head { display: flex; align-items: center; gap: 8px; padding: 9px 10px; font-size: 13.5px; }
+  .tsec { border-top: 1px solid var(--line); padding: 12px; }
+  .tsec .eyebrow { margin-bottom: 4px; }
+  .tsec p { font-size: 13.5px; color: var(--muted); }
+  .mini-q { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px; font-size: 13.5px; margin-top: 4px; }
+  .mini-q b { display: block; margin-bottom: 8px; }
+  .mini-q textarea { min-height: 64px; font-size: 13px; }
+  .mini-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    font-size: 12px; font-weight: 600; border-radius: 9px; padding: 8px 12px; margin-top: 10px; cursor: pointer; }
+  .note-merged { border: 1px dashed rgba(53,214,164,.4); background: rgba(53,214,164,.04); border-radius: 10px; padding: 10px 12px; margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+  .invite.compact { padding: 9px 12px; margin-top: 10px; }
+  .invite.compact .ava { width: 26px; height: 26px; font-size: 13px; border-radius: 8px; }
+  .invite.compact b { font-size: 13px; }
+  .callout { font-size: 12px; color: var(--faint); margin-top: 14px; line-height: 1.6; }
+  .callout b { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -124,12 +153,14 @@
         <button class="btn" onclick="goStep(3)">revelar resposta</button>
       </div>
 
-      <!-- PASSO 3: CONFERE -->
+      <!-- PASSO 3: CONFERE + RESPOSTA FINAL -->
       <div class="step" id="s3">
         <div class="revealed">
           <span class="eyebrow">resposta</span>
           GET. É o método de leitura: busca o recurso sem efeito colateral — seguro, idempotente e sem body na prática.
         </div>
+        <span class="eyebrow" style="margin-top:12px">resposta final — reescreve com a TUA palavra (vira tua anotação de revisão)</span>
+        <textarea id="ans3" placeholder="agora que conferiu: o que você leva dessa task?"></textarea>
         <button class="btn done" onclick="goStep(4)">✓ marcar como feita</button>
       </div>
 
@@ -148,6 +179,60 @@
       </div>
     </div>
   </div>
+
+  <div class="divider"><span>visão 2 — como cabe na tela de estudo real</span></div>
+
+  <div class="story">
+    <div class="story-head"><span class="task-id">1.1</span> Entendendo APIs REST <span class="count">1/2</span></div>
+
+    <!-- task vizinha (colapsada) -->
+    <div class="trow"><span class="chk ok"></span><span class="task-id">1.1.2</span> Explorar uma API pública <span class="chev">›</span></div>
+
+    <!-- A TASK ABERTA, com o fluxo embutido -->
+    <div class="trow-open">
+      <div class="head"><span class="chk"></span><span class="task-id">1.1.1</span> <b>O que é uma API REST</b> <span class="chev" style="margin-left:auto">⌄</span></div>
+
+      <div class="tsec">
+        <span class="eyebrow">objetivo</span>
+        <p>Entender como uma aplicação front-end troca dados com um servidor.</p>
+      </div>
+
+      <div class="tsec">
+        <span class="eyebrow">questão-modelo</span>
+        <div class="mini-q">
+          <b>Qual método HTTP normalmente é usado para buscar uma lista de produtos?</b>
+          <span class="eyebrow">sua resposta (frio)</span>
+          <textarea placeholder="escreve aqui…">O GET, porque só busca dados sem alterar nada.</textarea>
+          <div class="mini-btn">👁 tentei — ver pontos-chave</div>
+        </div>
+        <div class="callout">→ os estágios (pontos-chave → resposta → <b>resposta final</b>) acontecem AQUI DENTRO, um por vez —
+        mesma mecânica da visão 1, só que compacta. Nunca aparecem todos juntos.</div>
+      </div>
+
+      <div class="tsec">
+        <span class="eyebrow">anotações · generalização</span>
+        <div class="note-merged">💡 <b style="color:var(--ink)">a resposta final mora aqui:</b> depois de revelar a resposta-modelo,
+        este campo recebe o foco com o placeholder "reescreve com a tua palavra" — a resposta final E a generalização são o mesmo gesto.
+        Zero seção nova na tela.</div>
+      </div>
+
+      <div class="tsec">
+        <div class="invite compact">
+          <div class="ava">🎓</div>
+          <div><b>Ver correção do Tutor</b></div>
+          <div class="go">→</div>
+        </div>
+        <div class="callout">→ o convite só aparece DEPOIS do Done, e é 1 linha — o card denso da correção vive
+        na tela cheia (visão 1), nunca aqui na árvore.</div>
+      </div>
+    </div>
+
+    <!-- outra vizinha -->
+    <div class="trow"><span class="chk"></span><span class="task-id">1.1.3</span> Métodos HTTP na prática <span class="chev">›</span></div>
+  </div>
+
+  <div class="callout" style="text-align:center;margin-top:18px">resumo das mudanças pra caber: estágios um-por-vez (já é assim hoje) ·
+  resposta final = campo de anotações focado (nada novo) · Tutor = 1 linha de convite + tela cheia.</div>
 </div>
 
 <!-- SUPERFÍCIE FOCADA DO TUTOR (a árvore some — decisão §9.1 do plano) -->
@@ -198,7 +283,8 @@
 
   // "correção" local: avalia DE VERDADE o texto digitado (heurística — no produto real é o Gemini)
   function corrige() {
-    var t = (document.getElementById('ans2').value || document.getElementById('ans').value || '').toLowerCase();
+    var fin = document.getElementById('ans3').value || '';
+    var t = ((fin + ' ' + (document.getElementById('ans2').value || document.getElementById('ans').value || ''))).toLowerCase();
     var fb = [], nota = 0;
     var temGet = /\bget\b/.test(t);
     var temSeguro = /(n[ãa]o (altera|muda|modifica)|seguro|sem efeito|s[óo] busca|s[óo] l[êe]|leitura)/.test(t);
@@ -218,6 +304,8 @@
       if (temIdem) { nota += 2; fb.push(['ok', '<b>Nível prova:</b> citar <b>idempotência</b> (repetir dá no mesmo) é o detalhe que separa nota 7 de nota 10.']); }
       else { fb.push(['gap', '<b>Detalhe fino que cai em prova:</b> GET também é <b>idempotente</b> — repetir a mesma chamada N vezes dá o mesmo resultado.']); }
       if (temBody) { nota += 1; fb.push(['ok', '<b>Ponto extra:</b> lembrar que GET não leva body na prática mostra atenção ao uso real.']); }
+      if (fin.trim().length > 10) { nota += 1; fb.push(['ok', '<b>Fechou o método:</b> reescreveu com a própria palavra depois de conferir — é a etapa que mais consolida.']); }
+      else { fb.push(['gap', '<b>Faltou a resposta final:</b> reescrever com a tua palavra depois de ver a resposta é a etapa que mais consolida — não pula ela.']); }
       fb.push(['dica', '<b>Pra fixar:</b> generaliza em 4 palavras — "GET = ler · seguro · idempotente · sem body".']);
     }
     nota = Math.max(1, Math.min(10, nota));
@@ -227,7 +315,7 @@
       nota >= 7 ? 'Resposta certa e bem fundamentada — faltou detalhe fino.' :
       nota >= 4 ? 'No caminho certo, mas com gaps que valem revisão.' :
       'Essa merece voltar amanhã — e a correção abaixo te diz exatamente o quê.';
-    document.getElementById('suaresp').textContent = '"' + (document.getElementById('ans2').value || document.getElementById('ans').value || '(vazia)') + '"';
+    document.getElementById('suaresp').textContent = '"' + (fin || document.getElementById('ans2').value || document.getElementById('ans').value || '(vazia)') + '"';
     var html = '';
     fb.forEach(function (f) {
       var ic = f[0] === 'ok' ? '✓' : f[0] === 'gap' ? '⚠' : '💡';
