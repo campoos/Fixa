@@ -210,11 +210,13 @@
   }
   @media (max-width: 560px) { .loop, .feat { grid-template-columns: 1fr; } .waitlist { flex-direction: column; } .nav-links a[href="#duvidas"] { display: none; }
     .hero-tag { font-size: 10.5px; letter-spacing: .07em; }
-    .hero { padding-top: 56px; padding-bottom: 168px; } /* abre a banda da curva embaixo */
+    /* hero de tela cheia: conteúdo no topo, CTAs ancorados no pé */
+    .hero { min-height: 100svh; padding-top: 40px; padding-bottom: max(32px, env(safe-area-inset-bottom)); display: flex; }
+    .hero .wrap { display: flex; flex-direction: column; width: 100%; }
     .hero-note, .ladder { display: none; }  /* mobile: hero enxuto — tag, título, lead, CTAs */
-    .hero-cta { margin-top: 24px; }
-    /* overlay vira vertical: protege o texto em cima, libera a banda da curva embaixo */
-    .hero::before { background: linear-gradient(180deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 85%, transparent) 52%, transparent 74%); }
+    .hero-cta { margin-top: auto; padding-top: 32px; }
+    /* overlay vertical: protege o texto em cima, deixa a curva viva no fundo */
+    .hero::before { background: linear-gradient(180deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 82%, transparent) 48%, transparent 72%); }
     #memcanvas { opacity: .62; }
   }
   /* telas mínimas: nav enxuto (o botão já é a porta de entrada) e respiro lateral menor */
@@ -543,11 +545,7 @@
       return Math.exp(-k * u);
     }
     function yBase(f) {
-      // mobile: banda inferior fixa (px, ancorada no fundo — não compete com o texto);
-      // desktop: banda proporcional original
-      var top, bottom;
-      if (W <= 560) { top = H - 130; bottom = H - 22; }
-      else          { top = H * 0.36; bottom = H * 0.88; }
+      var top = H * 0.36, bottom = H * 0.88;
       return bottom - (bottom - top) * retention(f);
     }
     // wobble: logo após um resgate, o trecho novo assenta com oscilação amortecida (sutil)
