@@ -454,8 +454,9 @@
     root.setAttribute('data-theme', cur() === 'dark' ? 'light' : 'dark');
   });
 
-  // hero: linha do tempo da memória — um item ressurge em intervalos crescentes,
-  // a curva de retenção cai e é "resgatada" a cada revisão.
+  // hero: a curva do esquecimento sendo vencida — a cada revisão a retenção volta ao topo
+  // e o decaimento fica MAIS LENTO (por isso os intervalos crescem). Curva, pontos e cabeça
+  // saem todos da MESMA função yAt(f): nada desalinha.
   (function () {
     var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduce) return;
@@ -466,40 +467,77 @@
       c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     size(); addEventListener('resize', size);
-    function css(v){ return getComputedStyle(root).getPropertyValue(v).trim(); }
-    var reviews = [0.08, 0.18, 0.31, 0.47, 0.66, 0.86]; // pontos de revisão (fração da largura)
-    var t = 0;
+    function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+    // revisões em intervalos CRESCENTES (a régua do método) e decaimento que achata a cada acerto
+    var reviews = [0.05, 0.13, 0.24, 0.39, 0.58, 0.81];
+    var K0 = 26, FLAT = 1.75; // K0 = esquecimento inicial; a cada revisão k /= FLAT
+
+    // retenção 0..1 na fração f do tempo — única fonte de verdade da geometria
+    function retention(f) {
+      var seg = 0;
+      for (var i = 0; i < reviews.length; i++) if (f >= reviews[i]) seg = i + 1;
+      var start = seg === 0 ? 0 : reviews[seg - 1];
+      var k = K0 / Math.pow(FLAT, seg);
+      return Math.exp(-k * (f - start));
+    }
+    function yAt(f) {
+      var top = H * 0.30, bottom = H * 0.78; // retenção 1 → top; 0 → bottom
+      return bottom - (bottom - top) * retention(f);
+    }
+    var fx = function (f) { return f * W; };
+
+    var t = 0, HOLD = 0.22, SPEED = 0.0028;
     function loop() {
-      t += 0.006; if (t > 1.25) t = 0;
+      t += SPEED;
+      if (t > 1 + HOLD) t = 0; // desenha até o fim, segura um pouco, recomeça
+      var head = Math.min(t, 1);
       x.clearRect(0, 0, W, H);
-      var brand = css('--brand'), recall = css('--recall');
-      var baseY = H * 0.62, amp = H * 0.16;
-      // curva de retenção: sobe na revisão, decai até a próxima
+      var brand = css('--brand') || '#7c5cfc';
+      var brand2 = css('--brand-2') || brand;
+      var recall = css('--recall') || '#f4b740';
+
+      // linha de base (100% de retenção) sutil, tracejada
+      x.save();
+      x.strokeStyle = brand; x.globalAlpha = 0.12; x.lineWidth = 1;
+      x.setLineDash([2, 6]);
+      x.beginPath(); x.moveTo(0, yAt(0)); x.lineTo(W, yAt(0)); x.stroke();
+      x.restore();
+
+      // a curva, desenhada progressivamente até a cabeça
       x.beginPath();
-      for (var px = 0; px <= W; px += 6) {
-        var f = px / W, seg = 1;
-        for (var i = 0; i < reviews.length; i++) if (f >= reviews[i]) seg = i + 1;
-        var prev = reviews[seg - 1] || 0, next = reviews[seg] || 1;
-        var local = (f - prev) / Math.max(0.001, (next - prev));
-        var decay = Math.exp(-local * 2.2); // esquece entre revisões
-        var y = baseY - amp * decay;
-        px === 0 ? x.moveTo(px, y) : x.lineTo(px, y);
+      var steps = Math.max(2, Math.floor(fx(head) / 3));
+      for (var i = 0; i <= steps; i++) {
+        var f = (i / steps) * head;
+        var px = fx(f), py = yAt(f);
+        i === 0 ? x.moveTo(px, py) : x.lineTo(px, py);
       }
-      x.strokeStyle = brand; x.globalAlpha = 0.5; x.lineWidth = 2; x.stroke(); x.globalAlpha = 1;
-      // pontos de revisão pulsando conforme o "tempo" passa
+      x.strokeStyle = brand2; x.globalAlpha = 0.65; x.lineWidth = 2; x.lineJoin = 'round'; x.stroke();
+      x.globalAlpha = 1;
+
+      // pontos de revisão: EXATAMENTE sobre a curva (mesma yAt), acendem quando a cabeça passa
       for (var j = 0; j < reviews.length; j++) {
-        var rx = reviews[j] * W, ry = baseY - amp;
-        var d = Math.abs(t - reviews[j]);
-        var pulse = d < 0.06 ? (1 - d / 0.06) : 0;
-        x.beginPath(); x.arc(rx, ry, 3 + pulse * 6, 0, 7);
-        x.fillStyle = recall; x.globalAlpha = 0.35 + pulse * 0.65; x.fill(); x.globalAlpha = 1;
+        var r = reviews[j];
+        if (r > head) break;
+        var rx = fx(r), ry = yAt(r); // topo do salto — retenção volta a 1 aqui
+        var d = head - r;
+        var pulse = d < 0.05 ? (1 - d / 0.05) : 0;
+        // halo do pulso
+        if (pulse > 0) {
+          x.beginPath(); x.arc(rx, ry, 4 + pulse * 9, 0, 7);
+          x.fillStyle = recall; x.globalAlpha = 0.18 * pulse; x.fill();
+        }
+        x.beginPath(); x.arc(rx, ry, 3.2, 0, 7);
+        x.fillStyle = recall; x.globalAlpha = 0.85; x.fill();
+        x.globalAlpha = 1;
       }
-      // cabeça do tempo
-      var hx = t * W, hf = t, hseg = 1;
-      for (var k = 0; k < reviews.length; k++) if (hf >= reviews[k]) hseg = k + 1;
-      var hp = reviews[hseg - 1] || 0, hn = reviews[hseg] || 1;
-      var hl = (hf - hp) / Math.max(0.001, (hn - hp)), hy = baseY - amp * Math.exp(-hl * 2.2);
-      if (t <= 1) { x.beginPath(); x.arc(hx, hy, 4, 0, 7); x.fillStyle = brand; x.fill(); }
+
+      // cabeça do tempo, sobre a curva
+      if (t <= 1) {
+        var hx = fx(head), hy = yAt(head);
+        x.beginPath(); x.arc(hx, hy, 3.6, 0, 7);
+        x.fillStyle = brand2; x.fill();
+      }
       requestAnimationFrame(loop);
     }
     loop();
