@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
-import { ArrowLeft, CalendarClock, Check, ChevronDown, ChevronRight, Eye, EyeOff, FlaskConical, GraduationCap, Loader2, MessageSquare, MessageSquarePlus, Pencil, PlusCircle, RotateCcw, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, ChevronDown, ChevronRight, Eye, EyeOff, FlaskConical, GraduationCap, Loader2, MessageSquare, MessageSquarePlus, Pencil, PlusCircle, Target, Trash2 } from "lucide-react";
 import {
   appendTrack, editTask, getTrack, removeTask, renameTrack, setTrackTarget, taskComment, taskCommentDelete, taskDone,
   ApiError, type Comment, type Epic, type Me, type Progress, type Story, type Task, type TaskPatch, type Track as TrackData,
