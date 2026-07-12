@@ -210,14 +210,26 @@
   }
   @media (max-width: 560px) { .loop, .feat { grid-template-columns: 1fr; } .waitlist { flex-direction: column; } .nav-links a[href="#duvidas"] { display: none; }
     .hero-tag { font-size: 10.5px; letter-spacing: .07em; }
-    /* hero de tela cheia: conteúdo no topo, CTAs ancorados no pé */
-    .hero { min-height: 100svh; padding-top: 40px; padding-bottom: calc(88px + env(safe-area-inset-bottom)); display: flex; }
-    .hero .wrap { display: flex; flex-direction: column; width: 100%; }
-    .hero-note, .ladder { display: none; }  /* mobile: hero enxuto — tag, título, lead, CTAs */
-    .hero-cta { margin-top: auto; padding-top: 32px; }
-    /* overlay vertical: protege o texto em cima, deixa a curva viva no fundo */
-    .hero::before { background: linear-gradient(180deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 82%, transparent) 48%, transparent 72%); }
-    #memcanvas { opacity: .62; }
+    /* hero FINAL: fluxo natural (tag→h1→lead→CTAs→régua) + banda da curva no pé.
+       Nada de 100svh nem auto-margin: o conteúdo dita a altura, a curva fecha o quadro. */
+    .hero { min-height: 0; padding: 48px 0 236px; display: block; }
+    .hero .wrap { display: block; }
+    .hero h1 { margin-top: 20px; }
+    .hero p.lead { margin-top: 18px; }
+    .hero-cta { margin-top: 28px; padding-top: 0; gap: 10px; }
+    .hero-cta .btn { flex: 1; justify-content: center; min-width: 140px; }
+    .hero-note { display: none; }               /* morto de vez no mobile */
+    /* régua vira UMA linha mono compacta: REVISA EM 1d·2d·3d·4d·7d·15d·21d·30d */
+    .ladder { display: flex; flex-wrap: nowrap; margin-top: 16px; gap: 0; overflow: hidden; }
+    .ladder .lab { margin-right: 8px; flex: none; }
+    .ladder .chip { border: 0; background: transparent; padding: 0; font-size: 11px;
+      letter-spacing: .02em; color: var(--faint); border-radius: 0; }
+    .ladder .chip.on { color: var(--recall); }
+    .ladder .chip + .chip::before { content: '·'; margin: 0 4px; color: var(--faint); }
+    .ladder .chip[style*="dashed"] { display: none; }  /* "graduou" não cabe em 320px */
+    /* curva confinada à banda inferior (ver JS) → overlay vira só um véu no topo */
+    .hero::before { background: linear-gradient(180deg, var(--bg) 0%, transparent 30%); }
+    #memcanvas { opacity: .8; }
   }
   /* telas mínimas: nav enxuto (o botão já é a porta de entrada) e respiro lateral menor */
   @media (max-width: 460px) {
@@ -545,7 +557,11 @@
       return Math.exp(-k * u);
     }
     function yBase(f) {
-      var top = H * 0.36, bottom = H * 0.88;
+      // mobile: a curva vive numa banda própria no pé do hero (o texto flui livre acima);
+      // desktop: geometria original intocada.
+      var top, bottom;
+      if (W <= 560) { top = H - 216; bottom = H - 44; }
+      else { top = H * 0.36; bottom = H * 0.88; }
       return bottom - (bottom - top) * retention(f);
     }
     // wobble: logo após um resgate, o trecho novo assenta com oscilação amortecida (sutil)
