@@ -6,7 +6,7 @@ import { createHmac, timingSafeEqual, scrypt, randomBytes } from "node:crypto";
 import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
 import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry } from "./review-engine.js";
-import { emailEnabled, sendEmail, emailShell } from "./email.js";
+import { emailEnabled, sendEmail, emailShell, emailButton } from "./email.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -347,9 +347,18 @@ const server = createServer(async (req, res) => {
         const r = await sendEmail({
           to: em,
           subject: "Redefinir sua senha — Fixa",
-          html: emailShell("Redefinir senha", `<p style="font-size:14px;line-height:1.6;color:#5c5480">Alguém (provavelmente você) pediu pra redefinir a senha desta conta. O link vale por 1 hora.</p>
-            <p style="margin:20px 0"><a href="${link}" style="background:#6c47f0;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600">Criar nova senha</a></p>
-            <p style="font-size:12px;color:#8b83ab">Se não foi você, ignore este e-mail — nada muda.</p>`),
+          html: emailShell({
+            preheader: "O link vale por 1 hora e funciona uma única vez.",
+            eyebrow: "redefinir senha",
+            title: "Vamos criar uma senha nova.",
+            bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.65;color:#5c5480;">Recebemos um pedido pra redefinir a senha da sua conta. O botão abaixo vale por <strong style="font-weight:600;color:#231c39;">1&nbsp;hora</strong> e funciona uma única vez.</p>
+${emailButton(link, "Criar nova senha")}
+<p style="margin:0 0 16px;font-size:12px;line-height:1.6;color:#8b83ab;">Se o botão não abrir, copie e cole este link no navegador:<br><a href="${link}" style="color:#6c47f0;word-break:break-all;">${link}</a></p>
+<div style="border-top:1px solid #eeeaf5;padding-top:14px;">
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#8b83ab;">Se não foi você, ignore este e-mail — sua senha continua a mesma.</p>
+</div>`,
+            footnoteHtml: "Você recebeu este e-mail porque alguém pediu a redefinição de senha desta conta.",
+          }),
         });
         if (!r.ok) console.error("[forgot] envio falhou:", r.reason, "| link:", link);
       }
@@ -406,9 +415,17 @@ const server = createServer(async (req, res) => {
         const r = await sendEmail({
           to: u.email,
           subject: `${due} ${due === 1 ? "revisão te espera" : "revisões te esperam"} hoje — Fixa`,
-          html: emailShell(`${due} pra revisar hoje`, `<p style="font-size:14px;line-height:1.6;color:#5c5480">Suas tasks voltaram no tempo certo — revisar agora é o que faz fixar. Leva poucos minutos.</p>
-            <p style="margin:20px 0"><a href="${BASE_URL}/revisar" style="background:#6c47f0;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600">Revisar agora</a></p>
-            <p style="font-size:12px;color:#8b83ab"><a href="${offLink}" style="color:#8b83ab">Parar de receber lembretes</a></p>`),
+          html: emailShell({
+            preheader: "Revisar no tempo certo é o que faz fixar. Leva poucos minutos.",
+            eyebrow: "revisão do dia",
+            title: `${due} ${due === 1 ? "revisão" : "revisões"} no ponto certo.`,
+            bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.65;color:#5c5480;">Essas tasks voltaram hoje porque é agora que revisar rende mais — pouco antes de o cérebro soltar. Leva poucos minutos, e o dia conta pra sua consistência.</p>
+${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
+<div style="border-top:1px solid #eeeaf5;padding-top:14px;">
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#8b83ab;">Prefere revisar no seu ritmo, sem lembrete? <a href="${offLink}" style="color:#8b83ab;text-decoration:underline;">Parar de receber lembretes</a></p>
+</div>`,
+            footnoteHtml: "Você recebeu este lembrete porque tem revisões agendadas no Fixa.",
+          }),
         });
         if (r.ok) sent++;
       }

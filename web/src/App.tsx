@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { CircleHelp, Gem, Layers, Library, LogOut, Moon, Plus, Sun } from "lucide-react";
+import { CircleHelp, Eye, EyeOff, Gem, Layers, Library, Loader2, LogOut, Moon, Plus, Sun } from "lucide-react";
 import { ApiError, forgotPass, getMe, getReview, login, logout, resetPass, signup, type Me } from "@/lib/api";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { useApi } from "@/lib/useApi";
@@ -12,6 +12,11 @@ import { Pro } from "@/screens/Pro";
 
 // anel de foco padrão de todo interativo do app (spec §3)
 export const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+// campos das telas de auth (spec DESIGN-AUTH-EMAIL §B2.4)
+const INPUT = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-ring/25";
+const INPUT_ERR = "border-destructive focus:border-destructive focus:ring-destructive/25";
+const LABEL = "mb-1.5 block text-[13px] font-medium";
 
 // marca Fixa: um "loop" que fecha (o ciclo do método) com o ponto de recall
 export function Logo({ size = 24 }: { size?: number }) {
@@ -145,16 +150,105 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
   );
 }
 
+/* ── telas de auth (spec DESIGN-AUTH-EMAIL.md parte B) ── */
+
+// shell comum aos 4 modos (§B2.1/§B2.2): glow de marca + bloco de marca + card
+function AuthShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative grid min-h-full place-items-center overflow-hidden px-4 py-10">
+      {/* glow de marca — decorativo, some pra leitores de tela */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-72"
+        style={{ background: "radial-gradient(560px 280px at 50% -80px, color-mix(in srgb, var(--primary) 16%, transparent), transparent 70%)" }}
+      />
+      <div className="relative w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <Logo size={32} />
+            <span className="text-[22px] font-extrabold tracking-[-0.03em]">Fixa</span>
+          </div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">aprenda de um jeito que fixa</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// campo de senha com olho (§B2.4): toggle alterna o type, aria-label acompanha
+function PasswordInput({ id, value, onChange, autoComplete, autoFocus = false, invalid = false }: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete: "current-password" | "new-password";
+  autoFocus?: boolean;
+  invalid?: boolean;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        id={id} name={id} type={show ? "text" : "password"} value={value} onChange={(e) => onChange(e.target.value)}
+        placeholder="••••••••" autoComplete={autoComplete} autoFocus={autoFocus}
+        className={`${INPUT} pr-10 ${invalid ? INPUT_ERR : ""}`}
+      />
+      <button
+        type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "ocultar senha" : "mostrar senha"}
+        className={`absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground ${FOCUS}`}
+      >
+        {show ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+      </button>
+    </div>
+  );
+}
+
+// CTA primário (§B2.5): busy = spinner + palavra, nunca "…" solto
+function AuthCta({ busy, disabled, busyLabel, label }: { busy: boolean; disabled: boolean; busyLabel: string; label: string }) {
+  return (
+    <button
+      disabled={disabled}
+      className={`mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 ${FOCUS}`}
+    >
+      {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+      {busy ? busyLabel : label}
+    </button>
+  );
+}
+
+// alerta de erro de form (§B2.6) — mensagens da API já vêm em pt-BR
+function FormAlert({ children }: { children: ReactNode }) {
+  return <div role="alert" className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] leading-snug text-destructive">{children}</div>;
+}
+
+// link de troca de modo no rodapé do card (§B3)
+function ModeLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return <button type="button" onClick={onClick} className={`font-medium text-primary underline-offset-2 hover:underline ${FOCUS}`}>{children}</button>;
+}
+
+type AuthMode = "login" | "signup" | "forgot";
+
+const AUTH_COPY: Record<AuthMode, { h1: string; sub: string; cta: string; busy: string }> = {
+  login: { h1: "Bom te ver de novo.", sub: "Entre pra continuar de onde parou.", cta: "Entrar", busy: "entrando…" },
+  signup: { h1: "Crie sua conta.", sub: "Grátis pra começar — sem cartão.", cta: "Criar conta", busy: "criando conta…" },
+  forgot: { h1: "Esqueceu a senha?", sub: "Digite seu e-mail — enviamos um link pra criar uma nova.", cta: "Enviar link", busy: "enviando…" },
+};
+
 function Login({ onLogin }: { onLogin: (me: Me) => void }) {
-  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
+  // ?m=cadastro|esqueci abre já no modo certo (§B4) — lido só na montagem
+  const [mode, setMode] = useState<AuthMode>(() => {
+    const m = new URLSearchParams(window.location.search).get("m");
+    return m === "cadastro" ? "signup" : m === "esqueci" ? "forgot" : "login";
+  });
   const [sent, setSent] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const inputCls = "w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary";
   const canSubmit = mode === "login" ? email.trim() && pass : mode === "forgot" ? email.trim() : name.trim() && email.trim() && pass.length >= 6;
+  // troca de modo limpa erro/envio/senha e mantém o e-mail (§B5)
+  const switchMode = (m: AuthMode) => { setMode(m); setErr(null); setSent(false); setPass(""); };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true); setErr(null);
@@ -165,33 +259,74 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
       setErr(ex instanceof ApiError ? ex.message : "algo deu errado — tenta de novo");
     } finally { setBusy(false); }
   };
+  const copy = AUTH_COPY[mode];
+  const badCreds = mode === "login" && !!err; // no login, o culpado é o par e-mail+senha
   return (
-    <div className="grid min-h-full place-items-center px-4">
-      <form onSubmit={submit} className="w-full max-w-xs space-y-3 rounded-xl border border-border bg-card p-6">
-        <div className="flex items-center gap-2 text-lg font-extrabold tracking-tight"><Logo size={22} /> Fixa</div>
-        <p className="text-xs text-muted-foreground">{mode === "login" ? "Entre pra continuar estudando." : mode === "forgot" ? "Digite seu e-mail — enviamos um link pra criar uma senha nova." : "Crie sua conta — leva 10 segundos."}</p>
-        {mode === "signup" && (
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="seu nome" className={inputCls} />
-        )}
-        <input type="email" autoFocus={mode === "login"} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail" className={inputCls} />
-        {mode !== "forgot" && (
-          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={mode === "signup" ? "senha (6+ caracteres)" : "senha"} className={inputCls} />
-        )}
-        {mode === "forgot" && sent && <p className="text-xs text-domain">Se existir conta com esse e-mail, o link chegou. Vale por 1 hora.</p>}
-        {err && <p className="text-sm text-destructive">{err}</p>}
-        <button disabled={busy || !canSubmit || (mode === "forgot" && sent)} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-          {busy ? "…" : mode === "login" ? "entrar" : mode === "forgot" ? (sent ? "link enviado" : "enviar link") : "criar conta"}
-        </button>
-        <button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(null); setSent(false); }} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">
-          {mode === "login" ? "não tem conta? criar agora" : "já tem conta? entrar"}
-        </button>
-        {mode === "login" && (
-          <button type="button" onClick={() => { setMode("forgot"); setErr(null); setSent(false); }} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">
-            esqueci minha senha
-          </button>
-        )}
+    <AuthShell>
+      <form onSubmit={submit} aria-labelledby="auth-title">
+        {/* miolo com key={mode}: remonta (re-aplica autofocus) e anima a troca (§B5) */}
+        <div key={mode} className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+          <div className="mb-5">
+            <h1 id="auth-title" className="text-[17px] font-semibold tracking-[-0.01em]">{copy.h1}</h1>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{copy.sub}</p>
+          </div>
+          {err && <FormAlert>{err}</FormAlert>}
+          {mode === "forgot" && sent ? (
+            <>
+              {/* sucesso do esqueci substitui os campos (§B2.7) */}
+              <div role="status" className="rounded-md border border-domain/30 bg-domain/10 px-3 py-2.5 text-[13px] leading-relaxed text-domain">
+                Se existir conta com <strong className="font-semibold">{email}</strong>, o link chegou na sua caixa de entrada. Vale por 1 hora.
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Não chegou? Confira o spam ou <button type="button" onClick={() => setSent(false)} className={`underline underline-offset-2 hover:text-foreground ${FOCUS}`}>tentar com outro e-mail</button>.
+              </p>
+              <button type="button" onClick={() => switchMode("login")} className={`mt-5 h-10 w-full rounded-lg border border-border text-sm font-medium text-foreground transition-colors hover:bg-accent ${FOCUS}`}>
+                voltar pra entrar
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4">
+                {mode === "signup" && (
+                  <div>
+                    <label htmlFor="name" className={LABEL}>Nome</label>
+                    <input id="name" name="name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="como quer ser chamado" autoComplete="name" className={INPUT} />
+                  </div>
+                )}
+                <div>
+                  <label htmlFor="email" className={LABEL}>E-mail</label>
+                  <input
+                    id="email" name="email" type="email" autoFocus={mode !== "signup"} value={email} onChange={(e) => setEmail(e.target.value)}
+                    placeholder="voce@email.com" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email"
+                    className={`${INPUT} ${badCreds ? INPUT_ERR : ""}`}
+                  />
+                </div>
+                {mode !== "forgot" && (
+                  <div>
+                    <div className={mode === "login" ? "flex items-baseline justify-between" : undefined}>
+                      <label htmlFor="pass" className={LABEL}>Senha</label>
+                      {mode === "login" && (
+                        <button type="button" onClick={() => switchMode("forgot")} className={`text-xs font-medium text-muted-foreground underline-offset-2 hover:text-primary hover:underline ${FOCUS}`}>
+                          esqueci a senha
+                        </button>
+                      )}
+                    </div>
+                    <PasswordInput id="pass" value={pass} onChange={setPass} autoComplete={mode === "login" ? "current-password" : "new-password"} invalid={badCreds} />
+                    {mode === "signup" && <p className="mt-1.5 text-xs text-muted-foreground">mínimo de 6 caracteres</p>}
+                  </div>
+                )}
+              </div>
+              <AuthCta busy={busy} disabled={busy || !canSubmit} busyLabel={copy.busy} label={copy.cta} />
+            </>
+          )}
+        </div>
+        <p className="mt-5 border-t border-border pt-4 text-center text-[13px] text-muted-foreground">
+          {mode === "login" && <>Não tem conta? <ModeLink onClick={() => switchMode("signup")}>Criar conta</ModeLink></>}
+          {mode === "signup" && <>Já tem conta? <ModeLink onClick={() => switchMode("login")}>Entrar</ModeLink></>}
+          {mode === "forgot" && <>Lembrou a senha? <ModeLink onClick={() => switchMode("login")}>Voltar pra entrar</ModeLink></>}
+        </p>
       </form>
-    </div>
+    </AuthShell>
   );
 }
 
@@ -211,24 +346,43 @@ function ResetScreen({ onLogin }: { onLogin: (me: Me) => void }) {
       setErr(ex instanceof ApiError ? ex.message : "algo deu errado — tenta de novo");
     } finally { setBusy(false); }
   };
+  const tokenErr = !!err && err.includes("link inválido"); // resposta da API em §B4
   return (
-    <div className="grid min-h-full place-items-center px-4">
-      <form onSubmit={submit} className="w-full max-w-xs space-y-3 rounded-xl border border-border bg-card p-6">
-        <div className="flex items-center gap-2 text-lg font-extrabold tracking-tight"><Logo size={22} /> Fixa</div>
-        <p className="text-xs text-muted-foreground">Crie sua nova senha.</p>
-        <input type="password" autoFocus value={pass} onChange={(e) => setPass(e.target.value)} placeholder="nova senha (6+ caracteres)" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-        {err && <p className="text-sm text-destructive">{err}</p>}
-        <button disabled={busy || pass.length < 6} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-          {busy ? "…" : "salvar e entrar"}
-        </button>
+    <AuthShell>
+      <form onSubmit={submit} aria-labelledby="auth-title">
+        <div className="mb-5">
+          <h1 id="auth-title" className="text-[17px] font-semibold tracking-[-0.01em]">Crie sua nova senha.</h1>
+          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">Ela vale a partir de agora, em todos os seus aparelhos.</p>
+        </div>
+        {err && <FormAlert>{err}</FormAlert>}
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="new-pass" className={LABEL}>Nova senha</label>
+            <PasswordInput id="new-pass" value={pass} onChange={setPass} autoComplete="new-password" autoFocus />
+            <p className="mt-1.5 text-xs text-muted-foreground">mínimo de 6 caracteres</p>
+          </div>
+        </div>
+        <AuthCta busy={busy} disabled={busy || pass.length < 6} busyLabel="salvando…" label="Salvar e entrar" />
+        {tokenErr && (
+          <button type="button" onClick={() => navigate("/?m=esqueci")} className={`mt-2 h-10 w-full rounded-lg border border-border text-sm font-medium text-foreground transition-colors hover:bg-accent ${FOCUS}`}>
+            pedir um novo link
+          </button>
+        )}
       </form>
-    </div>
+    </AuthShell>
   );
 }
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [booting, setBooting] = useState(true);
+  // deslogado ninguém escuta popstate (Shell não montou) — re-render pra "pedir um novo link" (§B4) sair de /redefinir
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const on = () => setTick((n) => n + 1);
+    window.addEventListener("popstate", on);
+    return () => window.removeEventListener("popstate", on);
+  }, []);
   useEffect(() => { getMe().then(setMe).catch(() => setMe(null)).finally(() => setBooting(false)); }, []);
   const doLogout = async () => { await logout().catch(() => {}); setMe(null); navigate("/"); };
   return (
