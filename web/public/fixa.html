@@ -189,7 +189,21 @@
     .istep:last-child { border-bottom: 0; }
     .nav-links a.hide-sm { display: none; }
   }
-  @media (max-width: 560px) { .loop, .feat { grid-template-columns: 1fr; } .waitlist { flex-direction: column; } .nav-links a[href="#duvidas"] { display: none; } }
+  @media (max-width: 560px) { .loop, .feat { grid-template-columns: 1fr; } .waitlist { flex-direction: column; } .nav-links a[href="#duvidas"] { display: none; }
+    .hero-tag { font-size: 10.5px; letter-spacing: .07em; }
+    .hero { padding-top: 56px; }
+  }
+  /* telas mínimas: nav enxuto (o botão já é a porta de entrada) e respiro lateral menor */
+  @media (max-width: 460px) {
+    .wrap { padding: 0 16px; }
+    .nav-in { gap: 10px; }
+    .nav-links { gap: 4px; }
+    .nav-links a[href="/temas"]:not(.btn) { display: none; }
+    .nav-links .btn { padding: 9px 13px; font-size: 13px; }
+    .brand { font-size: 17px; }
+    .pcard { padding: 24px 18px; }
+    .cta { padding: 40px 18px; }
+  }
   @media (prefers-reduced-motion: reduce) { #memcanvas { display: none; } .btn:hover { transform: none; } }
   :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
 </style>
