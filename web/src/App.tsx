@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { LogOut, Moon, Plus, Sun } from "lucide-react";
+import { CircleHelp, Gem, Layers, Library, LogOut, Moon, Plus, Sun } from "lucide-react";
 import { ApiError, getMe, getReview, login, logout, signup, type Me } from "@/lib/api";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { useApi } from "@/lib/useApi";
@@ -62,13 +62,32 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
     window.addEventListener("fx-review-changed", on);
     return () => window.removeEventListener("fx-review-changed", on);
   }, [refetchReview]);
-  const NavBtn = ({ to, active, children, display = "inline-flex" }: { to: string; active: boolean; children: ReactNode; display?: string }) => (
+  const NavBtn = ({ to, active, children }: { to: string; active: boolean; children: ReactNode }) => (
     <button
       onClick={() => navigate(to)}
       aria-current={active ? "page" : undefined}
-      className={`${display} h-8 items-center rounded-lg px-3 text-sm transition-colors ${active ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"} ${FOCUS}`}
+      className={`inline-flex h-8 items-center rounded-lg px-3 text-sm transition-colors ${active ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"} ${FOCUS}`}
     >
       {children}
+    </button>
+  );
+  // aba da bottom bar mobile (DESIGN-SHELL-MOBILE §3.2): célula inteira é o alvo; ativa = tinta violeta
+  const TabBtn = ({ to, active, icon, label, badge }: { to: string; active: boolean; icon: ReactNode; label: string; badge?: number }) => (
+    <button
+      onClick={() => navigate(to)}
+      aria-current={active ? "page" : undefined}
+      aria-label={badge ? `${label}, ${badge} ${badge === 1 ? "pendente" : "pendentes"}` : label}
+      className={`relative flex h-full flex-col items-center justify-center gap-1 rounded-lg transition-colors ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"} ${FOCUS}`}
+    >
+      <span className="relative">
+        {icon}
+        {badge ? (
+          <span aria-hidden="true" className="absolute -right-3.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-recall/15 px-1 font-mono text-[10px] tabular-nums text-recall">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : null}
+      </span>
+      <span className="text-[10px] font-medium leading-none">{label}</span>
     </button>
   );
   return (
@@ -77,9 +96,9 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
         <div className="mx-auto flex h-14 max-w-4xl items-center gap-2 px-4">
           <button onClick={() => navigate("/")} className={`mr-2 flex items-center gap-2 rounded-lg ${FOCUS}`}>
             <Logo />
-            <span className="hidden text-[17px] font-extrabold tracking-[-0.02em] sm:inline">Fixa</span>
+            <span className="text-[17px] font-extrabold tracking-[-0.02em]">Fixa</span>
           </button>
-          <nav className="flex items-center gap-1">
+          <nav aria-label="navegação" className="hidden items-center gap-1 md:flex">
             <NavBtn to="/" active={route.name === "home" || route.name === "track"}>Temas</NavBtn>
             <NavBtn to="/revisar" active={route.name === "revisar"}>
               Revisar
@@ -90,7 +109,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
               )}
             </NavBtn>
             <NavBtn to="/ajuda" active={route.name === "ajuda"}>Ajuda</NavBtn>
-            <NavBtn to="/pro" active={route.name === "pro"} display="hidden sm:inline-flex">Pro</NavBtn>
+            <NavBtn to="/pro" active={route.name === "pro"}>Pro</NavBtn>
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => navigate("/novo")} className={`hidden h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:inline-flex ${FOCUS}`}>
@@ -102,7 +121,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-6">
+      <main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" ? "pb-6" : "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
         {route.name === "home" && <Home />}
         {route.name === "novo" && <NewTheme />}
         {route.name === "revisar" && <Review />}
@@ -110,6 +129,17 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
         {route.name === "pro" && <Pro me={me} />}
         {route.name === "track" && <Track id={route.id} me={me} />}
       </main>
+      {/* bottom tab bar mobile — some em /revisar (o dock do player é dono do fundo) */}
+      {route.name !== "revisar" && (
+        <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
+          <div className="mx-auto grid h-14 max-w-4xl grid-cols-4">
+            <TabBtn to="/" active={route.name === "home" || route.name === "track"} icon={<Library className="h-5 w-5" />} label="Temas" />
+            <TabBtn to="/revisar" active={false} icon={<Layers className="h-5 w-5" />} label="Revisar" badge={dueCount} />
+            <TabBtn to="/ajuda" active={route.name === "ajuda"} icon={<CircleHelp className="h-5 w-5" />} label="Ajuda" />
+            <TabBtn to="/pro" active={route.name === "pro"} icon={<Gem className="h-5 w-5" />} label="Pro" />
+          </div>
+        </nav>
+      )}
     </div>
   );
 }
