@@ -5,6 +5,7 @@ import { dirname, join, extname, normalize } from "node:path";
 import { createHmac, timingSafeEqual, scrypt, randomBytes } from "node:crypto";
 import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
+import { buildTutorPrompt } from "./prompt-tutor.js";
 import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry } from "./review-engine.js";
 import { emailEnabled, sendEmail, emailShell, emailButton } from "./email.js";
 
@@ -43,6 +44,9 @@ const CRON_SECRET = process.env.CRON_SECRET || "";
 const GEN_FREE_LIFETIME = Number(process.env.GEN_FREE_LIFETIME || 1);
 const GEN_PRO_MONTH = Number(process.env.GEN_PRO_MONTH || 30);
 const GEN_PRO_DAY = Number(process.env.GEN_PRO_DAY || 10);
+// correção do Tutor (DESIGN-TUTOR-IA §6): free = degustação lifetime; pro = fair use mensal
+const TUTOR_FREE_LIFETIME = Number(process.env.TUTOR_FREE_LIFETIME || 5);
+const TUTOR_PRO_MONTH = Number(process.env.TUTOR_PRO_MONTH || 100);
 const DIST = join(__dirname, "web", "dist");
 
 // ---- KV (Upstash REST ou arquivo local) ----
@@ -133,6 +137,20 @@ function genUsage(u) {
   }
   return { used: u.genTotal || 0, limit: GEN_FREE_LIFETIME };
 }
+function tutorUsage(u) {
+  if (u.plan === "pro") {
+    const ym = spDay().slice(0, 7);
+    const used = u.tutorMonth && u.tutorMonth.ym === ym ? u.tutorMonth.count : 0;
+    return { used, limit: TUTOR_PRO_MONTH };
+  }
+  return { used: u.tutorTotal || 0, limit: TUTOR_FREE_LIFETIME };
+}
+function bumpTutor(u) {
+  const ym = spDay().slice(0, 7);
+  u.tutorTotal = (u.tutorTotal || 0) + 1;
+  u.tutorMonth = u.tutorMonth && u.tutorMonth.ym === ym ? { ym, count: u.tutorMonth.count + 1 } : { ym, count: 1 };
+  saveUsers();
+}
 // incrementa contadores — chamar SÓ quando a geração importou um tema com sucesso
 function bumpGen(u) {
   const day = spDay(), ym = day.slice(0, 7);
@@ -147,6 +165,8 @@ const freeId = (ud, base) => { let id = base, n = 2; while (ud.tracks[id]) id = 
 function tState(ud, id) {
   const s = ud.state[id] || (ud.state[id] = { done: {}, comments: {}, review: {} });
   s.done ||= {}; s.comments ||= {}; s.review ||= {};
+  s.lesson ||= {}; // taskId -> { stage, answers[], updatedAt } (a Lição — DESIGN-LICAO-UX)
+  s.tutor ||= {};  // taskId -> { nota, veredito, acertos[], gaps[], dica, at }
   return s;
 }
 const taskIdsOf = (track) => {
@@ -199,7 +219,9 @@ function taskWithState(t, s, epicTitle, storyTitle, today, dueBucket, trackId) {
     review = { box: rv.box, next: rv.next, graduated, due, ladder: REVIEW_LADDER.length };
     if (due && dueBucket) dueBucket.push({ trackId, id: t.id, title: t.title, sample: t.sample, type: t.type, epic: epicTitle, story: storyTitle, box: rv.box, next: rv.next });
   }
-  return { ...t, done, completedAt: s.done[t.id] || null, comments: s.comments[t.id] || [], review };
+  const lesson = s.lesson && s.lesson[t.id] ? s.lesson[t.id] : null;
+  const tutor = s.tutor && s.tutor[t.id] ? s.tutor[t.id] : null;
+  return { ...t, done, completedAt: s.done[t.id] || null, comments: s.comments[t.id] || [], review, lesson, tutor };
 }
 function buildTrack(ud, id) {
   const track = ud.tracks[id];
@@ -449,7 +471,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     const isPro = me.plan === "pro";
 
     if (path === "/api/me") return json(res, 200, { name: me.name, email: me.email, plan: me.plan });
-    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me) });
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me) });
     // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
     // free: 1 degustação lifetime · pro: fair use 30/mês + máx 10/dia (PRICING.md)
     if (path === "/api/generate" && req.method === "POST") {
@@ -675,6 +697,97 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       return json(res, 200, { ok: true, added: trackCounts({ epics: renumbered }) });
     }
 
+    // A LIÇÃO (DESIGN-LICAO-UX): envio de um estágio; 'enviado é enviado'; Done automático no final
+    if (path === "/api/task/lesson" && req.method === "POST") {
+      const { trackId, taskId, answer, blank, restart } = await readBody(req);
+      const track = ud.tracks[trackId];
+      if (!track) return json(res, 404, { error: "tema não encontrado" });
+      let target = null;
+      for (const e of track.epics) for (const st of e.stories) for (const t of st.tasks) if (t.id === taskId) target = t;
+      if (!target) return json(res, 404, { error: "task não encontrada" });
+      const s = tState(ud, trackId);
+      const maxStages = target.type === "practice" ? 2 : 3; // prática: tentativa+relato · teórica: fria+pontos+final
+      let cur = s.lesson[taskId] || { stage: 0, answers: [] };
+      if (restart) { cur = { stage: 0, answers: [] }; s.lesson[taskId] = cur; await saveU(me.id, "state"); return json(res, 200, { ok: true, stage: 0 }); }
+      if (cur.stage >= maxStages) return json(res, 409, { error: "lição já concluída — use restart pra refazer" });
+      const text = String(answer || "").trim();
+      const isFinal = cur.stage === maxStages - 1;
+      if (!text && !(blank === true && !isFinal)) {
+        return json(res, 400, { error: isFinal ? "a resposta final é a que consolida — escreve com a tua palavra" : "escreve algo, ou toca em 'deu branco' pra seguir" });
+      }
+      cur.answers.push(text);
+      cur.stage += 1;
+      cur.updatedAt = new Date().toISOString();
+      s.lesson[taskId] = cur;
+      let becameDone = false;
+      if (cur.stage >= maxStages && !s.done[taskId]) {
+        s.done[taskId] = new Date().toISOString(); // Done automático na última resposta (decisão do dono)
+        if (!s.review[taskId]) seedReview(s, taskId, null, track.targetDate);
+        becameDone = true;
+      }
+      if (cur.stage >= maxStages) markActive(ud, me.id);
+      await saveU(me.id, "state");
+      return json(res, 200, { ok: true, stage: cur.stage, done: cur.stage >= maxStages, becameDone });
+    }
+    // O TUTOR: correção da jornada (pós-lição; medido por plano; idempotente — devolve a salva)
+    if (path === "/api/task/tutor" && req.method === "POST") {
+      if (!GEN_ENABLED) return json(res, 400, { error: "correção por IA não configurada no servidor" });
+      const { trackId, taskId } = await readBody(req);
+      const track = ud.tracks[trackId];
+      if (!track) return json(res, 404, { error: "tema não encontrado" });
+      let target = null;
+      for (const e of track.epics) for (const st of e.stories) for (const t of st.tasks) if (t.id === taskId) target = t;
+      if (!target) return json(res, 404, { error: "task não encontrada" });
+      const s = tState(ud, trackId);
+      if (s.tutor[taskId]) return json(res, 200, { ok: true, tutor: s.tutor[taskId], cached: true });
+      const maxStages = target.type === "practice" ? 2 : 3;
+      const cur = s.lesson[taskId];
+      if (!cur || cur.stage < maxStages) return json(res, 409, { error: "termina a lição primeiro — o Tutor corrige a jornada completa" });
+      const tu = tutorUsage(me);
+      if (tu.used >= tu.limit) {
+        return json(res, me.plan === "pro" ? 429 : 402, {
+          error: me.plan === "pro"
+            ? `suas ${tu.limit} correções do mês acabaram — renova no dia 1º`
+            : `suas ${tu.limit} correções de degustação acabaram — no Pro são ${TUTOR_PRO_MONTH}/mês`,
+        });
+      }
+      const prompt = buildTutorPrompt({ task: target, answers: cur.answers, comments: s.comments[taskId] });
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 60000);
+      let text = "";
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.3 } }),
+          signal: ac.signal,
+        });
+        if (r.status === 429) return json(res, 429, { error: "o Tutor está sobrecarregado — tenta de novo em instantes" });
+        if (!r.ok) return json(res, 502, { error: `Tutor indisponível (${r.status}) — tenta de novo` });
+        const d = await r.json();
+        text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
+      } catch (e) {
+        return json(res, 502, { error: e.name === "AbortError" ? "a correção demorou demais — tenta de novo" : "falha ao chamar o Tutor — tenta de novo" });
+      } finally { clearTimeout(timer); }
+      let parsed;
+      try { parsed = JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "")); } catch { parsed = null; }
+      const notaOk = parsed && typeof parsed.nota === "number" && parsed.nota >= 0 && parsed.nota <= 10;
+      if (!notaOk || !parsed.veredito || !Array.isArray(parsed.acertos) || !Array.isArray(parsed.gaps)) {
+        return json(res, 502, { error: "a correção veio fora do formato — tenta de novo" });
+      }
+      const tutor = {
+        nota: Math.round(parsed.nota * 2) / 2,
+        veredito: String(parsed.veredito).slice(0, 300),
+        acertos: parsed.acertos.slice(0, 5).map((x) => String(x).slice(0, 400)),
+        gaps: parsed.gaps.slice(0, 5).map((x) => String(x).slice(0, 400)),
+        dica: String(parsed.dica || "").slice(0, 400),
+        at: new Date().toISOString(),
+      };
+      s.tutor[taskId] = tutor;
+      bumpTutor(me);
+      await saveU(me.id, "state");
+      return json(res, 200, { ok: true, tutor });
+    }
     // ações por task (validam trackId + taskId)
     if (path.startsWith("/api/task/") && req.method === "POST") {
       const body = await readBody(req);
