@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Fixa — aprenda de um jeito que fixa</title></head><body>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Recall ativo e revisão espaçada pra quem tem prova com data. Nasceu na certificação do Claude (Anthropic): do zero ao escopo da prova em 1,5 semana. Grátis."><title>Fixa — estude pra certificação de um jeito que fixa</title></head><body>
 <style>
   :root {
     --bg: #0d0a1a; --bg-2: #141026; --card: #171231; --line: #2a2246;
@@ -96,6 +96,13 @@
     text-transform: uppercase; letter-spacing: .1em; color: var(--faint); }
   .loop-foot { display: flex; align-items: center; gap: 10px; margin-top: 20px; font-family: var(--mono);
     font-size: 13px; color: var(--recall); }
+  /* origin story */
+  .story { margin-top: 42px; max-width: 720px; background: var(--card); border: 1px solid var(--line);
+    border-left: 3px solid var(--brand); border-radius: var(--r); padding: 26px 28px; }
+  .story .q { margin: 0; font-size: 17px; line-height: 1.7; }
+  .story .num { font-family: var(--mono); color: var(--recall); font-weight: 700; white-space: nowrap; }
+  .story .who { margin: 16px 0 0; font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: .04em; }
+  .story .note { margin: 6px 0 0; font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: .04em; }
 
   /* features */
   .feat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 42px; }
@@ -272,14 +279,14 @@
 <header class="hero">
   <canvas id="memcanvas" aria-hidden="true"></canvas>
   <div class="wrap">
-    <span class="hero-tag">Aprendizado por repetição espaçada</span>
-    <h1>Estude de um jeito que <span class="hl">fixa</span> — e volta na hora certa.</h1>
-    <p class="lead">A Fixa transforma qualquer tema numa trilha guiada e te faz revisar no intervalo exato em que você está prestes a esquecer. Teoria e prática, mão na massa.</p>
+    <span class="hero-tag">Pra quem tem uma prova com data</span>
+    <h1>Estude pra certificação de um jeito que <span class="hl">fixa</span>.</h1>
+    <p class="lead">Trilha guiada do zero à prova e revisão no intervalo exato em que você ia esquecer. Nasceu preparando uma certificação de IA — e serve pra qualquer tema.</p>
     <div class="hero-cta">
       <a href="/temas" class="btn">Começar de graça</a>
       <a href="#metodo" class="btn ghost">Ver o método</a>
     </div>
-    <p class="hero-note">// sem cartão · feito por quem estava estudando pra uma prova e cansou de esquecer</p>
+    <p class="hero-note">// sem cartão · nasceu preparando a certificação do Claude, da Anthropic — história real abaixo</p>
     <div class="ladder" aria-label="intervalos de revisão em dias">
       <span class="lab">revisa em</span>
       <span class="chip on">1d</span><span class="chip on">2d</span><span class="chip">3d</span><span class="chip">4d</span>
@@ -289,12 +296,26 @@
   </div>
 </header>
 
+<section id="historia">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">A origem</span>
+      <h2>Nasceu de uma prova de verdade.</h2>
+    </div>
+    <div class="story">
+      <p class="q">"Eu não queria só passar na certificação do Claude, da Anthropic — queria nota alta. Cansei de reler e esquecer, então montei pra mim um sistema de recall ativo e revisão espaçada. Em <b class="num">1,5 semana</b> eu tinha me enquadrado no escopo de aprovação da prova. Esse sistema virou a Fixa — e hoje monta a trilha de qualquer prova ou tema."</p>
+      <p class="who">— João, criador da Fixa</p>
+      <p class="note">// a prova ainda vem — quando a nota sair, ela entra aqui.</p>
+    </div>
+  </div>
+</section>
+
 <section id="metodo">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">O método</span>
       <h2>Não é releitura. É esforço de lembrar.</h2>
-      <p>Reler dá a ilusão de que aprendeu. O que gruda é tentar puxar da memória antes de ver a resposta — e depois espaçar. Cada task roda esse loop.</p>
+      <p>Reler dá a ilusão de que aprendeu. O que gruda é tentar puxar da memória antes de ver a resposta — e depois espaçar. Cada task roda esse loop — foi ele que enquadrou uma certificação em 1,5 semana.</p>
     </div>
     <div class="loop">
       <div class="step"><span class="tag">frio</span><div class="n">01</div><h3>Tenta de cabeça</h3><p>Responde sem olhar a resposta. O esforço de recuperar é o que cria a trilha.</p></div>
@@ -339,7 +360,7 @@
       <div class="fcard">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v12H4zM8 20h8M12 16v4"/></svg>
         <h3>Feito pra prova</h3>
-        <p>Nasceu preparando uma certificação. Ideal pra quem tem um objetivo com data e não pode esquecer no dia.</p>
+        <p>Nasceu preparando a certificação do Claude, da Anthropic. Ideal pra quem tem data marcada — cert de TI, concurso, faculdade — e não pode esquecer no dia.</p>
       </div>
       <div class="fcard">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M11 18h2"/></svg>
@@ -358,7 +379,7 @@
       <p>Você diz o tema; a Fixa monta o prompt; a IA gera; você importa. Sem digitar tudo na mão.</p>
     </div>
     <div class="imp">
-      <div class="istep"><div class="num">1</div><h3>Descreve o tema</h3><p>“Consumo de API no front”, “teoria dos grafos”, a cert que você vai fazer. Escolhe nível e profundidade.</p></div>
+      <div class="istep"><div class="num">1</div><h3>Descreve o tema</h3><p>“Certificação AWS”, “API do Claude”, “teoria dos grafos” — a prova que você vai fazer ou o assunto que quiser. Escolhe nível e profundidade.</p></div>
       <div class="istep"><div class="num">2</div><h3>Gera o conteúdo</h3><p>A Fixa te dá um prompt pronto pra colar no seu assistente. Ele devolve a trilha estruturada.</p><div class="codeline">→ epics · stories · tasks (teoria + prática)</div></div>
       <div class="istep"><div class="num">3</div><h3>Importa e estuda</h3><p>Cola de volta, a Fixa valida e monta a árvore. No plano Pro, a geração é automática, sem copiar nada.</p></div>
     </div>
@@ -428,6 +449,10 @@
         <div class="ans">É revisar cada coisa no intervalo em que você está quase esquecendo — não antes (perda de tempo), nem depois (já esqueceu). A Fixa usa o sistema Leitner: acertou uma task, ela volta mais longe (1 → 2 → 3 → 4 → 7 → 15 → 21 → 30 dias); errou, volta amanhã. O que você domina se espaça; o que escorrega insiste.</div>
       </details>
       <details>
+        <summary>Pra quem é a Fixa? <span class="plus">+</span></summary>
+        <div class="ans">Pra quem tem uma prova com data — certificação de tecnologia e IA em primeiro lugar, que é onde a Fixa nasceu, mas também concurso, faculdade, idioma. E pra quem só quer aprender sem esquecer: o método serve pra qualquer tema.</div>
+      </details>
+      <details>
         <summary>Preciso saber programar pra usar? <span class="plus">+</span></summary>
         <div class="ans">Não. Serve pra qualquer assunto — teórico ou prático. As tasks práticas de código são um tipo entre vários; você estuda direito, história, idiomas, o que for.</div>
       </details>
@@ -437,7 +462,7 @@
       </details>
       <details>
         <summary>Serve pra passar numa certificação? <span class="plus">+</span></summary>
-        <div class="ans">É exatamente pra isso que nasceu. Você monta a trilha da prova, estuda com o método, e a fila de revisão garante que o conteúdo esteja fresco no dia — em vez de decorar tudo na véspera.</div>
+        <div class="ans">É pra isso que ela nasceu: o criador montou a Fixa estudando pra certificação do Claude, da Anthropic, e se enquadrou no escopo de aprovação em 1,5 semana. Você monta a trilha da prova, estuda com o método, e a fila de revisão garante o conteúdo fresco no dia — em vez de decorar tudo na véspera.</div>
       </details>
       <details>
         <summary>Quanto custa? O grátis expira? <span class="plus">+</span></summary>
