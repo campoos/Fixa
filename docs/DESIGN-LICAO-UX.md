@@ -217,8 +217,16 @@ o valor do registro. Única exceção de "voltar atrás": **refazer** a lição 
 
 ## 4. Tasks do tipo prática (e o fluxo curto)
 
-A prática tem `steps/hint/snippet/expected` e não tem pontos-chave. O fluxo sequencial acomoda
-com **2 envios** (M=2):
+> **EMENDA DO DONO (13/07, pós-teste real) — SUPERSEDE esta seção: prática também tem M=3.**
+> O método é o mesmo pra todo tipo: **fria** (tentar de cabeça, SEM ver o passo a passo) →
+> revela **passo a passo/dica/exemplo** (o "contexto", tinta violeta como os pontos-chave) →
+> **com o contexto** → revela **esperado + resposta-modelo** → **final**. O racional original
+> ("instruções pra FAZER não se escondem") perdeu pro princípio do recall: tentar de cabeça
+> ANTES do material é exatamente o que fixa. Só o `objective` fica visível desde a entrada
+> (é o enunciado do exercício). Lições antigas de prática migram no server (flag `v3`):
+> a resposta única antiga vira a "com o contexto"; a fria fica registrada em branco.
+
+O texto original (M=2), mantido como histórico:
 
 - **Entrada**: o **material de execução aparece de imediato**, antes de qualquer envio —
   objetivo, **passos**, dica, exemplo (snippet). Racional: são instruções pra FAZER, não

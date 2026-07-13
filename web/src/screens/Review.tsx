@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { FOCUS, navigate } from "@/App";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RichText } from "@/components/rich-text";
 
 // eyebrow padrão de zona (DESIGN-HOME §2.2) — mesma string da constante da Home
 const EYEBROW = "font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground";
@@ -284,7 +285,7 @@ export function Review() {
                 className="mt-4 min-h-[96px] rounded-lg border border-domain/25 bg-domain/5 p-3.5 outline-none duration-200 motion-safe:animate-in motion-safe:fade-in"
               >
                 <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-domain">resposta</p>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">{cur.sample.a}</p>
+                <RichText text={cur.sample.a} className="text-foreground" />
               </div>
             ) : (
               <div className="mt-4 grid min-h-[96px] place-items-center rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">

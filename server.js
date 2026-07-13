@@ -47,7 +47,37 @@ const GEN_PRO_DAY = Number(process.env.GEN_PRO_DAY || 10);
 // correção do Tutor (DESIGN-TUTOR-IA §6): free = degustação lifetime; pro = fair use mensal
 const TUTOR_FREE_LIFETIME = Number(process.env.TUTOR_FREE_LIFETIME || 5);
 const TUTOR_PRO_MONTH = Number(process.env.TUTOR_PRO_MONTH || 100);
+// a Lição tem SEMPRE 3 envios (método do dono): fria → com o contexto → final. v3 marca o contrato novo.
+const LESSON_STAGES = 3;
 const DIST = join(__dirname, "web", "dist");
+
+// chamada ao Gemini com retry: 5xx/rede são transitórios (o Tutor tomou 503 em prod) — 429 e 4xx não se repetem
+async function callGemini(prompt, { temperature = 0.4, timeoutMs = 60000, tries = 3 } = {}) {
+  let last = { status: 0, error: "sem tentativa" };
+  for (let i = 0; i < tries; i++) {
+    if (i > 0) await new Promise((ok) => setTimeout(ok, 1000 * i));
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature } }),
+        signal: ac.signal,
+      });
+      if (r.status === 429) return { ok: false, status: 429 };
+      if (!r.ok) { last = { status: r.status, error: `Gemini respondeu ${r.status}` }; if (r.status >= 500) continue; return { ok: false, status: r.status, error: last.error }; }
+      const d = await r.json();
+      const text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
+      if (!text.trim()) { last = { status: 502, error: "Gemini devolveu vazio" }; continue; }
+      return { ok: true, text };
+    } catch (e) {
+      if (e.name === "AbortError") return { ok: false, status: 504, error: "timeout" };
+      last = { status: 502, error: `falha ao chamar o Gemini: ${e.message}` };
+    } finally { clearTimeout(timer); }
+  }
+  return { ok: false, status: last.status || 502, error: last.error };
+}
 
 // ---- KV (Upstash REST ou arquivo local) ----
 const UPSTASH_URL = (process.env.UPSTASH_REDIS_REST_URL || "").replace(/\/+$/, "");
@@ -209,7 +239,18 @@ function computeStats(ud) {
 }
 
 // ---- montagem ----
+// migra lição de prática do contrato antigo (2 envios, material visível desde o início) pro atual (3):
+// a resposta antiga já era "com o contexto" → vira answers[1]; a fria fica em branco. Idempotente via flag v3.
+function migrateLesson(task, s, taskId) {
+  const cur = s.lesson && s.lesson[taskId];
+  if (!cur || cur.v3) return cur;
+  if (task.type === "practice" && cur.stage > 0 && cur.stage <= 2) { cur.answers.unshift(""); cur.stage += 1; }
+  cur.v3 = true;
+  return cur;
+}
+
 function taskWithState(t, s, epicTitle, storyTitle, today, dueBucket, trackId) {
+  migrateLesson(t, s, t.id);
   const done = !!s.done[t.id];
   const rv = s.review[t.id];
   let review = null;
@@ -491,27 +532,12 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       const { theme, level, mode, depth } = await readBody(req);
       if (!theme || !String(theme).trim()) return json(res, 400, { error: "tema obrigatório" });
       const prompt = buildPrompt({ theme, level, mode, depth });
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 120000);
-      let text = "";
-      try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
-          }),
-          signal: ac.signal,
-        });
-        if (r.status === 429) return json(res, 429, { error: "limite do Gemini atingido — tenta de novo em instantes ou usa o fluxo manual" });
-        if (!r.ok) return json(res, 502, { error: `Gemini respondeu ${r.status}` });
-        const d = await r.json();
-        text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
-      } catch (e) {
-        return json(res, 502, { error: e.name === "AbortError" ? "geração demorou demais (timeout) — tenta de novo" : `falha ao chamar o Gemini: ${e.message}` });
-      } finally { clearTimeout(timer); }
-      if (!text.trim()) return json(res, 502, { error: "Gemini devolveu vazio — tenta de novo" });
+      const g = await callGemini(prompt, { temperature: 0.4, timeoutMs: 120000, tries: 2 });
+      if (!g.ok) {
+        if (g.status === 429) return json(res, 429, { error: "limite do Gemini atingido — tenta de novo em instantes ou usa o fluxo manual" });
+        return json(res, 502, { error: g.status === 504 ? "geração demorou demais (timeout) — tenta de novo" : `${g.error} — tenta de novo` });
+      }
+      const text = g.text;
       // remove cercas de markdown se vierem, e valida
       const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
       const v = validateTrack(cleaned);
@@ -706,9 +732,9 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       for (const e of track.epics) for (const st of e.stories) for (const t of st.tasks) if (t.id === taskId) target = t;
       if (!target) return json(res, 404, { error: "task não encontrada" });
       const s = tState(ud, trackId);
-      const maxStages = target.type === "practice" ? 2 : 3; // prática: tentativa+relato · teórica: fria+pontos+final
-      let cur = s.lesson[taskId] || { stage: 0, answers: [] };
-      if (restart) { cur = { stage: 0, answers: [] }; s.lesson[taskId] = cur; await saveU(me.id, "state"); return json(res, 200, { ok: true, stage: 0 }); }
+      const maxStages = LESSON_STAGES; // 3 pra todo tipo: fria → com o contexto (pontos-chave/passo a passo) → final
+      let cur = migrateLesson(target, s, taskId) || { stage: 0, answers: [], v3: true };
+      if (restart) { cur = { stage: 0, answers: [], v3: true }; s.lesson[taskId] = cur; await saveU(me.id, "state"); return json(res, 200, { ok: true, stage: 0 }); }
       if (cur.stage >= maxStages) return json(res, 409, { error: "lição já concluída — use restart pra refazer" });
       const text = String(answer || "").trim();
       const isFinal = cur.stage === maxStages - 1;
@@ -740,9 +766,8 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       if (!target) return json(res, 404, { error: "task não encontrada" });
       const s = tState(ud, trackId);
       if (s.tutor[taskId]) return json(res, 200, { ok: true, tutor: s.tutor[taskId], cached: true });
-      const maxStages = target.type === "practice" ? 2 : 3;
-      const cur = s.lesson[taskId];
-      if (!cur || cur.stage < maxStages) return json(res, 409, { error: "termina a lição primeiro — o Tutor corrige a jornada completa" });
+      const cur = migrateLesson(target, s, taskId);
+      if (!cur || cur.stage < LESSON_STAGES) return json(res, 409, { error: "termina a lição primeiro — o Tutor corrige a jornada completa" });
       const tu = tutorUsage(me);
       if (tu.used >= tu.limit) {
         return json(res, me.plan === "pro" ? 429 : 402, {
@@ -752,23 +777,12 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         });
       }
       const prompt = buildTutorPrompt({ task: target, answers: cur.answers, comments: s.comments[taskId] });
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 60000);
-      let text = "";
-      try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.3 } }),
-          signal: ac.signal,
-        });
-        if (r.status === 429) return json(res, 429, { error: "o Tutor está sobrecarregado — tenta de novo em instantes" });
-        if (!r.ok) return json(res, 502, { error: `Tutor indisponível (${r.status}) — tenta de novo` });
-        const d = await r.json();
-        text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
-      } catch (e) {
-        return json(res, 502, { error: e.name === "AbortError" ? "a correção demorou demais — tenta de novo" : "falha ao chamar o Tutor — tenta de novo" });
-      } finally { clearTimeout(timer); }
+      const g = await callGemini(prompt, { temperature: 0.3, timeoutMs: 45000, tries: 3 });
+      if (!g.ok) {
+        if (g.status === 429) return json(res, 429, { error: "o Tutor está sobrecarregado — tenta de novo em instantes" });
+        return json(res, 502, { error: g.status === 504 ? "a correção demorou demais — tenta de novo" : `Tutor indisponível (${g.status}) — tenta de novo` });
+      }
+      const text = g.text;
       let parsed;
       try { parsed = JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "")); } catch { parsed = null; }
       const notaOk = parsed && typeof parsed.nota === "number" && parsed.nota >= 0 && parsed.nota <= 10;

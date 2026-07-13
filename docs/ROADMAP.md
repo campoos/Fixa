@@ -36,6 +36,11 @@ Home dashboard (streak/stats) · página Ajuda · landing/mockup em `/fixa.html`
 **LIÇÃO + TUTOR ✅ (13/07, ideia da Gabriela — 1ª feature de usuária real):** estudo em tela própria
 (player sequencial, transcript, retomada, Done automático) + correção por IA medida (specs
 DESIGN-LICAO-UX/UI + DESIGN-TUTOR-IA).
+**Correções pós-teste do dono ✅ (13/07):** prática também tem **3 envios** (fria sem o passo a passo →
+com o passo a passo → final; migração automática das lições antigas via flag `v3`) · retry no Gemini
+(Tutor tomava 503 transitório) · geração exige **código real** em tema técnico (keyPoints/sample.a/snippet)
++ render de blocos/inline code na Lição e no Revisar (`rich-text.tsx`) · Tutor não cobra o que o material
+não mostra (regra explícita no prompt).
 **Próximo:** Fase 0 (separação de IP) → M6 (contas+DB) → M7 (landing pública) → M8 (monetização) → M9 (sandbox/PWA).
 
 ---

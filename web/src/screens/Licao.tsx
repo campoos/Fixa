@@ -5,6 +5,7 @@ import { useApi } from "@/lib/useApi";
 import { usePersistentState } from "@/lib/usePersistentState";
 import { lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
 import { StepSegments } from "@/components/step-segments";
+import { RichText } from "@/components/rich-text";
 import { FOCUS, navigate } from "@/App";
 import { TaskEditor } from "@/screens/Track";
 import { cn } from "@/lib/utils";
@@ -55,16 +56,16 @@ function MissingSlot({ text, onEdit, className }: { text: string; onEdit: () => 
   );
 }
 
-// material de execução da prática (UX §4): instruções pra FAZER ficam visíveis desde a entrada; gabarito não
-function PracticeMaterial({ task }: { task: Task }) {
-  const sec = (title: string, body: ReactNode) => <div><p className={`mb-1 ${EYEBROW10}`}>{title}</p>{body}</div>;
+// material de execução da prática: é o "contexto" do método — revelado após a tentativa fria, como os
+// pontos-chave da teórica (mesma tinta violeta = conteúdo revelado)
+function PracticeMaterial({ task, className }: { task: Task; className?: string }) {
+  const sec = (title: string, body: ReactNode) => <div><p className={`mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-primary`}>{title}</p>{body}</div>;
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-3.5">
-      {sec("objetivo", <p className="text-sm leading-relaxed">{task.objective}</p>)}
-      {!!task.steps?.length && sec("passos", (
-        <ol className="space-y-1 text-sm leading-relaxed">{task.steps.map((s, i) => <li key={i} className="flex gap-2"><span className="font-mono text-xs text-muted-foreground">{i + 1}.</span><span>{s}</span></li>)}</ol>
+    <div className={cn("space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3.5", className)}>
+      {!!task.steps?.length && sec("passo a passo", (
+        <ol className="space-y-1 text-sm leading-relaxed">{task.steps.map((s, i) => <li key={i} className="flex gap-2"><span className="font-mono text-xs text-muted-foreground">{i + 1}.</span><RichText text={s} className="min-w-0 flex-1" /></li>)}</ol>
       ))}
-      {task.hint && sec("dica", <p className="text-sm text-muted-foreground">{task.hint}</p>)}
+      {task.hint && sec("dica", <RichText text={task.hint} className="text-muted-foreground" />)}
       {task.snippet && sec("exemplo", <pre className="overflow-x-auto rounded-md border border-border bg-background p-2.5 font-mono text-xs"><code>{task.snippet}</code></pre>)}
     </div>
   );
@@ -241,8 +242,8 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
     const m = lessonStages(t);
     const st = Math.min(t.lesson?.stage ?? 0, m);
     requestAnimationFrame(() => {
-      // passo 2 retomado (teórica): campo pré-preenchido com a resposta fria, se não há rascunho local
-      if (t.type !== "practice" && st === 1 && !draft) setDraft(t.lesson?.answers[0] ?? "");
+      // passo 2 retomado: campo pré-preenchido com a resposta fria, se não há rascunho local
+      if (st === 1 && !draft) setDraft(t.lesson?.answers[0] ?? "");
       if (st >= m) { topRef.current?.focus(); return; }
       if (t.done && st === 0) return; // "concluída sem registro": não rouba foco
       if (!t.sample.q.trim()) return; // bloqueio sem questão-modelo
@@ -291,7 +292,9 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
         if (r.becameDone) window.dispatchEvent(new Event("fx-review-changed"));
       } else {
         if (r.stage === M - 1) setDraft(""); // passo final começa vazio (a resposta é SUA palavra)
-        setLive(!isPractice && r.stage === 1 ? (hasKeys ? "resposta enviada — pontos-chave revelados" : "resposta enviada") : "resposta enviada — resposta-modelo revelada");
+        setLive(r.stage === 1
+          ? (isPractice ? "resposta enviada — passo a passo revelado" : hasKeys ? "resposta enviada — pontos-chave revelados" : "resposta enviada")
+          : "resposta enviada — resposta-modelo revelada");
       }
       refetch(true);
     } catch (e) {
@@ -367,20 +370,22 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
   }
 
   const concludedAt = task.completedAt ?? lesson?.updatedAt ?? null;
-  const answerLabels = isPractice ? ["seu relato", "sua resposta final"] : ["sua resposta · frio", "sua resposta · com os pontos-chave", "sua resposta final"];
+  const answerLabels = isPractice ? ["sua tentativa · frio", "sua tentativa · com o passo a passo", "sua resposta final"] : ["sua resposta · frio", "sua resposta · com os pontos-chave", "sua resposta final"];
   const when = (i: number) => (lesson && i === answers.length - 1 ? timeAgo(lesson.updatedAt) : undefined);
   const born = (s: number) => (bornStage === s ? BORN : "");
-  const modelRevealAt = isPractice ? 1 : 2;
+  const modelRevealAt = 2;
   const prevAnswer = (answers[M - 2] ?? "").trim();
 
   // rótulo/botão/válvula do passo ativo (microcopy UX §7; retomada ajusta o rótulo — UX §3.2)
   const isFinal = stage === M - 1;
   const meta = isFinal
     ? { label: "agora que conferiu: reescreve com a TUA palavra — é o que você leva desta task", btn: "Enviar e concluir", valve: null as string | null, placeholder: "o que você leva desta task?" }
-    : isPractice
-      ? { label: "fez o exercício? conta o que você fez e o que deu", btn: "Enviar e revelar resposta", valve: "não consegui fazer — mostrar o esperado", placeholder: "escreve do jeito que sair…" }
-      : stage === 0
-        ? { label: "responda de cabeça, escrevendo — é isso que fixa", btn: hasKeys ? "Enviar e ver pontos-chave" : "Enviar e continuar", valve: hasKeys ? "deu branco — mostrar pontos-chave" : "deu branco — continuar", placeholder: "escreve do jeito que sair…" }
+    : stage === 0
+      ? isPractice
+        ? { label: "tenta fazer de cabeça, sem ver o passo a passo — é isso que fixa", btn: "Enviar e ver passo a passo", valve: "deu branco — mostrar passo a passo", placeholder: "escreve o que você fez ou tentaria fazer…" }
+        : { label: "responda de cabeça, escrevendo — é isso que fixa", btn: hasKeys ? "Enviar e ver pontos-chave" : "Enviar e continuar", valve: hasKeys ? "deu branco — mostrar pontos-chave" : "deu branco — continuar", placeholder: "escreve do jeito que sair…" }
+      : isPractice
+        ? { label: "agora com o passo a passo: fez? conta o que você fez e o que deu", btn: "Enviar e revelar resposta", valve: "não consegui fazer — mostrar o esperado", placeholder: "escreve do jeito que sair…" }
         : {
             label: !acted ? "releia sua resposta acima — achou gaps? reescreve completa" : "achou gaps? reescreve a resposta — agora completa",
             btn: "Enviar e revelar resposta", valve: "não mudou nada — revelar resposta", placeholder: "escreve do jeito que sair…",
@@ -461,30 +466,31 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
           {/* transcript (UI §4): neutro = usuário · violeta = pontos-chave · esmeralda = resposta-modelo */}
           <div ref={topRef} tabIndex={-1} className="mt-4 space-y-3 outline-none">
             <Card className="gap-0 rounded-xl border-border bg-card p-4 shadow-sm">
-              <p className={EYEBROW10}>questão-modelo</p>
-              <p className="mt-1.5 text-[17px] font-semibold leading-snug text-balance">{task.sample.q}</p>
+              <p className={EYEBROW10}>{isPractice ? "exercício" : "questão-modelo"}</p>
+              <p className="mt-1.5 text-[17px] font-semibold leading-snug text-balance">{isPractice ? task.objective : task.sample.q}</p>
+              {isPractice && <p className="mt-1.5 text-sm text-muted-foreground">{task.sample.q}</p>}
             </Card>
 
-            {isPractice && <PracticeMaterial task={task} />}
-
             {stage >= 1 && <AnswerBlock label={answerLabels[0]} text={answers[0] ?? ""} when={when(0)} className={born(1)} />}
+
+            {isPractice && stage >= 1 && <PracticeMaterial task={task} className={born(1)} />}
 
             {!isPractice && stage >= 1 && (hasKeys ? (
               <div className={cn("space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3.5", born(1))}>
                 <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">pontos-chave</p>
-                <ul className="space-y-1">{task.keyPoints!.map((k, i) => <li key={i} className="flex gap-2 text-sm text-muted-foreground"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /><span>{k}</span></li>)}</ul>
+                <ul className="space-y-1">{task.keyPoints!.map((k, i) => <li key={i} className="flex gap-2 text-sm text-muted-foreground"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /><RichText text={k} className="min-w-0 flex-1" /></li>)}</ul>
               </div>
             ) : (
               <MissingSlot text="esta task está sem pontos-chave" onEdit={() => setEditing(true)} className={born(1)} />
             ))}
 
-            {!isPractice && stage >= 2 && <AnswerBlock label={answerLabels[1]} text={answers[1] ?? ""} when={when(1)} className={born(2)} />}
+            {stage >= 2 && <AnswerBlock label={answerLabels[1]} text={answers[1] ?? ""} when={when(1)} className={born(2)} />}
 
             {stage >= modelRevealAt && (task.sample.a.trim() ? (
               <div className={cn("rounded-lg border border-domain/25 bg-domain/5 p-3.5", born(modelRevealAt))}>
                 <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-domain">resposta</p>
-                {isPractice && task.expected && <p className="mt-1.5 rounded-md border border-domain/25 bg-domain/5 p-2 text-sm"><span className="font-medium text-domain">esperado: </span>{task.expected}</p>}
-                <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-foreground">{task.sample.a}</p>
+                {isPractice && task.expected && <div className="mt-1.5 rounded-md border border-domain/25 bg-domain/5 p-2 text-sm"><p className="mb-0.5 font-medium text-domain">esperado</p><RichText text={task.expected} /></div>}
+                <RichText text={task.sample.a} className="mt-1.5 text-foreground" />
               </div>
             ) : (
               <MissingSlot text="esta task está sem resposta-modelo" onEdit={() => setEditing(true)} className={born(modelRevealAt)} />
