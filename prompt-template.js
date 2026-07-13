@@ -7,6 +7,9 @@ const MODE_LABEL = {
   mixed: "MISTO (mescle tasks teóricas e práticas conforme o tópico pede)",
 };
 
+// catálogo de ícones de tema (espelha TRACK_ICONS do server / TRACK_ICON_LIST do front)
+export const ICON_CATALOG = ["target","book-open","book-marked","library","notebook-pen","brain","puzzle","blocks","code","terminal","braces","database","server","cpu","bug","git-branch","atom","microscope","telescope","dna","calculator","sigma","chart-line","cloud","stethoscope","heart-pulse","pill","scale","gavel","landmark","scroll-text","shield","briefcase","coins","banknote","trending-up","languages","globe","map","compass","hourglass","palette","music","guitar","camera","film","drama","dumbbell","bike","trophy","medal","chef-hat","utensils-crossed","coffee","mountain","tree-pine","sprout","paw-print","wrench","rocket","zap","plane","car","award"];
+
 export function buildPrompt({ theme, level = "intermediário", mode = "mixed", depth = "médio" } = {}) {
   const t = (theme || "").trim() || "<tema>";
   const modeText = MODE_LABEL[mode] || MODE_LABEL.mixed;
@@ -31,6 +34,7 @@ FORMATO DE SAÍDA — responda SOMENTE com um JSON válido (sem markdown, sem co
 {
   "title": "string (nome do tema)",
   "summary": "string (1 linha)",
+  "icon": "string — escolha O ÍCONE MAIS RELACIONADO ao tema dentre exatamente estes nomes: ${ICON_CATALOG.join(", ")}",
   "epics": [
     {
       "title": "string",

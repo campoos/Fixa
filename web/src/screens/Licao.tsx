@@ -97,7 +97,7 @@ function TutorSheet({ taskId, tutor, busy, error, finalAnswer, dicaSaved, dicaBu
       ]
     : [];
   return (
-    <div role="dialog" aria-modal="true" aria-label="correção do Tutor" className="fixed inset-0 z-50 overflow-y-auto bg-background duration-300 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4">
+    <div role="dialog" aria-modal="true" aria-label="correção do Tutor" onKeyDown={(e) => { if (e.key === "Escape") onClose(); }} className="fixed inset-0 z-50 overflow-y-auto bg-background duration-300 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4">
       <div className="mx-auto w-full max-w-xl px-4 pb-10 pt-4">
         <div className="flex items-center gap-2">
           <button onClick={onClose} aria-label="voltar ao estudo" title="voltar ao estudo" className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground", FOCUS)}>

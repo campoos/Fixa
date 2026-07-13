@@ -18,10 +18,10 @@
    ao tocar** (manipulação direta: ícone é escolha visual de 1 toque, feedback imediato; não é
    formulário). Enfiar no `/rename` obrigaria a entrar no modo renomear pra trocar um ícone —
    gesto errado. O `/rename` fica intocado.
-3. **Picker = bloco inline expansível** no Card do header do tema — o idioma do app é bloco
-   inline (`RenameBlock`, `TaskEditor`, `AppendBlock`); o app não tem popover/dropdown e não
-   vai ganhar um por isso (precedente: DESIGN-LICAO-UI §5.c). Inline funciona igual no mobile
-   (sem colisão com a tab bar, sem z-index novo) e no desktop.
+3. ~~**Picker = bloco inline expansível**~~ **SUPERSEDED (emenda §9):** o dono testou o inline
+   e pediu modal. O picker agora é **sheet de tela cheia no idioma da `TutorSheet`** — o ÚNICO
+   idioma de overlay do app (sem popover/dropdown novo, sem segundo idioma de painel+backdrop).
+   Racional completo no §9.
 4. **Tinta: violeta (`primary`) em todas as superfícies.** O ícone do tema é marca de
    identidade/atividade — mesma gramática dos chips 9×9 dos cards de ação da Home
    (`bg-primary/10 text-primary`). O mesmo tema tem a mesma cara em todo lugar; wayfinding se
@@ -189,7 +189,12 @@ título). Substituir por:
 Home — e o alvo de toque sobe de 20px pra 36px. Import: `Target` sai do lucide import da linha
 2 se ficar sem uso; entram `TrackIcon` e, no picker, `TRACK_ICON_LIST` + `setTrackIcon`.)
 
-### 5.b O picker inline
+### 5.b O picker inline — **SUPERSEDED pela emenda §9 (13/07)**
+
+> O dono usou esta versão no ar e pediu modal ("preferia que abrisse modal do que expandisse
+> sessão"). **Não implementar o bloco abaixo** — vale o §9. O texto original fica como
+> histórico da decisão; as regras de conteúdo (grid, células, selecionado, salvar-ao-tocar,
+> erro) migraram pro §9 com o container novo.
 
 Renderiza dentro do Card do header, na linha do `RenameBlock` (hoje linha 356) — mesmo padrão:
 
@@ -319,3 +324,133 @@ O chip existente troca o `BookOpen` genérico pelo ícone do tema:
   por Tab percorre o grid na ordem visual.
 - [ ] **Onde não aparece:** lixeira, crumb do `/revisar` e crumb da Lição continuam sem ícone
   de tema (decisão §0.5, não esquecimento).
+
+> O item 1 deste checklist ("grid inline") foi superseded pela emenda §9 — vale o checklist §9.e.
+
+---
+
+## 9. EMENDA (13/07, pós-uso) — o picker vira MODAL (sheet de tela cheia)
+
+**Feedback do dono, com o inline no ar:** "preferia que abrisse modal do que expandisse
+sessão". Decisão dele — o §5.b perdeu. Esta emenda substitui **apenas o container** do picker;
+gesto de abrir (chip §5.a), conteúdo do grid, salvar-ao-tocar, estado selecionado, tratamento
+de erro e todo o resto da spec (§0–§4, §6–§8) permanecem.
+
+### 9.a Decisão de idioma: exatamente a `TutorSheet` (sem segundo idioma de overlay)
+
+O app tem UM idioma de overlay — a sheet de tela cheia da correção do Tutor
+(`fixed inset-0 z-50 bg-background`, coluna `max-w-xl`, X no topo esquerdo, entrada
+fade+slide-from-bottom). O picker usa **esse idioma, célula por célula** — não um painel
+centrado com backdrop: (1) introduzir um segundo idioma de overlay tem custo de sistema que um
+picker não paga; (2) mobile-first, tela cheia é o que um painel centrado vira de qualquer
+jeito em 390px; (3) sem teclado envolvido e com 64 células, a tela cheia dá ar pro grid
+respirar (células sobem pra 44px); (4) zero mecânica nova de backdrop/scroll-lock — a sheet
+cobre tudo, tab bar inclusive (`z-50`), igualzinho à correção. No desktop a coluna `max-w-xl`
+centrada mantém a composição.
+
+### 9.b Anatomia do `IconPicker` (versão final — substitui o componente do §5.b)
+
+Continua componente local do `Track.tsx`; muda o container e ganha foco/Esc:
+
+```tsx
+/* picker de ícone do tema (DESIGN-TEMA-ICONE §9): sheet de tela cheia no idioma da TutorSheet;
+   salva sozinho ao tocar e fecha; X/Esc fecham sem trocar */
+function IconPicker({ track, onChanged, onClose }: { track: TrackData; onChanged: () => void; onClose: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const currentRef = useRef<HTMLButtonElement>(null);
+  const current = track.icon ?? "target";
+  useEffect(() => { currentRef.current?.focus(); }, []); // entra com foco na célula selecionada
+  const pick = async (name: string) => {
+    if (busy) return;
+    setBusy(name);
+    try { await setTrackIcon(track.id, name); onChanged(); onClose(); } finally { setBusy(null); }
+  };
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="escolher ícone do tema"
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      className="fixed inset-0 z-50 overflow-y-auto bg-background duration-300 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4"
+    >
+      <div className="mx-auto w-full max-w-xl px-4 pb-10 pt-4">
+        <div className="flex items-center gap-2">
+          <button onClick={onClose} aria-label="fechar sem trocar" title="fechar sem trocar" className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground", FOCUS)}>
+            <X className="h-4 w-4" />
+          </button>
+          <p className="min-w-0 flex-1 truncate font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">ícone do tema · {track.title}</p>
+        </div>
+        <div className="mt-6 grid grid-cols-6 justify-items-center gap-2 sm:grid-cols-8">
+          {TRACK_ICON_LIST.map(([name, Icon, label]) => (
+            <button
+              key={name}
+              ref={name === current ? currentRef : undefined}
+              onClick={() => pick(name)}
+              disabled={!!busy}
+              aria-label={label}
+              aria-pressed={name === current}
+              title={label}
+              className={cn(
+                "grid h-11 w-11 place-items-center rounded-lg border transition-colors disabled:opacity-50",
+                name === current ? "border-primary bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
+                FOCUS,
+              )}
+            >
+              {busy === name ? <Loader2 className="h-5 w-5 animate-spin" /> : <Icon className="h-5 w-5" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+Diferenças deliberadas vs §5.b: células **44×44px** (`h-11 w-11`, ícone `h-5 w-5`) — a tela
+cheia paga o upgrade de toque; `gap-2`; colunas iguais (6 mobile / 8 `sm:` — em 390px,
+6×44 + gaps + `px-4` cabem com folga). `X` e `Loader2` já estão no import lucide do `Track.tsx`
+(`X` entra se ainda não estiver); `useEffect`/`useRef` entram no import react da linha 1.
+
+### 9.c Abrir, fechar, foco
+
+- **Abrir:** mesmo chip do header (§5.a), com um ajuste de aria: trocar `aria-expanded={picking}`
+  por **`aria-haspopup="dialog"`** (abre diálogo, não expande seção). O chip ganha
+  `ref={chipRef}` (`const chipRef = useRef<HTMLButtonElement>(null);` no `Track`).
+- **Render:** `{picking && <IconPicker track={data} onChanged={changed} onClose={closePicker} />}`
+  sai do Card do header e vai pro **fim do root** do `Track` (`<div className="space-y-4">`,
+  hoje linha 345) — é `fixed`, não participa do layout; longe do Card evita re-render confuso.
+- **Fechar sem trocar:** X do topo **ou Esc** (`onKeyDown` no dialog — o foco está sempre
+  dentro dele, o evento borbulha). **Não existe "tocar fora"**: a sheet é tela cheia, não há
+  fora — mesma regra da TutorSheet.
+- **Fechar salvando:** tocar numa célula → spinner na célula → `POST` → `onChanged()` →
+  `onClose()`. Sem botão salvar, sem confirm (regra §0.2 mantida).
+- **Foco:** entra na **célula selecionada** (`currentRef`, effect no mount); ao fechar
+  (qualquer via), volta pro chip do header:
+  ```tsx
+  const closePicker = () => { setPicking(false); requestAnimationFrame(() => chipRef.current?.focus()); };
+  ```
+  — mesmo padrão do `closeSheet` da Lição. Após salvar, o chip focado já mostra o ícone novo
+  (feedback do gesto completo).
+- Sem scroll-lock do body (paridade com a TutorSheet — a sheet cobre tudo, `overflow-y-auto`
+  próprio pro grid em telas baixas).
+- Opcional recomendado (fora do escopo, 1 linha): a `TutorSheet` ganhar o mesmo `onKeyDown`
+  de Esc, pra paridade total do idioma.
+
+### 9.d Nota de contexto — ícone escolhido pela geração por IA
+
+O dono também pediu que a geração por IA escolha um ícone do catálogo automaticamente (campo
+`icon` no JSON gerado). **Fora do escopo desta spec** (implementação do coordenador), mas a
+porta já existe e é uma só: a whitelist `TRACK_ICONS` do §3.a valida qualquer origem — gerado
+fora do set = trata como ausente (default `target`), nunca 500. O picker deste doc é e continua
+sendo o **override manual**.
+
+### 9.e Checklist da emenda (substitui o item 1 do §8)
+
+- [ ] **Gesto mobile (390px):** tocar no chip abre a sheet de tela cheia (fade+slide, tab bar
+  coberta); grid 6 colunas, células 44px, sem scroll horizontal; tocar num ícone mostra
+  spinner, salva, fecha e o foco volta pro chip já com o ícone novo.
+- [ ] **Fechar sem trocar:** X e Esc fecham sem POST; não há backdrop parcial nem "tocar fora".
+- [ ] **Foco:** ao abrir, o foco está na célula selecionada (visível com anel `FOCUS`); Tab
+  percorre X → células na ordem visual; ao fechar, foco no chip do header.
+- [ ] **Idioma único:** lado a lado com a sheet do Tutor, mesmo container, mesmo X, mesma
+  entrada — muda só o conteúdo; nenhum popover/painel centrado novo no app.

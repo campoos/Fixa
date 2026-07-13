@@ -90,6 +90,8 @@ export function validateTrack(input) {
     id: slug(title),
     title,
     summary: clean(data.summary),
+    // ícone sugerido pelo gerador (opcional) — o server valida contra o catálogo (TRACK_ICONS)
+    icon: clean(data.icon).toLowerCase() || null,
     epics,
   };
   return { ok: true, errors: [], track };

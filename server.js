@@ -553,6 +553,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       v.track.id = id;
       v.track.createdAt = new Date().toISOString();
       v.track.generatedBy = GEMINI_MODEL;
+      if (!v.track.icon || !TRACK_ICONS.has(v.track.icon)) delete v.track.icon; // ícone sugerido: só entra se está no catálogo
       ud.tracks[id] = v.track;
       tState(ud, id);
       await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state")]);
@@ -572,6 +573,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       const id = freeId(ud, v.track.id);
       v.track.id = id;
       v.track.createdAt = new Date().toISOString();
+      if (!v.track.icon || !TRACK_ICONS.has(v.track.icon)) delete v.track.icon; // idem geração: catálogo ou nada
       ud.tracks[id] = v.track;
       tState(ud, id);
       await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state")]);
