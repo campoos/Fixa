@@ -51,6 +51,8 @@ const TUTOR_FREE_LIFETIME = Number(process.env.TUTOR_FREE_LIFETIME || 5);
 const TUTOR_PRO_MONTH = Number(process.env.TUTOR_PRO_MONTH || 100);
 // a Lição tem SEMPRE 3 envios (método do dono): fria → com o contexto → final. v3 marca o contrato novo.
 const LESSON_STAGES = 3;
+// set curado de ícones de tema — DEVE espelhar TRACK_ICON_LIST do front (docs/DESIGN-TEMA-ICONE §1)
+const TRACK_ICONS = new Set(["target","book-open","book-marked","library","notebook-pen","brain","puzzle","blocks","code","terminal","braces","database","server","cpu","bug","git-branch","atom","microscope","telescope","dna","calculator","sigma","chart-line","cloud","stethoscope","heart-pulse","pill","scale","gavel","landmark","scroll-text","shield","briefcase","coins","banknote","trending-up","languages","globe","map","compass","hourglass","palette","music","guitar","camera","film","drama","dumbbell","bike","trophy","medal","chef-hat","utensils-crossed","coffee","mountain","tree-pine","sprout","paw-print","wrench","rocket","zap","plane","car","award"]);
 const DIST = join(__dirname, "web", "dist");
 
 // chamada ao Gemini com retry + fallback de modelo: a 1ª tentativa usa o principal; se ele está
@@ -295,11 +297,11 @@ function buildTrack(ud, id) {
   // meta diária pra dominar tudo a tempo (heurística: o que falta dominar ÷ dias restantes)
   const remaining = total - mastery;
   const dailyGoal = targetDate && daysLeft && daysLeft > 0 ? Math.ceil(remaining / daysLeft) : null;
-  return { id, title: track.title, summary: track.summary, epics, progress: { done: dn, total }, mastery, targetDate, daysLeft, dailyGoal, review: { due, ladder: REVIEW_LADDER } };
+  return { id, title: track.title, summary: track.summary, icon: track.icon ?? null, epics, progress: { done: dn, total }, mastery, targetDate, daysLeft, dailyGoal, review: { due, ladder: REVIEW_LADDER } };
 }
 function trackSummary(ud, id) {
   const t = buildTrack(ud, id);
-  return { id, title: t.title, summary: t.summary, progress: t.progress, mastery: t.mastery, due: t.review.due.length, targetDate: t.targetDate, daysLeft: t.daysLeft, counts: trackCounts(ud.tracks[id]) };
+  return { id, title: t.title, summary: t.summary, icon: t.icon, progress: t.progress, mastery: t.mastery, due: t.review.due.length, targetDate: t.targetDate, daysLeft: t.daysLeft, counts: trackCounts(ud.tracks[id]) };
 }
 function globalReview(ud) {
   const today = spDay();
@@ -662,6 +664,16 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       if (!ud.tracks[id]) return json(res, 404, { error: "tema não encontrado" });
       if (title && String(title).trim()) ud.tracks[id].title = String(title).trim();
       if (summary !== undefined) ud.tracks[id].summary = String(summary || "").trim();
+      await saveU(me.id, "tracks");
+      return json(res, 200, { ok: true });
+    }
+    // ícone do tema (DESIGN-TEMA-ICONE): o picker salva sozinho ao tocar; null volta ao padrão
+    if (path === "/api/track/icon" && req.method === "POST") {
+      const { id, icon } = await readBody(req);
+      if (!ud.tracks[id]) return json(res, 404, { error: "tema não encontrado" });
+      if (icon == null) delete ud.tracks[id].icon;
+      else if (typeof icon === "string" && TRACK_ICONS.has(icon)) ud.tracks[id].icon = icon;
+      else return json(res, 400, { error: "ícone fora do catálogo" });
       await saveU(me.id, "tracks");
       return json(res, 200, { ok: true });
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { Activity, BookOpen, CalendarClock, Check, ChevronDown, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { Activity, CalendarClock, Check, ChevronDown, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { TrackIcon } from "@/components/track-icon";
 import { deleteTrack, getStats, getTracks, getTrash, purgeTrash, restoreTrack } from "@/lib/api";
 import type { Progress, Stats, TrackSummary } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
@@ -54,7 +55,7 @@ function ContinueCard({ next }: { next: TrackSummary | undefined }) {
       className={`flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/50 ${FOCUS}`}
     >
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-        {next ? <BookOpen className="h-[18px] w-[18px]" /> : <Plus className="h-[18px] w-[18px]" />}
+        {next ? <TrackIcon name={next.icon} className="h-[18px] w-[18px]" /> : <Plus className="h-[18px] w-[18px]" />}
       </span>
       {next ? (
         <span className="min-w-0 flex-1">
@@ -220,6 +221,9 @@ function ThemeCard({ t, onDelete }: { t: TrackSummary; onDelete: (e: MouseEvent<
   return (
     <Card role="button" tabIndex={0} onClick={open} onKeyDown={onKey} className={`cursor-pointer rounded-xl p-4 transition-colors hover:border-primary/40 ${FOCUS}`}>
       <div className="flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <TrackIcon name={t.icon} className="h-[18px] w-[18px]" />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{t.title}</h3>

@@ -1,9 +1,10 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, CalendarClock, Check, ChevronDown, ChevronRight, FlaskConical, GraduationCap, Loader2, MessageSquarePlus, Pencil, PlusCircle, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, Check, ChevronDown, ChevronRight, FlaskConical, GraduationCap, Loader2, MessageSquarePlus, Pencil, PlusCircle, Trash2 } from "lucide-react";
 import {
-  appendTrack, editTask, getTrack, removeTask, renameTrack, setTrackTarget, taskComment, taskCommentDelete, taskDone,
+  appendTrack, editTask, getTrack, removeTask, renameTrack, setTrackIcon, setTrackTarget, taskComment, taskCommentDelete, taskDone,
   ApiError, type Comment, type Epic, type Me, type Progress, type Story, type Task, type TaskPatch, type Track as TrackData,
 } from "@/lib/api";
+import { TrackIcon, TRACK_ICON_LIST } from "@/components/track-icon";
 import { useApi } from "@/lib/useApi";
 import { fmtNota, lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
 import { StepSegments } from "@/components/step-segments";
@@ -342,9 +343,45 @@ function RenameBlock({ track, onChanged, onClose }: { track: TrackData; onChange
   );
 }
 
+/* picker de ícone do tema (DESIGN-TEMA-ICONE §5.b): grid inline, salva sozinho ao tocar */
+function IconPicker({ track, onChanged, onClose }: { track: TrackData; onChanged: () => void; onClose: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const current = track.icon ?? "target";
+  const pick = async (name: string) => {
+    if (busy) return;
+    setBusy(name);
+    try { await setTrackIcon(track.id, name); onChanged(); onClose(); } finally { setBusy(null); }
+  };
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-background p-3">
+      <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">ícone do tema</p>
+      <div className="grid grid-cols-6 justify-items-center gap-1.5 sm:grid-cols-8">
+        {TRACK_ICON_LIST.map(([name, Icon, label]) => (
+          <button
+            key={name}
+            onClick={() => pick(name)}
+            disabled={!!busy}
+            aria-label={label}
+            aria-pressed={name === current}
+            title={label}
+            className={cn(
+              "grid h-10 w-10 place-items-center rounded-lg border transition-colors disabled:opacity-50",
+              name === current ? "border-primary bg-primary/10 text-primary" : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
+              FOCUS,
+            )}
+          >
+            {busy === name ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Icon className="h-[18px] w-[18px]" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Track({ id, me }: { id: string; me: Me }) {
   const { data, loading, error, refetch } = useApi<TrackData>(() => getTrack(id), [id]);
   const [renaming, setRenaming] = useState(false);
+  const [picking, setPicking] = useState(false);
   const changed = () => refetch(true);
   if (loading && !data) return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20" />)}</div>;
   if (error) return <Card className="p-4 text-sm text-destructive">erro: {error}</Card>;
@@ -359,13 +396,22 @@ export function Track({ id, me }: { id: string; me: Me }) {
       <button onClick={() => navigate("/")} className={`inline-flex items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground ${FOCUS}`}><ArrowLeft className="h-4 w-4" /> temas</button>
       <Card className="p-4">
         <div className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-primary" />
+          <button
+            onClick={() => setPicking(!picking)}
+            aria-expanded={picking}
+            aria-label="escolher ícone do tema"
+            title="escolher ícone do tema"
+            className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-colors hover:bg-primary/15", FOCUS)}
+          >
+            <TrackIcon name={data.icon} className="h-5 w-5" />
+          </button>
           <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{data.title}</h1>
           <button onClick={() => setRenaming(!renaming)} title="renomear tema" className={`grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-accent ${FOCUS}`}>
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <span className="font-mono text-sm text-muted-foreground tabular-nums">{data.progress.done}/{data.progress.total} · {pct(data.progress)}%</span>
         </div>
+        {picking && <IconPicker track={data} onChanged={changed} onClose={() => setPicking(false)} />}
         {renaming && <RenameBlock track={data} onChanged={changed} onClose={() => setRenaming(false)} />}
         {data.summary && !renaming && <p className="mt-1 text-sm text-muted-foreground">{data.summary}</p>}
         <Bar p={data.progress} className="mt-3 h-2" />

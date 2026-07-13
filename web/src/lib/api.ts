@@ -28,7 +28,7 @@ const api = {
 export interface Me { name: string; email: string; plan: "free" | "pro" }
 export interface Counts { epics: number; stories: number; tasks: number; practice: number; theory: number }
 export interface Progress { done: number; total: number }
-export interface TrackSummary { id: string; title: string; summary: string; progress: Progress; mastery: number; due: number; targetDate: string | null; daysLeft: number | null; counts: Counts }
+export interface TrackSummary { id: string; title: string; summary: string; icon: string | null; progress: Progress; mastery: number; due: number; targetDate: string | null; daysLeft: number | null; counts: Counts }
 export interface Comment { text: string; at: string; author: string }
 export interface Review { box: number; next: string | null; graduated: boolean; due: boolean; ladder: number }
 export interface Sample { q: string; a: string }
@@ -60,7 +60,7 @@ export interface Task {
 export interface Story { id: string; title: string; tasks: Task[]; progress: Progress }
 export interface Epic { id: string; title: string; goal: string; stories: Story[]; progress: Progress }
 export interface Due { trackId: string; trackTitle?: string; id: string; title: string; sample: Sample; type: "theory" | "practice"; epic: string; story: string; box: number; next: string }
-export interface Track { id: string; title: string; summary: string; epics: Epic[]; progress: Progress; mastery: number; targetDate: string | null; daysLeft: number | null; dailyGoal: number | null; review: { due: Due[]; ladder: number[] } }
+export interface Track { id: string; title: string; summary: string; icon: string | null; epics: Epic[]; progress: Progress; mastery: number; targetDate: string | null; daysLeft: number | null; dailyGoal: number | null; review: { due: Due[]; ladder: number[] } }
 export interface ReviewList { due: Due[]; ladder: number[] }
 
 // ---- auth ----
@@ -81,6 +81,7 @@ export const getTrash = () => api.get<{ items: TrashItem[] }>("/api/trash").then
 export const restoreTrack = (id: string) => api.post<{ ok: true; id: string }>("/api/track/restore", { id });
 export const setTrackTarget = (id: string, date: string | null) => api.post("/api/track/target", { id, date });
 export const renameTrack = (id: string, title: string, summary?: string) => api.post("/api/track/rename", { id, title, summary });
+export const setTrackIcon = (id: string, icon: string | null) => api.post("/api/track/icon", { id, icon });
 export type TaskPatch = Partial<Pick<Task, "title" | "objective" | "keyPoints" | "steps" | "expected" | "hint" | "snippet" | "language">> & { sample?: Sample };
 export const editTask = (trackId: string, taskId: string, patch: TaskPatch) => api.post("/api/task/edit", { trackId, taskId, patch });
 export const removeTask = (trackId: string, taskId: string) => api.post("/api/task/remove", { trackId, taskId });
