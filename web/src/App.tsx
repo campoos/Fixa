@@ -6,6 +6,7 @@ import { useApi } from "@/lib/useApi";
 import { Home } from "@/screens/Home";
 import { NewTheme } from "@/screens/NewTheme";
 import { Track } from "@/screens/Track";
+import { Licao } from "@/screens/Licao";
 import { Review } from "@/screens/Review";
 import { Ajuda } from "@/screens/Ajuda";
 import { Pro } from "@/screens/Pro";
@@ -28,7 +29,7 @@ export function Logo({ size = 24 }: { size?: number }) {
   );
 }
 
-type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "pro" } | { name: "track"; id: string } | { name: "redefinir" };
+type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "pro" } | { name: "track"; id: string } | { name: "licao"; trackId: string; taskId: string } | { name: "redefinir" };
 function parseRoute(): Route {
   const p = window.location.pathname.replace(/^\/+|\/+$/g, "");
   if (p === "novo") return { name: "novo" };
@@ -36,6 +37,9 @@ function parseRoute(): Route {
   if (p === "ajuda") return { name: "ajuda" };
   if (p === "pro") return { name: "pro" };
   if (p === "redefinir") return { name: "redefinir" };
+  // a Lição é rota própria (DESIGN-LICAO-UX §1.1) — checar antes de t/:id, que é prefixo dela
+  const licao = p.match(/^t\/([^/]+)\/l\/(.+)$/);
+  if (licao) return { name: "licao", trackId: decodeURIComponent(licao[1]), taskId: decodeURIComponent(licao[2]) };
   if (p.startsWith("t/")) return { name: "track", id: decodeURIComponent(p.slice(2)) };
   return { name: "home" };
 }
@@ -105,7 +109,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
             <span className="text-[17px] font-extrabold tracking-[-0.02em]">Fixa</span>
           </button>
           <nav aria-label="navegação" className="hidden items-center gap-1 md:flex">
-            <NavBtn to="/" active={route.name === "home" || route.name === "track"}>Temas</NavBtn>
+            <NavBtn to="/" active={route.name === "home" || route.name === "track" || route.name === "licao"}>Temas</NavBtn>
             <NavBtn to="/revisar" active={route.name === "revisar"}>
               Revisar
               {dueCount > 0 && (
@@ -127,16 +131,17 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
           </div>
         </div>
       </header>
-      <main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" ? "pb-6" : "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
+      <main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" || route.name === "licao" ? "pb-6" : "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
         {(route.name === "home" || route.name === "redefinir") && <Home />}
         {route.name === "novo" && <NewTheme />}
         {route.name === "revisar" && <Review />}
         {route.name === "ajuda" && <Ajuda />}
         {route.name === "pro" && <Pro me={me} />}
         {route.name === "track" && <Track id={route.id} me={me} />}
+        {route.name === "licao" && <Licao key={`${route.trackId}/${route.taskId}`} trackId={route.trackId} taskId={route.taskId} />}
       </main>
-      {/* bottom tab bar mobile — some em /revisar (o dock do player é dono do fundo) */}
-      {route.name !== "revisar" && (
+      {/* bottom tab bar mobile — some nos players /revisar e na Lição (o dock é dono do fundo — DESIGN-LICAO-UI §1.1) */}
+      {route.name !== "revisar" && route.name !== "licao" && (
         <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
           <div className="mx-auto grid h-14 max-w-4xl grid-cols-4">
             <TabBtn to="/" active={route.name === "home" || route.name === "track"} icon={<Library className="h-5 w-5" />} label="Temas" />

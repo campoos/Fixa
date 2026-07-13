@@ -1,10 +1,12 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
-import { ArrowLeft, CalendarClock, Check, ChevronDown, ChevronRight, Eye, EyeOff, FlaskConical, GraduationCap, Loader2, MessageSquare, MessageSquarePlus, Pencil, PlusCircle, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, Check, ChevronDown, ChevronRight, FlaskConical, GraduationCap, Loader2, MessageSquare, MessageSquarePlus, Pencil, PlusCircle, Target, Trash2 } from "lucide-react";
 import {
   appendTrack, editTask, getTrack, removeTask, renameTrack, setTrackTarget, taskComment, taskCommentDelete, taskDone,
   ApiError, type Comment, type Epic, type Me, type Progress, type Story, type Task, type TaskPatch, type Track as TrackData,
 } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
+import { lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
+import { StepSegments } from "@/components/step-segments";
 import { FOCUS, navigate } from "@/App";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -55,74 +57,37 @@ function Comments({ list, meName, onAdd, onDelete }: { list: Comment[]; meName: 
   );
 }
 
-function TaskDetail({ task, meName, onComment, onDeleteComment }: { task: Task; meName: string; onComment: (t: string) => Promise<void>; onDeleteComment: (i: number, at: string) => Promise<void> }) {
-  // recall em DOIS estágios (o método): frio → revela PONTOS-CHAVE (gaps) → responde de novo → revela RESPOSTA.
-  // teórica: 0 → 1 (pontos-chave) → 2 (resposta). prática (sem pontos-chave): 0 → 2 direto.
-  const [stage, setStage] = useState(0);
-  const isPractice = task.type === "practice";
-  const hasKeys = !isPractice && !!task.keyPoints?.length;
-  const revealBtn = (label: string, onClick: () => void) => (
-    <button onClick={onClick} className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium hover:bg-accent ${FOCUS}`}>
-      <Eye className="h-3.5 w-3.5" /> {label}
-    </button>
-  );
+/* peek de leitura da task (DESIGN-LICAO-UX §1.3 / UI §7.b): só objetivo, estado da lição + CTA e anotações.
+   Conteúdo pedagógico (questão, pontos-chave, resposta) mora SÓ na Lição — mostrar aqui é regressão. */
+function TaskPeek({ task, meName, onStudy, onComment, onDeleteComment }: { task: Task; meName: string; onStudy: () => void; onComment: (t: string) => Promise<void>; onDeleteComment: (i: number, at: string) => Promise<void> }) {
+  const total = lessonStages(task);
+  const stage = task.lesson?.stage ?? 0;
+  const inProgress = stage > 0 && stage < total;
+  const concluded = stage >= total || task.done;
+  const concludedAt = task.completedAt ?? task.lesson?.updatedAt ?? null;
   return (
     <div className="space-y-3 border-t border-border px-3 py-3">
       <Section title="Objetivo"><p className="text-sm leading-relaxed">{task.objective}</p></Section>
-
-      {/* prática: os passos são pra fazer o exercício, então ficam visíveis */}
-      {isPractice && (
-        <>
-          {!!task.steps?.length && (
-            <Section title="Passos"><ol className="space-y-1 text-sm leading-relaxed">{task.steps.map((s, i) => <li key={i} className="flex gap-2"><span className="font-mono text-xs text-muted-foreground">{i + 1}.</span><span>{s}</span></li>)}</ol></Section>
-          )}
-          {task.hint && <Section title="Dica"><p className="text-sm text-muted-foreground">{task.hint}</p></Section>}
-          {task.snippet && <Section title="Exemplo"><pre className="overflow-x-auto rounded-md border border-border bg-background p-2.5 font-mono text-xs"><code>{task.snippet}</code></pre></Section>}
-        </>
-      )}
-
-      <Section title="Questão-modelo">
-        <div className="rounded-lg border border-border bg-background p-3 text-sm">
-          <p className="font-medium">{task.sample.q}</p>
-
-          {/* estágio 0: tudo oculto — tenta de cabeça */}
-          {stage === 0 && (
-            <div className="mt-2 grid min-h-[72px] place-items-center rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2.5">
-              <div className="flex flex-col items-center gap-1.5 text-center">
-                <EyeOff className="h-4 w-4 text-muted-foreground/60" />
-                <p className="text-xs text-muted-foreground/70">responda de cabeça — depois revela</p>
-                {revealBtn(hasKeys ? "tentei — ver pontos-chave" : "tentei — revelar", () => setStage(hasKeys ? 1 : 2))}
-              </div>
-            </div>
-          )}
-
-          {/* estágio 1 (só teórica): pontos-chave revelados — acha os gaps e responde de novo */}
-          {stage >= 1 && hasKeys && (
-            <div className="mt-2 space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">pontos-chave</p>
-              <ul className="space-y-1">{task.keyPoints!.map((k, i) => <li key={i} className="flex gap-2 text-muted-foreground"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /><span>{k}</span></li>)}</ul>
-            </div>
-          )}
-          {stage === 1 && (
-            <div className="mt-2 grid place-items-center rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2.5">
-              <div className="flex flex-col items-center gap-1.5 text-center">
-                <p className="text-xs text-muted-foreground/70">achou os gaps? responde de novo — depois confere</p>
-                {revealBtn("revelar resposta", () => setStage(2))}
-              </div>
-            </div>
-          )}
-
-          {/* estágio 2: a resposta — confere e generaliza */}
-          {stage === 2 && (
-            <div className="mt-2 space-y-2 rounded-lg border border-domain/25 bg-domain/5 p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-domain">resposta</p>
-              {isPractice && task.expected && <p className="rounded-md border border-domain/25 bg-domain/5 p-2"><span className="font-medium text-domain">esperado: </span>{task.expected}</p>}
-              <p className="text-muted-foreground">{task.sample.a}</p>
-            </div>
+      {/* estado da lição + CTA contextual — mesmo destino da row, redundância intencional */}
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          {inProgress && <StepSegments current={stage} total={total} className="shrink-0" />}
+          {inProgress ? (
+            <span>você parou no passo <span className="font-mono tabular-nums">{stage + 1}</span> de <span className="font-mono tabular-nums">{total}</span>{task.lesson?.updatedAt && <> · {timeAgo(task.lesson.updatedAt)}</>}</span>
+          ) : concluded ? (
+            <span>concluída{concludedAt && <> em <span className="font-mono tabular-nums">{shortDate(concludedAt)}</span></>}</span>
+          ) : (
+            <span>não iniciada</span>
           )}
         </div>
-      </Section>
-
+        {concluded && !inProgress ? (
+          <button onClick={onStudy} className={cn("h-9 shrink-0", QUIET_BTN, FOCUS)}>Rever lição</button>
+        ) : (
+          <button onClick={onStudy} className={cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90", FOCUS)}>
+            {inProgress ? "Continuar lição" : "Estudar"} <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
       <Section title="Anotações"><Comments list={task.comments} meName={meName} onAdd={onComment} onDelete={onDeleteComment} /></Section>
     </div>
   );
@@ -133,8 +98,8 @@ function Fld({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block space-y-1"><span className={EYEBROW}>{label}</span>{children}</label>;
 }
 
-/* editor inline da task — edita campos por tipo; remover mora aqui */
-function TaskEditor({ trackId, task, onDone, onChanged }: { trackId: string; task: Task; onDone: () => void; onChanged: () => void }) {
+/* editor inline da task — edita campos por tipo; remover mora aqui (exportado: a Lição reusa intocado — UI §5.c) */
+export function TaskEditor({ trackId, task, onDone, onChanged }: { trackId: string; task: Task; onDone: () => void; onChanged: () => void }) {
   const [f, setF] = useState({
     title: task.title, objective: task.objective, q: task.sample.q, a: task.sample.a,
     keyPoints: (task.keyPoints ?? []).join("\n"), steps: (task.steps ?? []).join("\n"),
@@ -197,31 +162,41 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
   const toggleDone = async () => { setBusy(true); try { await taskDone(trackId, task.id, !task.done); onChanged(); } finally { setBusy(false); } };
   const addC = async (t: string) => { await taskComment(trackId, task.id, t); onChanged(); };
   const delC = async (i: number, at: string) => { await taskCommentDelete(trackId, task.id, i, at); onChanged(); };
+  // a row inteira é o convite pra Lição (UX §1.3): tocar no título ABRE a Lição; o chevron só espia
+  const goLesson = () => navigate(`/t/${encodeURIComponent(trackId)}/l/${encodeURIComponent(task.id)}`);
+  const total = lessonStages(task);
+  const stage = task.lesson?.stage ?? 0;
+  const inProgress = !task.done && stage > 0 && stage < total; // único estado com selo — o "você parou aqui" da árvore
   return (
     <div className="rounded-lg border border-border bg-card">
       <div className="flex items-center gap-2 p-2.5">
         <DoneBox done={task.done} busy={busy} onToggle={toggleDone} />
-        <button onClick={() => setOpen(!open)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left ${FOCUS}`}>
+        <button onClick={goLesson} title="abrir a lição" className={`flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left ${FOCUS}`}>
           <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{task.id}</span>
           {task.type === "practice" && <span className="shrink-0" title="prática"><FlaskConical className="h-3.5 w-3.5 text-muted-foreground" aria-label="prática" /></span>}
           <span className={cn("min-w-0 flex-1 truncate text-sm", task.done && "text-muted-foreground line-through")}>{task.title}</span>
+          {inProgress && (
+            <span title={`você parou no passo ${stage + 1} de ${total}`} className="inline-flex h-[18px] shrink-0 items-center rounded-full bg-primary/10 px-1.5 font-mono text-[10px] tabular-nums text-primary">{stage + 1}/{total}</span>
+          )}
           {task.review?.graduated && <span className="shrink-0 text-domain" title="dominada"><GraduationCap className="h-3.5 w-3.5" aria-label="dominada" /></span>}
           {task.comments.length > 0 && (
             <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground" title="anotações">
               <MessageSquare className="h-3.5 w-3.5" /><span className="font-mono text-[11px] tabular-nums">{task.comments.length}</span>
             </span>
           )}
-          {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" />}
         </button>
         {open && (
           <button onClick={() => setEditing(!editing)} aria-label="editar task" title={editing ? "fechar edição" : "editar task"} className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-accent", editing && "border-primary text-primary", FOCUS)}>
             <Pencil className="h-3.5 w-3.5" />
           </button>
         )}
+        <button onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "fechar detalhes" : "ver detalhes"} title={open ? "fechar detalhes" : "ver detalhes"} className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground", FOCUS)}>
+          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
       </div>
       {open && (editing
         ? <TaskEditor trackId={trackId} task={task} onDone={() => setEditing(false)} onChanged={onChanged} />
-        : <TaskDetail task={task} meName={meName} onComment={addC} onDeleteComment={delC} />)}
+        : <TaskPeek task={task} meName={meName} onStudy={goLesson} onComment={addC} onDeleteComment={delC} />)}
     </div>
   );
 }

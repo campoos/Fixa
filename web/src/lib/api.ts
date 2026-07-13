@@ -32,6 +32,10 @@ export interface TrackSummary { id: string; title: string; summary: string; prog
 export interface Comment { text: string; at: string; author: string }
 export interface Review { box: number; next: string | null; graduated: boolean; due: boolean; ladder: number }
 export interface Sample { q: string; a: string }
+// a Lição (DESIGN-LICAO-UX §2.0): stage = quantas respostas já foram enviadas; resposta em branco = ""
+export interface Lesson { stage: number; answers: string[]; updatedAt: string }
+// correção do Tutor (DESIGN-TUTOR-IA): salva por task, idempotente no server
+export interface Tutor { nota: number; veredito: string; acertos: string[]; gaps: string[]; dica: string; at: string }
 export interface Task {
   id: string;
   type: "theory" | "practice";
@@ -42,6 +46,8 @@ export interface Task {
   completedAt: string | null;
   comments: Comment[];
   review: Review | null;
+  lesson: Lesson | null;
+  tutor: Tutor | null;
   // theory
   keyPoints?: string[];
   // practice
@@ -86,7 +92,9 @@ export const appendTrack = (id: string, jsonStr: string) => {
 // geração direta (Gemini) — disponível quando o server tem GEMINI_API_KEY
 // gen: uso real da geração por IA — free: used/limit lifetime (degustação); pro: used/limit no mês + dayUsed/dayLimit no dia
 export interface GenUsage { used: number; limit: number; dayUsed?: number; dayLimit?: number }
-export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage }
+// tutor: uso das correções do Tutor — free: lifetime (degustação); pro: no mês
+export interface TutorUsage { used: number; limit: number }
+export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage }
 export const getConfig = () => api.get<Config>("/api/config");
 // lista do Pro (pré-billing) — guarda o e-mail pra avisar quando abrir
 export const joinWaitlist = (email: string) => api.post<{ ok: true }>("/api/waitlist", { email });
@@ -109,6 +117,12 @@ export const taskDone = (trackId: string, taskId: string, done: boolean) => api.
 export const taskComment = (trackId: string, taskId: string, text: string) => api.post("/api/task/comment", { trackId, taskId, text });
 export const taskCommentDelete = (trackId: string, taskId: string, index: number, at: string) => api.post("/api/task/comment/delete", { trackId, taskId, index, at });
 export const taskReview = (trackId: string, taskId: string, result: "pass" | "fail") => api.post("/api/task/review", { trackId, taskId, result });
+// a Lição: envia um estágio ('enviado é enviado'); blank registra em branco (só intermediário); restart refaz (Done permanece)
+export const lessonSubmit = (trackId: string, taskId: string, p: { answer?: string; blank?: boolean; restart?: boolean }) =>
+  api.post<{ ok: true; stage: number; done?: boolean; becameDone?: boolean }>("/api/task/lesson", { trackId, taskId, ...p });
+// o Tutor: corrige a jornada completa (409 se incompleta · 402/429 limite · 502 transitório — retry manual)
+export const tutorCorrect = (trackId: string, taskId: string) =>
+  api.post<{ ok: true; tutor: Tutor; cached?: boolean }>("/api/task/tutor", { trackId, taskId });
 export const getReview = () => api.get<ReviewList>("/api/review");
 export interface Stats { streak: number; dueToday: number; themes: number; tasksDone: number; tasksTotal: number; mastered: number; days: { day: string; count: number }[] }
 export const getStats = () => api.get<Stats>("/api/stats");
