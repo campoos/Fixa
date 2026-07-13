@@ -200,14 +200,13 @@ function Heatmap({ days }: { days: Stats["days"] }) {
 
 /* ── zona SEUS TEMAS — card de tema ── */
 
-const PILL = "inline-flex h-[20px] shrink-0 items-center gap-1 rounded-full px-2 text-[11px] font-medium";
-
+// sem pill e sem label (pedido do dono 13/07): ícone + dias — o title carrega a frase completa
 function ExamBadge({ daysLeft }: { daysLeft: number }) {
-  const tone = daysLeft < 0 ? "bg-muted text-muted-foreground" : daysLeft > 7 ? "bg-primary/10 text-primary" : "bg-recall/12 text-recall";
-  const text = daysLeft < 0 ? "prova passou" : daysLeft === 0 ? "prova hoje" : `prova em ${daysLeft}d`;
+  const tone = daysLeft < 0 ? "text-muted-foreground" : daysLeft > 7 ? "text-primary" : "text-recall";
+  const title = daysLeft < 0 ? "prova passou" : daysLeft === 0 ? "prova hoje" : `prova em ${daysLeft} dias`;
   return (
-    <span className={`${PILL} ${tone}`}>
-      <CalendarClock className="h-3 w-3" />{text}
+    <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] font-medium ${tone}`} title={title}>
+      <CalendarClock className="h-3 w-3" /><span className="font-mono tabular-nums">{daysLeft < 0 ? "—" : `${daysLeft}d`}</span>
     </span>
   );
 }
@@ -226,7 +225,7 @@ function ThemeCard({ t, onDelete }: { t: TrackSummary; onDelete: (e: MouseEvent<
             <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{t.title}</h3>
             {t.targetDate && t.daysLeft != null && <ExamBadge daysLeft={t.daysLeft} />}
             {t.due > 0 && (
-              <span className={`${PILL} bg-recall/12 text-recall`} title="pra revisar hoje">
+              <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-recall" title="pra revisar hoje">
                 <RotateCcw className="h-3 w-3" /><span className="font-mono tabular-nums">{t.due}</span>
               </span>
             )}
