@@ -17,7 +17,7 @@ const Mono = ({ children }: { children: ReactNode }) => <span className="font-mo
 
 const METHOD = [
   { n: "01", tag: "frio", icon: EyeOff, t: "Tenta de cabeça", d: "Responda a questão sem olhar nada. O esforço de puxar da memória — mesmo errando — é o que grava." },
-  { n: "02", tag: "corrige", icon: Eye, t: "Confere em dois tempos", d: "Revele primeiro só os pontos-chave e ache o que faltou; responda de novo e só então confira a resposta. Erro percebido fixa mais que acerto fácil." },
+  { n: "02", tag: "corrige", icon: Eye, t: "Confere em dois tempos", d: "Revele primeiro só os pontos-chave e ache o que faltou; responda de novo e só então confira a resposta. Erro percebido fixa mais que acerto fácil. No fim, o Tutor pode corrigir por IA — nota, acertos e gaps." },
   { n: "03", tag: "generaliza", icon: PenLine, t: "Comprime com a sua palavra", d: "Anote nas Anotações da task, em 2–4 frases, o que entendeu e onde errou. O cérebro esmaga o conteúdo no mínimo revisável." },
   { n: "04", tag: "espaça", icon: RotateCcw, t: "Revisa no tempo certo", d: "A task volta em intervalos crescentes: acertou, espaça mais; errou, volta amanhã. Acertou até a última caixa, ela está dominada." },
 ];
@@ -43,6 +43,14 @@ const FAQ_GROUPS: { label: string; items: Faq[] }[] = [
         a: (
           <>
             <B>Concluída</B> é o checkbox: você estudou a task e marcou feita — ela entra na fila e volta <B>amanhã</B> pra primeira revisão. <B>Dominada</B> é prova real: você acertou essa task nas revisões até o topo da escada. Marcar feito não convence a Fixa — só o acerto repetido, com semanas de distância, conta como saber.
+          </>
+        ),
+      },
+      {
+        q: "O que é a correção do Tutor?",
+        a: (
+          <>
+            Ao fechar uma task, o Tutor lê a resposta que você escreveu e devolve <B>nota 0–10</B>, os acertos, os gaps (com a correção) e uma dica de fixação. Ele corrige com base no material da task, não na internet — e a nota <B>não mexe nas caixas</B>: o Acertei/Errei da revisão continua sendo seu. No grátis você tem <B>5 correções</B> de degustação, uma cortesia única; no Pro, <B>100 por mês</B>. É correção por IA — pode errar; desconfie, confira, aprenda.
           </>
         ),
       },
@@ -108,7 +116,7 @@ const FAQ_GROUPS: { label: string; items: Faq[] }[] = [
         q: "O que é grátis e o que é do Pro?",
         a: (
           <>
-            O método inteiro é grátis pra sempre: <B>revisões ilimitadas</B>, até <B>2 temas</B> ativos, fluxo manual sem limite e <B>1 geração por IA</B> de degustação. O Pro tira o teto: <B>temas ilimitados</B> e <B>30 gerações por IA/mês</B> (máx. 10/dia). Os detalhes e preços estão na aba <B>Pro</B>.
+            O método inteiro é grátis pra sempre: <B>revisões ilimitadas</B>, até <B>2 temas</B> ativos, fluxo manual sem limite, <B>1 geração por IA</B> e <B>5 correções do Tutor</B> de degustação. O Pro tira o teto: <B>temas ilimitados</B>, <B>30 gerações por IA/mês</B> (máx. 10/dia) e <B>100 correções do Tutor/mês</B>. Os detalhes e preços estão na aba <B>Pro</B>.
           </>
         ),
       },

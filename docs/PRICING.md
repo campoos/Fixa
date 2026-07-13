@@ -14,6 +14,7 @@
 | Temas ativos | até 2 | ilimitados |
 | Criação manual (prompt + JSON) | ✅ | ✅ |
 | Geração por IA (1 clique) | **1 de degustação** | **30/mês** (fair use, máx 10/dia) |
+| Correção do Tutor (nota + gaps por IA) | **5 de degustação** | **100/mês** (fair use) |
 | Data da prova + meta diária | ✅ | ✅ |
 | Export dos dados | ✅ sempre | ✅ sempre |
 
@@ -26,6 +27,7 @@ E seus dados são seus — exporte tudo a qualquer momento, inclusive no grátis
 ## Racional (dos 3 conselheiros)
 - **R$19,90** = mediana; fica no "slot mental" de streaming BR, sob o limiar dos R$20 (CPO), acima do
   "projetinho de R$9,90" (Mkt), com margem ≥70% folgada (custo variável típico R$0,21/mês, heavy R$1,60 — Fin).
+- **Tutor (13/07):** correção por IA pós-lição; custo ~R$0,01–0,03/correção; limites acima ENFORCED no server.
 - **Nunca dizer "ilimitado" na geração** — fair use explícito 30/mês protege a margem sem ninguém sentir
   (típico usa 3–10). Revisão é custo ~zero → ilimitada de verdade (é o hábito que retém).
 - **Free generoso é posicionamento**: o Quizlet tem Trustpilot 1.4 por paywall raivoso; nosso gate é de

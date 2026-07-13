@@ -33,6 +33,9 @@ Home dashboard (streak/stats) · página Ajuda · landing/mockup em `/fixa.html`
 - **M4** atividade por dia + heatmap de consistência · **M5** revisão em sessão (interleaving round-robin, atalhos espaço/1/2, placar).
 - Extras: favicon/título da marca · card "Continuar" no Home · badge Revisar em tempo real ·
   motor Leitner extraído (`review-engine.js`) · **suíte de testes (11 casos, `npm test`)** · consistência da régua na copy.
+**LIÇÃO + TUTOR ✅ (13/07, ideia da Gabriela — 1ª feature de usuária real):** estudo em tela própria
+(player sequencial, transcript, retomada, Done automático) + correção por IA medida (specs
+DESIGN-LICAO-UX/UI + DESIGN-TUTOR-IA).
 **Próximo:** Fase 0 (separação de IP) → M6 (contas+DB) → M7 (landing pública) → M8 (monetização) → M9 (sandbox/PWA).
 
 ---

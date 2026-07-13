@@ -44,6 +44,7 @@ const FREE_FEATURES: ReactNode[] = [
   <>até <B>2 temas</B> ativos</>,
   <>criação manual — prompt pronto + JSON</>,
   <><B>1 geração por IA</B> de degustação</>,
+  <><B>5 correções do Tutor</B> de degustação</>,
   <>data da prova + meta diária</>,
   <>export dos seus dados, sempre</>,
 ];
@@ -52,6 +53,8 @@ const PRO_FEATURES: ReactNode[] = [
   <><B>temas ilimitados</B> — o grátis para em 2</>,
   <><B>geração por IA em 1 clique</B></>,
   <><B>30 gerações/mês</B> (máx. 10/dia)</>,
+  <><B>correção do Tutor</B> — nota, acertos e gaps por IA</>,
+  <><B>100 correções/mês</B></>,
   <>tudo do Grátis incluso</>,
 ];
 
