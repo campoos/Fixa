@@ -28,6 +28,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 // geração direta (opcional): Gemini Flash — sem key o app segue 100% funcional no fluxo manual
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest"; // alias evergreen (2.5-flash 404 pra keys novas)
+// quando o principal está em "high demand" (503 que demora 70s pra chegar), o lite responde em ~1s
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-flash-lite-latest";
 const GEN_ENABLED = Boolean(GEMINI_API_KEY);
 const SSO_SECRET = process.env.SSO_SECRET || "dev-secret-troca-em-prod";
 const APP_PASS = process.env.APP_PASS || "estudar";       // senha da conta fundadora (bootstrap)
@@ -51,29 +53,32 @@ const TUTOR_PRO_MONTH = Number(process.env.TUTOR_PRO_MONTH || 100);
 const LESSON_STAGES = 3;
 const DIST = join(__dirname, "web", "dist");
 
-// chamada ao Gemini com retry: 5xx/rede são transitórios (o Tutor tomou 503 em prod) — 429 e 4xx não se repetem
+// chamada ao Gemini com retry + fallback de modelo: a 1ª tentativa usa o principal; se ele está
+// sobrecarregado (503/429/timeout — visto em prod 13/07: 70s pra devolver 503), as seguintes caem
+// pro lite, que responde em ~1s. 4xx de request (400/404) não se repetem.
 async function callGemini(prompt, { temperature = 0.4, timeoutMs = 60000, tries = 3 } = {}) {
+  const models = [GEMINI_MODEL];
+  if (GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL) models.push(GEMINI_FALLBACK_MODEL);
   let last = { status: 0, error: "sem tentativa" };
   for (let i = 0; i < tries; i++) {
-    if (i > 0) await new Promise((ok) => setTimeout(ok, 1000 * i));
+    if (i > 0) await new Promise((ok) => setTimeout(ok, 500 * i));
+    const model = models[Math.min(i, models.length - 1)];
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature } }),
         signal: ac.signal,
       });
-      if (r.status === 429) return { ok: false, status: 429 };
-      if (!r.ok) { last = { status: r.status, error: `Gemini respondeu ${r.status}` }; if (r.status >= 500) continue; return { ok: false, status: r.status, error: last.error }; }
+      if (!r.ok) { last = { status: r.status, error: `Gemini respondeu ${r.status}` }; if (r.status >= 500 || r.status === 429) continue; return { ok: false, status: r.status, error: last.error }; }
       const d = await r.json();
       const text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
       if (!text.trim()) { last = { status: 502, error: "Gemini devolveu vazio" }; continue; }
-      return { ok: true, text };
+      return { ok: true, text, model };
     } catch (e) {
-      if (e.name === "AbortError") return { ok: false, status: 504, error: "timeout" };
-      last = { status: 502, error: `falha ao chamar o Gemini: ${e.message}` };
+      last = e.name === "AbortError" ? { status: 504, error: "timeout" } : { status: 502, error: `falha ao chamar o Gemini: ${e.message}` };
     } finally { clearTimeout(timer); }
   }
   return { ok: false, status: last.status || 502, error: last.error };
@@ -777,7 +782,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         });
       }
       const prompt = buildTutorPrompt({ task: target, answers: cur.answers, comments: s.comments[taskId] });
-      const g = await callGemini(prompt, { temperature: 0.3, timeoutMs: 45000, tries: 3 });
+      const g = await callGemini(prompt, { temperature: 0.3, timeoutMs: 25000, tries: 3 });
       if (!g.ok) {
         if (g.status === 429) return json(res, 429, { error: "o Tutor está sobrecarregado — tenta de novo em instantes" });
         return json(res, 502, { error: g.status === 504 ? "a correção demorou demais — tenta de novo" : `Tutor indisponível (${g.status}) — tenta de novo` });
