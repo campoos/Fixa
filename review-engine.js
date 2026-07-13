@@ -35,3 +35,17 @@ export function gradeEntry(rv, result, today, targetDate) {
   if (nb >= REVIEW_LADDER.length) return { box: REVIEW_LADDER.length, last: day, next: null }; // graduou
   return { box: nb, last: day, next: clampNext(addDays(day, REVIEW_LADDER[nb]), targetDate) };
 }
+
+// anti-burnout (DESIGN-FILA-RETORNO): a sessão do dia. Dose fixa quando há backlog;
+// fila inteira em dia normal ou em reta final de prova. NUNCA reagenda nada — só seleciona.
+export const REVIEW_DOSE = 12;
+const byFragility = (a, b) => (a.box - b.box) || (a.next < b.next ? -1 : a.next > b.next ? 1 : 0);
+export function planSession(due, today, minDaysLeft = null) {
+  const overdue = due.filter((d) => d.next < today).length;
+  const examSoon = minDaysLeft != null && minDaysLeft <= 7;
+  if (!overdue || due.length <= REVIEW_DOSE)
+    return { mode: "normal", session: due, rest: 0, overdue };
+  const sorted = [...due].sort(byFragility);
+  if (examSoon) return { mode: "prova", session: sorted, rest: 0, overdue };
+  return { mode: "retorno", session: sorted.slice(0, REVIEW_DOSE), rest: due.length - REVIEW_DOSE, overdue };
+}

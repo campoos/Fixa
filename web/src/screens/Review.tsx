@@ -91,7 +91,7 @@ function EmptyQueue({ ladder }: { ladder: number[] }) {
   );
 }
 
-function SessionDone({ hits, misses, titleRef, onSeeQueue }: { hits: number; misses: number; titleRef: RefObject<HTMLParagraphElement | null>; onSeeQueue: () => void }) {
+function SessionDone({ hits, misses, rest, titleRef, onSeeQueue }: { hits: number; misses: number; rest: number; titleRef: RefObject<HTMLParagraphElement | null>; onSeeQueue: () => void }) {
   const tiles = [
     { icon: <Check className="h-4 w-4 text-domain" />, value: hits, label: hits === 1 ? "acerto" : "acertos" },
     { icon: <RotateCcw className="h-4 w-4 text-recall" />, value: misses, label: misses === 1 ? "erro" : "erros" },
@@ -111,10 +111,17 @@ function SessionDone({ hits, misses, titleRef, onSeeQueue }: { hits: number; mis
           </div>
         ))}
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">{misses > 0 ? "Erros voltam amanhã — é assim que fixa." : "Tudo subiu de caixa — os intervalos aumentam."}</p>
+      <p className="mt-3 text-sm text-muted-foreground">
+        {rest > 0
+          ? <>Dose de hoje feita. <span className="font-mono tabular-nums">{rest}</span> seguem na fila — mais uma dose agora, se quiser; senão, amanhã tem mais.</>
+          : misses > 0 ? "Erros voltam amanhã — é assim que fixa." : "Tudo subiu de caixa — os intervalos aumentam."}
+      </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+        {rest > 0 && (
+          <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Mais uma dose ({Math.min(12, rest)})</button>
+        )}
         <button onClick={() => navigate("/")} className={cn(QUIET_BTN, FOCUS)}>Voltar aos temas</button>
-        <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Ver fila</button>
+        {rest === 0 && <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Ver fila</button>}
       </div>
     </Card>
   );
@@ -141,9 +148,10 @@ export function Review() {
   const trackCount = useMemo(() => new Set((data?.due ?? []).map((d) => d.trackId)).size, [data]);
 
   // monta a sessão quando os dados chegam (ou quando muda o modo intercalado)
+  // a fila da sessão é a DOSE do plano (FILA-RETORNO §1) — o total continua em data.due
   useEffect(() => {
     if (!data) return;
-    const base = [...data.due];
+    const base = [...(data.session ?? data.due)];
     setQueue(mix && trackCount > 1 ? interleave(base) : base);
     setPos(0); setShown(false); setHits(0); setMisses(0);
   }, [data, mix, trackCount]);
@@ -229,7 +237,7 @@ export function Review() {
             >
               <X className="h-4 w-4" />
             </button>
-            <h2 className={EYEBROW}>revisão de hoje</h2>
+            <h2 className={EYEBROW}>{data?.mode === "retorno" ? "sessão de retorno" : data?.mode === "prova" ? "reta final" : "revisão de hoje"}</h2>
             {trackCount > 1 && (
               <button
                 onClick={() => setMix(!mix)}
@@ -245,6 +253,18 @@ export function Review() {
               </button>
             )}
           </div>
+          {/* banner de modo (FILA-RETORNO §4.a): âmbar informativo — acolhe, não culpa */}
+          {data?.mode === "retorno" && (
+            <p className="mt-3 rounded-lg border border-recall/40 bg-recall/10 p-2.5 text-xs leading-relaxed text-recall">
+              Você voltou — é o que importa. Hoje: as <span className="font-mono font-semibold tabular-nums">{data.session.length}</span> mais
+              frágeis; as outras <span className="font-mono font-semibold tabular-nums">{data.rest}</span> seguem na fila, sem pressa.
+            </p>
+          )}
+          {data?.mode === "prova" && (
+            <p className="mt-3 rounded-lg border border-recall/40 bg-recall/10 p-2.5 text-xs leading-relaxed text-recall">
+              Prova chegando — hoje sem dose: a fila inteira, começando pelas mais frágeis.
+            </p>
+          )}
           <div className="mt-3 flex items-center gap-3">
             <div
               role="progressbar"
@@ -266,7 +286,7 @@ export function Review() {
       {total === 0 ? (
         <EmptyQueue ladder={ladder} />
       ) : finished ? (
-        <SessionDone hits={hits} misses={misses} titleRef={doneRef} onSeeQueue={() => refetch()} />
+        <SessionDone hits={hits} misses={misses} rest={data?.rest ?? 0} titleRef={doneRef} onSeeQueue={() => refetch()} />
       ) : cur ? (
         <>
           {/* card de revisão (§4) — min-h segura o pulo entre cards de tamanhos diferentes */}

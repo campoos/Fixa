@@ -25,7 +25,8 @@ const pct = (p: Progress) => (p.total ? Math.round((p.done / p.total) * 100) : 0
 
 /* ── zona HOJE — cards de ação ── */
 
-function ReviewCard({ due }: { due: number }) {
+function ReviewCard({ s }: { s: Stats }) {
+  const due = s.dueToday;
   if (due === 0)
     return (
       <div className="flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -40,10 +41,16 @@ function ReviewCard({ due }: { due: number }) {
     <button onClick={() => navigate("/revisar")} className={`flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-recall/50 ${FOCUS}`}>
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-recall/12 text-recall"><RotateCcw className="h-[18px] w-[18px]" /></span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold">Revisar hoje</span>
-        <span className="block text-xs text-muted-foreground">{due} {due === 1 ? "task" : "tasks"} na fila</span>
+        <span className="block text-sm font-semibold">{s.dueMode === "retorno" ? "Retomar revisões" : "Revisar hoje"}</span>
+        <span className="block text-xs text-muted-foreground">
+          {s.dueMode === "retorno"
+            ? <>hoje: <span className="font-mono tabular-nums">{s.doseToday}</span> · na fila: <span className="font-mono tabular-nums">{due}</span></>
+            : s.dueMode === "prova"
+              ? <><span className="font-mono tabular-nums">{due}</span> na fila · reta final da prova</>
+              : <>{due} {due === 1 ? "task" : "tasks"} na fila</>}
+        </span>
       </span>
-      <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-recall/12 px-3 text-[13px] font-medium text-recall">Revisar</span>
+      <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-recall/12 px-3 text-[13px] font-medium text-recall">{s.dueMode === "retorno" ? "Retomar" : "Revisar"}</span>
     </button>
   );
 }
@@ -362,7 +369,7 @@ export function Home() {
             <span className="font-mono text-[11px] lowercase text-muted-foreground/70">{fmtShort(new Date())}</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {s && <ReviewCard due={s.dueToday} />}
+            {s && <ReviewCard s={s} />}
             <ContinueCard next={next} />
           </div>
         </section>

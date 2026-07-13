@@ -6,7 +6,7 @@ import { createHmac, timingSafeEqual, scrypt, randomBytes } from "node:crypto";
 import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
 import { buildTutorPrompt } from "./prompt-tutor.js";
-import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry } from "./review-engine.js";
+import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry, planSession } from "./review-engine.js";
 import { emailEnabled, sendEmail, emailShell, emailButton } from "./email.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -242,7 +242,8 @@ function computeStats(ud) {
   const dow = new Date(`${today}T00:00:00Z`).getUTCDay(); // 0=dom … 6=sáb (dia de calendário, sem fuso)
   let d = addDays(today, -(51 * 7 + dow)); // sempre um domingo ⇒ coluna 52 = semana corrente (parcial)
   while (d <= today) { days.push({ day: d, count: ud.activity[d] || 0 }); d = addDays(d, 1); }
-  return { streak: computeStreak(ud), dueToday: globalReview(ud).due.length, themes: Object.keys(ud.tracks).length, tasksDone, tasksTotal, mastered, days };
+  const gr = globalReview(ud);
+  return { streak: computeStreak(ud), dueToday: gr.due.length, doseToday: gr.session.length, dueMode: gr.mode, themes: Object.keys(ud.tracks).length, tasksDone, tasksTotal, mastered, days };
 }
 
 // ---- montagem ----
@@ -315,7 +316,16 @@ function globalReview(ud) {
     }
   }
   due.sort((a, b) => (a.next < b.next ? -1 : a.next > b.next ? 1 : 0));
-  return { due, ladder: REVIEW_LADDER };
+  // menor prazo de prova entre os temas COM item na fila — decide o modo "prova" do plano
+  let minDaysLeft = null;
+  for (const d of due) {
+    const td = ud.tracks[d.trackId]?.targetDate;
+    if (!td) continue;
+    const left = daysBetween(today, td);
+    if (left >= 0 && (minDaysLeft === null || left < minDaysLeft)) minDaysLeft = left;
+  }
+  const plan = planSession(due, today, minDaysLeft);
+  return { due, ladder: REVIEW_LADDER, mode: plan.mode, session: plan.session, rest: plan.rest };
 }
 
 // ---- sessão (cookie assinado; payload = id do usuário) ----
@@ -479,17 +489,30 @@ ${emailButton(link, "Criar nova senha")}
       for (const u of Object.values(users)) {
         if (u.remindersOff) { skipped++; continue; }
         const ud = await udata(u.id);
-        const due = globalReview(ud).due.length;
+        const gr = globalReview(ud);
+        const due = gr.due.length;
         if (!due) continue;
         const offLink = `${BASE_URL}/api/reminders/off?u=${u.id}&sig=${signUid(u.id)}`;
+        // modos do plano (DESIGN-FILA-RETORNO §5): retorno lidera com a dose; prova lidera com a fila inteira
+        const subject = gr.mode === "retorno"
+          ? `Sua dose de hoje: ${gr.session.length} revisões — Fixa`
+          : gr.mode === "prova"
+            ? `Reta final: ${due} revisões antes da prova — Fixa`
+            : `${due} ${due === 1 ? "revisão te espera" : "revisões te esperam"} hoje — Fixa`;
+        const title = gr.mode === "retorno" ? `${gr.session.length} revisões — a dose de hoje.` : `${due} ${due === 1 ? "revisão" : "revisões"} no ponto certo.`;
+        const bodyP = gr.mode === "retorno"
+          ? `A fila cresceu enquanto você esteve fora — acontece, e ela não cobra juros. A Fixa separou as ${gr.session.length} mais frágeis pra hoje; as outras ${gr.rest} vão em doses, no seu ritmo. Leva poucos minutos.`
+          : gr.mode === "prova"
+            ? `Essas tasks voltaram hoje porque é agora que revisar rende mais — pouco antes de o cérebro soltar. Prova chegando — vale encarar a fila inteira.`
+            : `Essas tasks voltaram hoje porque é agora que revisar rende mais — pouco antes de o cérebro soltar. Leva poucos minutos, e o dia conta pra sua consistência.`;
         const r = await sendEmail({
           to: u.email,
-          subject: `${due} ${due === 1 ? "revisão te espera" : "revisões te esperam"} hoje — Fixa`,
+          subject,
           html: emailShell({
             preheader: "Revisar no tempo certo é o que faz fixar. Leva poucos minutos.",
             eyebrow: "revisão do dia",
-            title: `${due} ${due === 1 ? "revisão" : "revisões"} no ponto certo.`,
-            bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.65;color:#5c5480;">Essas tasks voltaram hoje porque é agora que revisar rende mais — pouco antes de o cérebro soltar. Leva poucos minutos, e o dia conta pra sua consistência.</p>
+            title,
+            bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.65;color:#5c5480;">${bodyP}</p>
 ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
 <div style="border-top:1px solid #eeeaf5;padding-top:14px;">
   <p style="margin:0;font-size:12px;line-height:1.6;color:#8b83ab;">Prefere revisar no seu ritmo, sem lembrete? <a href="${offLink}" style="color:#8b83ab;text-decoration:underline;">Parar de receber lembretes</a></p>

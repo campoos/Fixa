@@ -65,7 +65,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
     return () => window.removeEventListener("popstate", on);
   }, []);
   const { data: review, refetch: refetchReview } = useApi(getReview, [route.name]);
-  const dueCount = review?.due.length ?? 0;
+  const dueCount = review?.session?.length ?? review?.due.length ?? 0; // ação = dose (FILA-RETORNO §3)
   // badge atualiza na hora quando uma revisão é avaliada (evento disparado pela tela Revisar)
   useEffect(() => {
     const on = () => refetchReview(true);

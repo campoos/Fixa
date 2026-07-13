@@ -61,7 +61,7 @@ export interface Story { id: string; title: string; tasks: Task[]; progress: Pro
 export interface Epic { id: string; title: string; goal: string; stories: Story[]; progress: Progress }
 export interface Due { trackId: string; trackTitle?: string; id: string; title: string; sample: Sample; type: "theory" | "practice"; epic: string; story: string; box: number; next: string }
 export interface Track { id: string; title: string; summary: string; icon: string | null; epics: Epic[]; progress: Progress; mastery: number; targetDate: string | null; daysLeft: number | null; dailyGoal: number | null; review: { due: Due[]; ladder: number[] } }
-export interface ReviewList { due: Due[]; ladder: number[] }
+export interface ReviewList { due: Due[]; ladder: number[]; mode: "normal" | "retorno" | "prova"; session: Due[]; rest: number }
 
 // ---- auth ----
 export const getMe = () => api.get<Me>("/api/me");
@@ -125,5 +125,5 @@ export const lessonSubmit = (trackId: string, taskId: string, p: { answer?: stri
 export const tutorCorrect = (trackId: string, taskId: string) =>
   api.post<{ ok: true; tutor: Tutor; cached?: boolean }>("/api/task/tutor", { trackId, taskId });
 export const getReview = () => api.get<ReviewList>("/api/review");
-export interface Stats { streak: number; dueToday: number; themes: number; tasksDone: number; tasksTotal: number; mastered: number; days: { day: string; count: number }[] }
+export interface Stats { streak: number; dueToday: number; doseToday: number; dueMode: "normal" | "retorno" | "prova"; themes: number; tasksDone: number; tasksTotal: number; mastered: number; days: { day: string; count: number }[] }
 export const getStats = () => api.get<Stats>("/api/stats");
