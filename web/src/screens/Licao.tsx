@@ -29,7 +29,7 @@ const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matc
 /* ── blocos do transcript (UI §4) ── */
 
 // resposta enviada — somente leitura, sem nenhuma affordance de edição: enviado é enviado (UX §0.2)
-function AnswerBlock({ label, text, when, className }: { label: string; text: string; when?: string; className?: string }) {
+function AnswerBlock({ label, text, when, blankText, footer, className }: { label: string; text: string; when?: string; blankText?: string; footer?: ReactNode; className?: string }) {
   return (
     <div className={cn("rounded-lg border border-border bg-card p-3.5", className)}>
       <div className="flex items-baseline gap-2">
@@ -39,8 +39,9 @@ function AnswerBlock({ label, text, when, className }: { label: string; text: st
       {text.trim() ? (
         <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-foreground">{text}</p>
       ) : (
-        <p className="mt-1.5 text-sm italic text-muted-foreground/70">(em branco — deu branco aqui)</p>
+        <p className="mt-1.5 text-sm italic text-muted-foreground/70">{blankText ?? "(em branco — deu branco aqui)"}</p>
       )}
+      {footer}
     </div>
   );
 }
@@ -171,8 +172,12 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
 
   // rascunho não enviado persiste localmente por task (UX §2.0) — nunca vira registro
   const [draft, setDraft] = usePersistentState(`fx-licao-draft-${trackId}:${taskId}`, "");
+  // Lição v2 (DESIGN-LICAO-V2-METODO): lacunas (sub-momento do envio 2) e generalização (envio final)
+  const [gapsDraft, setGapsDraft] = usePersistentState(`fx-licao-gaps-${trackId}:${taskId}`, "");
+  const [synDraft, setSynDraft] = usePersistentState(`fx-licao-syn-${trackId}:${taskId}`, "");
+  const [gapsDone, setGapsDone] = useState(false); // sub-momento client-side; o server vê UM envio
   // override otimista da lesson: o envio atualiza na hora; o refetch silencioso confirma
-  const [override, setOverride] = useState<{ stage: number; answers: string[]; updatedAt: string } | null>(null);
+  const [override, setOverride] = useState<{ stage: number; answers: string[]; gaps?: string; synthesis?: string; updatedAt: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
@@ -274,20 +279,49 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
     el.style.height = `${el.scrollHeight}px`;
   }, [draft, stage, mode]);
 
+  // fria em branco → auto-skip do momento lacunas ("o que faltou? tudo" — sem calibração a fazer)
+  const frioBlank = !(answers[0] ?? "").trim();
+  const inGaps = stage === 1 && !gapsDone && !frioBlank;
+
+  // registrar lacunas NÃO chama o server: congela no transcript e abre a reescrita (V2-METODO §2.a)
+  const registrarLacunas = (valve: boolean) => {
+    if (busy) return;
+    if (!valve && !gapsDraft.trim()) return;
+    if (valve) setGapsDraft("");
+    setGapsDone(true);
+    setActed(true);
+    setLive("lacunas registradas — agora reescreve completa");
+    requestAnimationFrame(() => taRef.current?.focus());
+  };
+
   const doSubmit = async (allowBlank: boolean) => {
     if (busy || !task) return;
     const text = draft.trim();
     const isFinal = stage === M - 1;
     if (!text && (!allowBlank || isFinal)) return; // final nunca tem válvula — vazia não conclui (UX §2.4)
+    const syn = synDraft.trim();
+    if (isFinal && !syn) return; // generalização obrigatória (V2-METODO §3.a) — o botão já bloqueia
+    const sendGaps = stage === 1 && !frioBlank;
     setBusy(true); setErr(null);
     try {
-      const r = await lessonSubmit(trackId, taskId, { answer: text, ...(text ? {} : { blank: true }) });
-      setOverride({ stage: r.stage, answers: [...answers, text], updatedAt: new Date().toISOString() });
+      const r = await lessonSubmit(trackId, taskId, {
+        answer: text,
+        ...(text ? {} : { blank: true }),
+        ...(sendGaps ? { gaps: gapsDraft.trim() } : {}),
+        ...(isFinal ? { synthesis: syn } : {}),
+      });
+      setOverride({
+        stage: r.stage, answers: [...answers, text], updatedAt: new Date().toISOString(),
+        ...(lesson?.gaps !== undefined ? { gaps: lesson.gaps } : {}),
+        ...(sendGaps ? { gaps: gapsDraft.trim() } : {}),
+        ...(isFinal ? { synthesis: syn } : {}),
+      });
       setBornStage(r.stage);
       setActed(true); // passado e presente se fundem no primeiro envio da sessão
       setConflict(false);
+      if (sendGaps) setGapsDraft("");
       if (r.stage >= M) {
-        setDraft("");
+        setDraft(""); setSynDraft("");
         setJustConcluded(true);
         setLive("task concluída — ela volta pra revisão amanhã");
         if (r.becameDone) window.dispatchEvent(new Event("fx-review-changed"));
@@ -303,13 +337,16 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
         // esta lição avançou em outra aba — recarrega o estado do server (UX §6.4)
         setOverride(null); setConflict(true); setActed(true); refetch(true);
       } else {
-        setErr("não consegui salvar — tenta de novo"); // texto permanece no campo, nada é descartado
+        setErr(e instanceof ApiError ? e.message : "não consegui salvar — tenta de novo"); // texto permanece no campo
       }
     } finally { setBusy(false); }
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSubmit(false); } // Enter envia · Shift+Enter quebra
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (inGaps) registrarLacunas(false); else doSubmit(false); // Enter avança o momento · Shift+Enter quebra
+    }
   };
 
   const requestTutor = async () => {
@@ -341,13 +378,14 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
     setBusy(true);
     try {
       const finalAnswer = answers[answers.length - 1] ?? "";
-      if (finalAnswer.trim()) await taskComment(trackId, taskId, `resposta final anterior: ${finalAnswer}`);
+      if (finalAnswer.trim()) await taskComment(trackId, taskId, `resposta final anterior: ${finalAnswer}${lesson?.synthesis ? `\nem 1 frase: ${lesson.synthesis}` : ""}`);
       if (tutor) await taskComment(trackId, taskId, `correção do Tutor anterior — nota ${fmtNota(tutor.nota)}/10: ${tutor.veredito}${tutor.dica ? `\ndica: ${tutor.dica}` : ""}`);
       await lessonSubmit(trackId, taskId, { restart: true });
       setOverride({ stage: 0, answers: [], updatedAt: new Date().toISOString() });
       // a task segue Done + stage 0 = mesmo shape do "doneNoLesson" — studying diz que a lição está ATIVA
       setStudying(true);
       setJustConcluded(false); setBornStage(null); setActed(true); setReused(false); setDraft("");
+      setGapsDraft(""); setSynDraft(""); setGapsDone(false);
       setLive("lição reiniciada — responda de cabeça");
       refetch(true);
       requestAnimationFrame(() => taRef.current?.focus());
@@ -383,11 +421,16 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
   // rótulo/botão/válvula do passo ativo (microcopy UX §7; retomada ajusta o rótulo — UX §3.2)
   const isFinal = stage === M - 1;
   const meta = isFinal
-    ? { label: "agora que conferiu: reescreve com a TUA palavra — é o que você leva desta task", btn: "Enviar e concluir", valve: null as string | null, placeholder: "o que você leva desta task?" }
+    ? { label: "agora que conferiu: reescreve com a TUA palavra — e fecha com o essencial em 1 frase.", btn: "Enviar e concluir", valve: null as string | null, placeholder: "o que você leva desta task?" }
     : stage === 0
       ? isPractice
         ? { label: "tenta fazer de cabeça, sem ver o passo a passo — é isso que fixa", btn: "Enviar e ver passo a passo", valve: "deu branco — mostrar passo a passo", placeholder: "escreve o que você fez ou tentaria fazer…" }
         : { label: "responda de cabeça, escrevendo — é isso que fixa", btn: hasKeys ? "Enviar e ver pontos-chave" : "Enviar e continuar", valve: hasKeys ? "deu branco — mostrar pontos-chave" : "deu branco — continuar", placeholder: "escreve do jeito que sair…" }
+      : inGaps
+        ? {
+            label: isPractice ? "o que você não fez — ou fez diferente do passo a passo?" : "antes de reescrever: o que FALTOU na sua fria? escreve as lacunas — é isso que consolida",
+            btn: "Registrar lacunas", valve: "não faltou nada — reescrever direto", placeholder: "faltou falar de…",
+          }
       : isPractice
         ? { label: "agora com o passo a passo: fez? conta o que você fez e o que deu", btn: "Enviar e revelar resposta", valve: "não consegui fazer — mostrar o esperado", placeholder: "escreve do jeito que sair…" }
         : {
@@ -499,6 +542,14 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
               <MissingSlot text="esta task está sem pontos-chave" onEdit={() => setEditing(true)} className={born(1)} />
             ))}
 
+            {/* lacunas (V2-METODO §2.b): calibração escrita entre o contexto e a reescrita */}
+            {stage >= 2 && lesson?.gaps !== undefined && (
+              <AnswerBlock label="suas lacunas" text={lesson.gaps} blankText="(disse que não faltou nada)" className={born(2)} />
+            )}
+            {stage === 1 && gapsDone && !frioBlank && (
+              <AnswerBlock label="suas lacunas" text={gapsDraft} blankText="(disse que não faltou nada)" className={BORN} />
+            )}
+
             {stage >= 2 && <AnswerBlock label={answerLabels[1]} text={answers[1] ?? ""} when={when(1)} className={born(2)} />}
 
             {stage >= modelRevealAt && (task.sample.a.trim() ? (
@@ -511,7 +562,20 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
               <MissingSlot text="esta task está sem resposta-modelo" onEdit={() => setEditing(true)} className={born(modelRevealAt)} />
             ))}
 
-            {stage >= M && <AnswerBlock label="sua resposta final" text={answers[M - 1] ?? ""} when={when(M - 1)} className={born(M)} />}
+            {stage >= M && (
+              <AnswerBlock
+                label="sua resposta final"
+                text={answers[M - 1] ?? ""}
+                when={when(M - 1)}
+                className={born(M)}
+                footer={lesson?.synthesis ? (
+                  <div className="mt-2 border-t border-border pt-2">
+                    <p className={EYEBROW10}>em 1 frase</p>
+                    <p className="mt-1 text-sm font-medium leading-snug">{lesson.synthesis}</p>
+                  </div>
+                ) : undefined}
+              />
+            )}
 
             {/* marcador de retomada (UI §4.f) — o único âmbar da Lição: o olho cai nele primeiro */}
             {!acted && stage > 0 && stage < M && lesson && (
@@ -574,22 +638,40 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
               <p className="mb-2 text-[13px] leading-snug text-muted-foreground">{meta.label}</p>
               <textarea
                 ref={taRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                value={inGaps ? gapsDraft : draft}
+                onChange={(e) => (inGaps ? setGapsDraft(e.target.value) : setDraft(e.target.value))}
                 onKeyDown={onKeyDown}
                 onFocus={(e) => { const el = e.currentTarget; requestAnimationFrame(() => el.scrollIntoView({ block: "nearest" })); }}
                 readOnly={busy}
                 placeholder={meta.placeholder}
                 aria-label={meta.label}
                 className={cn(
-                  "max-h-[38svh] min-h-[88px] w-full resize-none overflow-y-auto rounded-lg border border-border bg-card px-3.5 py-3 text-[16px] leading-relaxed outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-ring/30 sm:text-sm",
+                  "min-h-[88px] w-full resize-none overflow-y-auto rounded-lg border border-border bg-card px-3.5 py-3 text-[16px] leading-relaxed outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-ring/30 sm:text-sm",
+                  isFinal ? "max-h-[32svh]" : "max-h-[38svh]", // final divide o espaço com a síntese (V2 §3.a)
                   busy && "opacity-70",
                 )}
               />
+              {isFinal && (
+                <>
+                  <input
+                    value={synDraft}
+                    onChange={(e) => setSynDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); doSubmit(false); } }}
+                    maxLength={140}
+                    readOnly={busy}
+                    placeholder="o essencial em 1 frase…"
+                    aria-label="generalização — o essencial em 1 frase"
+                    className="mt-2 h-11 w-full rounded-lg border border-border bg-card px-3.5 text-[16px] outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-ring/30 sm:text-sm"
+                  />
+                  {synDraft.length > 110 && (
+                    <p className="mt-0.5 text-right font-mono text-[10px] tabular-nums text-muted-foreground/60">{synDraft.length}/140</p>
+                  )}
+                </>
+              )}
               {err && <p className="mt-2 text-xs text-destructive">{err}</p>}
               <button
-                onClick={() => doSubmit(false)}
-                disabled={busy || !draft.trim()}
+                onClick={() => (inGaps ? registrarLacunas(false) : doSubmit(false))}
+                disabled={busy || (inGaps ? !gapsDraft.trim() : !draft.trim() || (isFinal && !synDraft.trim()))}
                 className={cn(
                   "mt-2.5 flex h-12 w-full items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50",
                   isFinal
@@ -598,12 +680,12 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
                   FOCUS,
                 )}
               >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isFinal ? <Check className="h-4 w-4" /> : <Eye className="h-4 w-4" />} {meta.btn}
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isFinal ? <Check className="h-4 w-4" /> : inGaps ? <ArrowRight className="h-4 w-4" /> : <Eye className="h-4 w-4" />} {meta.btn}
                 <kbd aria-hidden="true" className={cn(KBD, isFinal ? "bg-domain-foreground/20 text-domain-foreground" : "bg-primary-foreground/20 text-primary-foreground")}>enter</kbd>
               </button>
               <div className="mt-2 flex min-h-[18px] items-center justify-center gap-3">
                 {meta.valve && (
-                  <button onClick={() => doSubmit(true)} disabled={busy} className={cn(VALVE_BTN, FOCUS)}>{meta.valve}</button>
+                  <button onClick={() => (inGaps ? registrarLacunas(true) : doSubmit(true))} disabled={busy} className={cn(VALVE_BTN, FOCUS)}>{meta.valve}</button>
                 )}
                 {isFinal && !reused && !!prevAnswer && (
                   <button onClick={() => { setDraft(prevAnswer); setReused(true); taRef.current?.focus(); }} disabled={busy} className={cn(VALVE_BTN, FOCUS)}>

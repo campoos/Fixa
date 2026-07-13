@@ -33,7 +33,7 @@ export interface Comment { text: string; at: string; author: string }
 export interface Review { box: number; next: string | null; graduated: boolean; due: boolean; ladder: number }
 export interface Sample { q: string; a: string }
 // a Lição (DESIGN-LICAO-UX §2.0): stage = quantas respostas já foram enviadas; resposta em branco = ""
-export interface Lesson { stage: number; answers: string[]; updatedAt: string }
+export interface Lesson { stage: number; answers: string[]; gaps?: string; synthesis?: string; updatedAt: string }
 // correção do Tutor (DESIGN-TUTOR-IA): salva por task, idempotente no server
 export interface Tutor { nota: number; veredito: string; acertos: string[]; gaps: string[]; dica: string; at: string }
 export interface Task {
@@ -119,7 +119,7 @@ export const taskComment = (trackId: string, taskId: string, text: string) => ap
 export const taskCommentDelete = (trackId: string, taskId: string, index: number, at: string) => api.post("/api/task/comment/delete", { trackId, taskId, index, at });
 export const taskReview = (trackId: string, taskId: string, result: "pass" | "fail") => api.post("/api/task/review", { trackId, taskId, result });
 // a Lição: envia um estágio ('enviado é enviado'); blank registra em branco (só intermediário); restart refaz (Done permanece)
-export const lessonSubmit = (trackId: string, taskId: string, p: { answer?: string; blank?: boolean; restart?: boolean }) =>
+export const lessonSubmit = (trackId: string, taskId: string, p: { answer?: string; blank?: boolean; restart?: boolean; gaps?: string; synthesis?: string }) =>
   api.post<{ ok: true; stage: number; done?: boolean; becameDone?: boolean }>("/api/task/lesson", { trackId, taskId, ...p });
 // o Tutor: corrige a jornada completa (409 se incompleta · 402/429 limite · 502 transitório — retry manual)
 export const tutorCorrect = (trackId: string, taskId: string) =>

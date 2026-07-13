@@ -808,7 +808,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
 
     // A LIÇÃO (DESIGN-LICAO-UX): envio de um estágio; 'enviado é enviado'; Done automático no final
     if (path === "/api/task/lesson" && req.method === "POST") {
-      const { trackId, taskId, answer, blank, restart } = await readBody(req);
+      const { trackId, taskId, answer, blank, restart, gaps, synthesis } = await readBody(req);
       const track = ud.tracks[trackId];
       if (!track) return json(res, 404, { error: "tema não encontrado" });
       let target = null;
@@ -831,6 +831,14 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       const isFinal = cur.stage === maxStages - 1;
       if (!text && !(blank === true && !isFinal)) {
         return json(res, 400, { error: isFinal ? "a resposta final é a que consolida — escreve com a tua palavra" : "escreve algo, ou toca em 'deu branco' pra seguir" });
+      }
+      // Lição v2 (DESIGN-LICAO-V2-METODO): lacunas acompanham a reescrita ("" = disse que não faltou
+      // nada — registro honesto); a generalização fecha o envio final e é obrigatória
+      if (cur.stage === 1 && gaps !== undefined) cur.gaps = String(gaps).trim().slice(0, 2000);
+      if (isFinal) {
+        const syn = String(synthesis || "").trim();
+        if (!syn) return json(res, 400, { error: "fecha com o essencial em 1 frase — é ela que você leva" });
+        cur.synthesis = syn.slice(0, 140);
       }
       cur.answers.push(text);
       cur.stage += 1;
@@ -867,7 +875,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
             : `suas ${tu.limit} correções de degustação acabaram — no Pro são ${TUTOR_PRO_MONTH}/mês`,
         });
       }
-      const prompt = buildTutorPrompt({ task: target, answers: cur.answers, comments: s.comments[taskId] });
+      const prompt = buildTutorPrompt({ task: target, answers: cur.answers, gaps: cur.gaps, synthesis: cur.synthesis, comments: s.comments[taskId] });
       const g = await callGemini(prompt, { temperature: 0.3, timeoutMs: 25000, tries: 3 });
       if (!g.ok) {
         if (g.status === 429) return json(res, 429, { error: "o Tutor está sobrecarregado — tenta de novo em instantes" });
