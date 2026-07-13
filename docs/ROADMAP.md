@@ -49,8 +49,12 @@ com a história real: "o Fixa nasceu quando eu quis tirar nota mais alta na cert
 (Anthropic) — e me enquadrei no escopo de aprovação em 1,5 semana". Porta de entrada = quem estuda
 certificação de tecnologia/IA; o "qualquer tema" é o segundo ato. Spec da landing:
 DESIGN-LP-REPOSICIONAMENTO.md · plano de canais: DISTRIBUICAO.md · régua: DECISAO-90-DIAS.md.
-**Pré-requisito de billing mantido e reforçado (PARECER-CEO §8.1): MP só liga após Fase 0 completa**
-(conversa de IP com a empresa + domínio próprio + Render Starter).
+**Fase 0 — status real (13/07):** todas as contas já são pessoais (GitHub/Render/Upstash/Brevo/Gemini/MP);
+o único vínculo restante é a MÁQUINA de desenvolvimento. Decisão do dono: **migrar o dev pra máquina
+própria assim que tiver PC, ANTES de postar/divulgar pra qualquer pessoa**. Até lá: seguir polindo o
+produto sem exposição pública. Checklist da migração: clone fresco + **rotacionar todas as credenciais**
+do .secrets.env (passaram por máquina compartilhada) + domínio próprio + Render Starter → aí libera
+primeiro post e billing. MP: plano criado quando o token sair; env só liga pós-migração.
 
 ---
 
