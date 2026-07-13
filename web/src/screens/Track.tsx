@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, CalendarClock, Check, ChevronDown, ChevronRight, FlaskConical, GraduationCap, Loader2, MessageSquare, MessageSquarePlus, Pencil, PlusCircle, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, Check, ChevronDown, ChevronRight, FlaskConical, GraduationCap, Loader2, MessageSquarePlus, Pencil, PlusCircle, Target, Trash2 } from "lucide-react";
 import {
   appendTrack, editTask, getTrack, removeTask, renameTrack, setTrackTarget, taskComment, taskCommentDelete, taskDone,
   ApiError, type Comment, type Epic, type Me, type Progress, type Story, type Task, type TaskPatch, type Track as TrackData,
@@ -197,11 +197,6 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
             </span>
           )}
           {task.review?.graduated && <span className="shrink-0 text-domain" title="dominada"><GraduationCap className="h-3.5 w-3.5" aria-label="dominada" /></span>}
-          {task.comments.length > 0 && (
-            <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground" title="anotações">
-              <MessageSquare className="h-3.5 w-3.5" /><span className="font-mono text-[11px] tabular-nums">{task.comments.length}</span>
-            </span>
-          )}
         </button>
         {open && (
           <button onClick={() => setEditing(!editing)} aria-label="editar task" title={editing ? "fechar edição" : "editar task"} className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-accent", editing && "border-primary text-primary", FOCUS)}>

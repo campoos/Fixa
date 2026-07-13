@@ -16,8 +16,8 @@
 A nota do Tutor é **registro de estudo**, não sinal de revisão. O que a árvore esconde de
 propósito são sinais que prescrevem ação agora (fila, atraso, escada Leitner) — esses têm dono,
 o `/revisar`. A nota não prescreve nada: é o **desfecho da lição**, da mesma família do
-"concluída em 12/07", do contador de anotações e da GraduationCap de dominada — memória do que
-aconteceu, não chamada pra agir. E, por decisão de método, ela nunca mexe no agendamento
+"concluída em 12/07" e da GraduationCap de dominada — memória do que aconteceu, não chamada
+pra agir. E, por decisão de método, ela nunca mexe no agendamento
 (`DESIGN-TUTOR-IA.md` §5): mostrá-la não cria uma segunda fila nem compete com o Revisar. Ela
 responde exatamente a pergunta que o dono fez à árvore ("quais já corrigi e com que nota") —
 pergunta de **mapa**, não de fila. Entra.
@@ -171,8 +171,8 @@ Anchor: dentro do botão da row, **logo após** a pill `inProgress` (hoje linhas
 
 - Condição é só `task.tutor` — corrigida implica lição completa; após refazer o server apaga
   a correção e o badge some sozinho (o registro fica nas anotações, como já acontece).
-- Sem ícone (regra §0.1). Convive com a GraduationCap esmeralda (dominada) e o contador de
-  anotações na mesma row, cada um com um significado.
+- Sem ícone (regra §0.1). Convive com a GraduationCap esmeralda (dominada) na mesma row —
+  o contador de anotações **sai** da row (emenda §g).
 - Task concluída **sem** correção: nenhuma marca nova — a ausência do badge é o sinal
   (feedback 3 pede distinguir; presença/ausência distingue).
 
@@ -255,3 +255,33 @@ vigente; zero exclamação; nota **sempre** `font-mono tabular-nums`.
   peek (questão/pontos-chave/resposta seguem só na Lição).
 - [ ] **Tinta e tipografia:** toda nota em `font-mono tabular-nums`; violeta (`primary`) é a
   única cor do Tutor; nenhum GraduationCap novo na árvore; nenhum token novo.
+
+---
+
+## (g) EMENDA (13/07, pós-aplicação) — contador de anotações SAI da TaskRow
+
+**Feedback do dono, com a spec no ar:** leu o contador (`MessageSquare` + `task.comments.length`)
+como "quantidade de respostas" ("tô mostrando 1, eu tenho 3") e concluiu "não faz mais sentido
+mostrar isso". Decisão: **remover da row; as anotações continuam no peek** (opção b).
+
+**Racional (2 linhas):** o contador era o proxy de "esta task tem registro de estudo" na era
+pré-Lição; hoje esse trabalho é da pill `2/3`, do badge `8/10` e da GraduationCap — e as
+anotações viraram acervo secundário (dicas do Tutor, resposta final arquivada no refazer),
+cujo lugar de leitura é o peek, que já tem a seção **Anotações** completa (ler + adicionar).
+Na row ele só competia por espaço e acabou de ser mal-interpretado por um usuário real.
+
+**Mudança em `Track.tsx` (cirúrgica):**
+1. Deletar o bloco inteiro `{task.comments.length > 0 && (…)}` de dentro do botão da row
+   (hoje linhas 182–186 — o `<span>` com `MessageSquare` + contador, logo após a
+   GraduationCap de dominada).
+2. Remover `MessageSquare` do import lucide (linha 2). `MessageSquarePlus` **fica** — o
+   `Comments` do peek usa.
+3. Nada mais muda: `TaskPeek` (seção Anotações), `Comments` e o fluxo de arquivar no refazer
+   ficam intocados.
+
+**Estado final dos selos da row** (ordem, todos opcionais): pill `2/3` (em andamento) →
+badge `8/10` (corrigida) → GraduationCap esmeralda (dominada). Três marcas, três perguntas
+de mapa — nenhuma de fila, nenhuma redundante com o peek.
+
+- [ ] **Aceite (g):** nenhuma row exibe ícone/contador de anotações; o peek segue mostrando
+  e aceitando anotações; `MessageSquare` não é mais importado em `Track.tsx`.
