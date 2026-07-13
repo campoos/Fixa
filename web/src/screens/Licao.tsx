@@ -341,8 +341,8 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
     setBusy(true);
     try {
       const finalAnswer = answers[answers.length - 1] ?? "";
-      if (finalAnswer.trim()) await taskComment(trackId, taskId, `resposta final da lição anterior: ${finalAnswer}`);
-      if (tutor) await taskComment(trackId, taskId, `correção do Tutor da lição anterior — nota ${fmtNota(tutor.nota)}/10: ${tutor.veredito}${tutor.dica ? `\ndica: ${tutor.dica}` : ""}`);
+      if (finalAnswer.trim()) await taskComment(trackId, taskId, `resposta final anterior: ${finalAnswer}`);
+      if (tutor) await taskComment(trackId, taskId, `correção do Tutor anterior — nota ${fmtNota(tutor.nota)}/10: ${tutor.veredito}${tutor.dica ? `\ndica: ${tutor.dica}` : ""}`);
       await lessonSubmit(trackId, taskId, { restart: true });
       setOverride({ stage: 0, answers: [], updatedAt: new Date().toISOString() });
       // a task segue Done + stage 0 = mesmo shape do "doneNoLesson" — studying diz que a lição está ATIVA
