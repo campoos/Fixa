@@ -345,6 +345,8 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
       if (tutor) await taskComment(trackId, taskId, `correção do Tutor da lição anterior — nota ${fmtNota(tutor.nota)}/10: ${tutor.veredito}${tutor.dica ? `\ndica: ${tutor.dica}` : ""}`);
       await lessonSubmit(trackId, taskId, { restart: true });
       setOverride({ stage: 0, answers: [], updatedAt: new Date().toISOString() });
+      // a task segue Done + stage 0 = mesmo shape do "doneNoLesson" — studying diz que a lição está ATIVA
+      setStudying(true);
       setJustConcluded(false); setBornStage(null); setActed(true); setReused(false); setDraft("");
       setLive("lição reiniciada — responda de cabeça");
       refetch(true);
