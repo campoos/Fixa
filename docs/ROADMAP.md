@@ -43,6 +43,15 @@ com o passo a passo → final; migração automática das lições antigas via f
 não mostra (regra explícita no prompt).
 **Próximo:** Fase 0 (separação de IP) → M6 (contas+DB) → M7 (landing pública) → M8 (monetização) → M9 (sandbox/PWA).
 
+**DECISÃO DE POSICIONAMENTO (13/07, do dono, pós-PARECER-CEO) — encerra o re-litígio amplo×nicho:**
+**beachhead com história de origem.** O produto CONTINUA amplo (qualquer tema); a APRESENTAÇÃO lidera
+com a história real: "o Fixa nasceu quando eu quis tirar nota mais alta na certificação do Claude
+(Anthropic) — e me enquadrei no escopo de aprovação em 1,5 semana". Porta de entrada = quem estuda
+certificação de tecnologia/IA; o "qualquer tema" é o segundo ato. Spec da landing:
+DESIGN-LP-REPOSICIONAMENTO.md · plano de canais: DISTRIBUICAO.md · régua: DECISAO-90-DIAS.md.
+**Pré-requisito de billing mantido e reforçado (PARECER-CEO §8.1): MP só liga após Fase 0 completa**
+(conversa de IP com a empresa + domínio próprio + Render Starter).
+
 ---
 
 ## 🎯 Milestones (ordem de execução)

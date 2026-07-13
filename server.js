@@ -640,6 +640,47 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         return json(res, 502, { error: "não deu pra iniciar o checkout — tenta de novo" });
       }
     }
+    // métricas de produto (founder-only) — os 3 números do PARECER-CEO §8.3:
+    // ativação (criou tema + estudou), retenção D7 e uso do teto free. Sem isso, post = tiro no escuro.
+    if (path === "/api/admin/metrics") {
+      if (me.email !== FOUNDER_EMAIL) return json(res, 403, { error: "só o fundador" });
+      const today = spDay();
+      const rows = [];
+      for (const u of Object.values(users)) {
+        const d = await udata(u.id);
+        const themes = Object.keys(d.tracks).length;
+        const actDays = Object.keys(d.activity).sort();
+        let tasksDone = 0, reviewed = 0; // reviewed = tasks que já subiram pelo menos 1 caixa
+        for (const s of Object.values(d.state)) {
+          tasksDone += Object.keys(s.done || {}).length;
+          for (const rv of Object.values(s.review || {})) if (rv.box > 0) reviewed++;
+        }
+        const signupDay = (u.createdAt || "").slice(0, 10);
+        const d7day = signupDay ? addDays(signupDay, 7) : null;
+        rows.push({
+          email: u.email, plan: u.plan, signup: signupDay,
+          themes, tasksDone, reviewed, daysActive: actDays.length,
+          lastActive: actDays[actDays.length - 1] || null,
+          activated: themes > 0 && actDays.length > 0,
+          d7Eligible: !!d7day && d7day <= today,
+          d7Retained: !!d7day && actDays.some((day) => day >= d7day),
+        });
+      }
+      const free = rows.filter((r) => r.plan === "free");
+      const eligible = rows.filter((r) => r.d7Eligible);
+      const pctFmt = (a, b) => (b ? Math.round((a / b) * 100) : null);
+      return json(res, 200, {
+        at: new Date().toISOString(),
+        users: rows.length,
+        byPlan: rows.reduce((m, r) => ((m[r.plan] = (m[r.plan] || 0) + 1), m), {}),
+        signupsLast7d: rows.filter((r) => r.signup && r.signup >= addDays(today, -7)).length,
+        activesLast7d: rows.filter((r) => r.lastActive && r.lastActive >= addDays(today, -7)).length,
+        activation: { activated: rows.filter((r) => r.activated).length, of: rows.length, pct: pctFmt(rows.filter((r) => r.activated).length, rows.length) },
+        d7: { retained: eligible.filter((r) => r.d7Retained).length, of: eligible.length, pct: pctFmt(eligible.filter((r) => r.d7Retained).length, eligible.length) },
+        freeLimit: { atLimit: free.filter((r) => r.themes >= FREE_THEME_LIMIT).length, of: free.length },
+        rows: rows.sort((a, b) => (a.signup < b.signup ? 1 : -1)),
+      });
+    }
     // export completo dos dados do usuário (a promessa "seus dados são exportáveis, sempre")
     if (path === "/api/export") {
       const payload = {
