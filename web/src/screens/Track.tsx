@@ -5,7 +5,7 @@ import {
   ApiError, type Comment, type Epic, type Me, type Progress, type Story, type Task, type TaskPatch, type Track as TrackData,
 } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
-import { lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
+import { fmtNota, lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
 import { StepSegments } from "@/components/step-segments";
 import { FOCUS, navigate } from "@/App";
 import { cn } from "@/lib/utils";
@@ -59,7 +59,7 @@ function Comments({ list, meName, onAdd, onDelete }: { list: Comment[]; meName: 
 
 /* peek de leitura da task (DESIGN-LICAO-UX §1.3 / UI §7.b): só objetivo, estado da lição + CTA e anotações.
    Conteúdo pedagógico (questão, pontos-chave, resposta) mora SÓ na Lição — mostrar aqui é regressão. */
-function TaskPeek({ task, meName, onStudy, onComment, onDeleteComment }: { task: Task; meName: string; onStudy: () => void; onComment: (t: string) => Promise<void>; onDeleteComment: (i: number, at: string) => Promise<void> }) {
+function TaskPeek({ task, meName, onStudy, onCorrection, onComment, onDeleteComment }: { task: Task; meName: string; onStudy: () => void; onCorrection: () => void; onComment: (t: string) => Promise<void>; onDeleteComment: (i: number, at: string) => Promise<void> }) {
   const total = lessonStages(task);
   const stage = task.lesson?.stage ?? 0;
   const inProgress = stage > 0 && stage < total;
@@ -70,12 +70,21 @@ function TaskPeek({ task, meName, onStudy, onComment, onDeleteComment }: { task:
       <Section title="Objetivo"><p className="text-sm leading-relaxed">{task.objective}</p></Section>
       {/* estado da lição + CTA contextual — mesmo destino da row, redundância intencional */}
       <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
-        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {inProgress && <StepSegments current={stage} total={total} className="shrink-0" />}
           {inProgress ? (
             <span>você parou no passo <span className="font-mono tabular-nums">{stage + 1}</span> de <span className="font-mono tabular-nums">{total}</span>{task.lesson?.updatedAt && <> · {timeAgo(task.lesson.updatedAt)}</>}</span>
           ) : concluded ? (
-            <span>concluída{concludedAt && <> em <span className="font-mono tabular-nums">{shortDate(concludedAt)}</span></>}</span>
+            <>
+              <span>concluída{concludedAt && <> em <span className="font-mono tabular-nums">{shortDate(concludedAt)}</span></>}</span>
+              {task.tutor && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="font-medium text-primary">Tutor <span className="font-mono tabular-nums">{fmtNota(task.tutor.nota)}/10</span></span>
+                  <button onClick={onCorrection} className={cn("text-primary underline-offset-2 hover:underline", FOCUS)}>ver correção</button>
+                </>
+              )}
+            </>
           ) : (
             <span>não iniciada</span>
           )}
@@ -178,6 +187,15 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
           {inProgress && (
             <span title={`você parou no passo ${stage + 1} de ${total}`} className="inline-flex h-[18px] shrink-0 items-center rounded-full bg-primary/10 px-1.5 font-mono text-[10px] tabular-nums text-primary">{stage + 1}/{total}</span>
           )}
+          {/* badge da nota (TUTOR-VISIBILIDADE §c): contornado = registro permanente; pill cheia = progresso transitório */}
+          {task.tutor && (
+            <span
+              title={`correção do Tutor: ${fmtNota(task.tutor.nota)}/10`}
+              className="inline-flex h-[18px] shrink-0 items-center rounded-[5px] border border-primary/25 bg-primary/5 px-1.5 font-mono text-[10px] tabular-nums text-primary"
+            >
+              {fmtNota(task.tutor.nota)}/10
+            </span>
+          )}
           {task.review?.graduated && <span className="shrink-0 text-domain" title="dominada"><GraduationCap className="h-3.5 w-3.5" aria-label="dominada" /></span>}
           {task.comments.length > 0 && (
             <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground" title="anotações">
@@ -196,7 +214,7 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
       </div>
       {open && (editing
         ? <TaskEditor trackId={trackId} task={task} onDone={() => setEditing(false)} onChanged={onChanged} />
-        : <TaskPeek task={task} meName={meName} onStudy={goLesson} onComment={addC} onDeleteComment={delC} />)}
+        : <TaskPeek task={task} meName={meName} onStudy={goLesson} onCorrection={() => navigate(`/t/${encodeURIComponent(trackId)}/l/${encodeURIComponent(task.id)}?correcao=1`)} onComment={addC} onDeleteComment={delC} />)}
     </div>
   );
 }

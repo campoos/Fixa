@@ -3,7 +3,7 @@ import { ArrowRight, Check, Eye, GraduationCap, Lightbulb, Loader2, Pencil, Refr
 import { ApiError, getConfig, getTrack, lessonSubmit, taskComment, tutorCorrect, type Epic, type Story, type Task, type Track as TrackData, type Tutor } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { usePersistentState } from "@/lib/usePersistentState";
-import { lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
+import { fmtNota, lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
 import { StepSegments } from "@/components/step-segments";
 import { RichText } from "@/components/rich-text";
 import { FOCUS, navigate } from "@/App";
@@ -25,7 +25,6 @@ const VALVE_BTN = "py-1 text-xs text-muted-foreground underline-offset-2 transit
 const BORN = "duration-200 motion-safe:animate-in motion-safe:fade-in";
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const fmtNota = (n: number) => n.toLocaleString("pt-BR");
 
 /* ── blocos do transcript (UI §4) ── */
 
@@ -241,10 +240,12 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
     const t = found.task;
     const m = lessonStages(t);
     const st = Math.min(t.lesson?.stage ?? 0, m);
+    // deep-link da árvore (TUTOR-VISIBILIDADE §b): abre direto a sheet da correção, se ela existe
+    const wantsSheet = new URLSearchParams(window.location.search).get("correcao") === "1";
     requestAnimationFrame(() => {
       // passo 2 retomado: campo pré-preenchido com a resposta fria, se não há rascunho local
       if (st === 1 && !draft) setDraft(t.lesson?.answers[0] ?? "");
-      if (st >= m) { topRef.current?.focus(); return; }
+      if (st >= m) { if (wantsSheet && t.tutor) { setSheet(true); return; } topRef.current?.focus(); return; }
       if (t.done && st === 0) return; // "concluída sem registro": não rouba foco
       if (!t.sample.q.trim()) return; // bloqueio sem questão-modelo
       if (st > 0) markerRef.current?.scrollIntoView({ block: "center" });
@@ -323,6 +324,7 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
   };
   const openSheet = () => { setSheet(true); if (!tutor && !tutorBusy) requestTutor(); };
   const closeSheet = () => {
+    if (window.location.search) window.history.replaceState({}, "", window.location.pathname); // refresh não reabre a sheet
     setSheet(false); setTutorErr(null);
     requestAnimationFrame(() => tutorCardRef.current?.focus()); // devolve o foco ao card do Tutor (UI §8)
   };
@@ -465,6 +467,17 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
         <>
           {/* transcript (UI §4): neutro = usuário · violeta = pontos-chave · esmeralda = resposta-modelo */}
           <div ref={topRef} tabIndex={-1} className="mt-4 space-y-3 outline-none">
+            {/* capa do modo leitura (TUTOR-VISIBILIDADE §a.1): quem reabre lição corrigida vê a nota de cara */}
+            {complete && tutor && !justConcluded && (
+              <button ref={tutorCardRef} onClick={openSheet} className={cn("flex w-full items-center gap-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3 text-left transition-colors hover:bg-primary/10", FOCUS)}>
+                <span className="shrink-0"><span className="font-mono text-xl font-semibold tabular-nums text-primary">{fmtNota(tutor.nota)}</span><span className="font-mono text-[11px] text-muted-foreground">/10</span></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">correção do Tutor</span>
+                  <span className="block truncate text-xs text-muted-foreground">{tutor.veredito}</span>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
+              </button>
+            )}
             <Card className="gap-0 rounded-xl border-border bg-card p-4 shadow-sm">
               <p className={EYEBROW10}>{isPractice ? "exercício" : "questão-modelo"}</p>
               <p className="mt-1.5 text-[17px] font-semibold leading-snug text-balance">{isPractice ? task.objective : task.sample.q}</p>
@@ -507,17 +520,6 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
               </div>
             )}
 
-            {/* correção salva: card no fim do transcript, toque reabre a sheet (UI §4.g) */}
-            {complete && tutor && (
-              <button ref={tutorCardRef} onClick={openSheet} className={cn("flex w-full items-center gap-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3 text-left transition-colors hover:bg-primary/10", FOCUS)}>
-                <span className="shrink-0"><span className="font-mono text-xl font-semibold tabular-nums text-primary">{fmtNota(tutor.nota)}</span><span className="font-mono text-[11px] text-muted-foreground">/10</span></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">correção do Tutor</span>
-                  <span className="block truncate text-xs text-muted-foreground">{tutor.veredito}</span>
-                </span>
-                <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
-              </button>
-            )}
           </div>
 
           {mode === "reading" && justConcluded ? (
@@ -526,10 +528,20 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
               <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-domain/12 text-domain"><Check className="h-5 w-5" /></div>
               <p ref={doneTitleRef} tabIndex={-1} className="mt-4 font-semibold outline-none">Task concluída</p>
               <p className="mt-1 text-sm text-muted-foreground">ela volta pra revisão amanhã — é o espaçamento trabalhando.</p>
-              {!tutor && (
+              {tutor ? (
+                /* slot corrigido (TUTOR-VISIBILIDADE §a.2): a nota é a protagonista — a correção já foi gasta */
                 <div className="mt-4">
-                  {saldo ? <><TutorInvite onOpen={openSheet} />{counter}</> : exhausted}
+                  <p>
+                    <span className="font-mono text-4xl font-semibold leading-none tracking-[-0.02em] text-primary tabular-nums">{fmtNota(tutor.nota)}</span>
+                    <span className="font-mono text-xs text-muted-foreground">/10</span>
+                  </p>
+                  <p className="mx-auto mt-1.5 max-w-[40ch] text-sm text-muted-foreground text-balance">{tutor.veredito}</p>
+                  <button ref={tutorCardRef} onClick={openSheet} className={cn("mt-2 text-xs text-primary underline-offset-2 hover:underline", FOCUS)}>
+                    ver correção completa
+                  </button>
                 </div>
+              ) : (
+                <div className="mt-4">{saldo ? <><TutorInvite onOpen={openSheet} />{counter}</> : exhausted}</div>
               )}
               <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
                 <button onClick={exit} className={cn(QUIET_BTN, FOCUS)}>Voltar ao tema</button>
@@ -538,6 +550,9 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
                     Próxima: <span className="font-mono text-xs tabular-nums">{next.id}</span> <span className="max-w-[240px] truncate">{next.title}</span> <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 )}
+                <button onClick={refazer} disabled={busy} className={cn("disabled:opacity-50", QUIET_BTN, FOCUS)}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Refazer lição
+                </button>
               </div>
             </Card>
           ) : mode === "reading" ? (

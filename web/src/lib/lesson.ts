@@ -3,6 +3,9 @@ import type { Task } from "@/lib/api";
 // nº de envios da Lição (contrato do server): SEMPRE 3 — fria → com o contexto (pontos-chave/passo a passo) → final
 export const lessonStages = (_task: Pick<Task, "type">) => 3;
 
+// nota do Tutor formatada pt-BR — sempre em mono tabular no JSX
+export const fmtNota = (n: number) => n.toLocaleString("pt-BR");
+
 // data curta pt-BR ("12/07") — face de dados, sempre em mono tabular no JSX
 export const shortDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 

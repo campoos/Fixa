@@ -739,7 +739,15 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       const s = tState(ud, trackId);
       const maxStages = LESSON_STAGES; // 3 pra todo tipo: fria → com o contexto (pontos-chave/passo a passo) → final
       let cur = migrateLesson(target, s, taskId) || { stage: 0, answers: [], v3: true };
-      if (restart) { cur = { stage: 0, answers: [], v3: true }; s.lesson[taskId] = cur; await saveU(me.id, "state"); return json(res, 200, { ok: true, stage: 0 }); }
+      if (restart) {
+        // refazer zera a lição E a correção (o front já arquivou ambas nas anotações) —
+        // sem isso o Tutor devolveria pra sempre a correção velha em cache (idempotência)
+        cur = { stage: 0, answers: [], v3: true };
+        s.lesson[taskId] = cur;
+        delete s.tutor[taskId];
+        await saveU(me.id, "state");
+        return json(res, 200, { ok: true, stage: 0 });
+      }
       if (cur.stage >= maxStages) return json(res, 409, { error: "lição já concluída — use restart pra refazer" });
       const text = String(answer || "").trim();
       const isFinal = cur.stage === maxStages - 1;
