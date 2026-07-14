@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 30" fill="none">
+  <!-- Fixa · wordmark: "fixa" minúsculo, monoline geométrica desenhada em paths (sem fonte).
+       x-height 13.5 (y 12.5→26) · ascendente y 4.5 · traço 3 round · tittle do i = o ponto âmbar da marca.
+       Letras em currentColor (tinta do contexto); só o tittle é fixo. -->
+  <g stroke="currentColor" stroke-width="3" stroke-linecap="round">
+    <path d="M11 26V10A5.5 5.5 0 0 1 16.5 4.5"/>
+    <path d="M7 12.5H15.5"/>
+    <path d="M22.5 12.5V26"/>
+    <path d="M28.5 12.5 38.5 26M38.5 12.5 28.5 26"/>
+    <circle cx="51.25" cy="19.25" r="6.75"/>
+    <path d="M58 12.5V26"/>
+  </g>
+  <circle cx="22.5" cy="7" r="2.4" fill="#F4B740"/>
+</svg>

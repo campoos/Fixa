@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Fixa · símbolo oficial: o anel da revisão (290°) que volta e crava o ponto âmbar no vão.
+       Grid 32 · centro (16,16) · R 11 · traço 4 round · vão ±35° centrado a NE (-45°) · ponto r 3.2 no vão. -->
+  <path d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="#7C5CFC" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="23.78" cy="8.22" r="3.2" fill="#F4B740"/>
+</svg>

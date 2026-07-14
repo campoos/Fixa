@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Fixa · símbolo monocromático (traço único — INPI/carimbo/gravação). currentColor: herda a cor do contexto. -->
+  <path d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="23.78" cy="8.22" r="3.2" fill="currentColor"/>
+</svg>

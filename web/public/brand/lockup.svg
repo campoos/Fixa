@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 91 32" fill="none">
+  <!-- Fixa · lockup horizontal oficial: símbolo (escala 0.84, levemente mais pesado que o texto — hierarquia)
+       + wordmark. Vão símbolo→texto ≈ 11 (0.4× a altura do símbolo). Centros ópticos alinhados (y≈16). -->
+  <g transform="translate(0 2.56) scale(0.84)">
+    <path d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="#7C5CFC" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="23.78" cy="8.22" r="3.2" fill="#F4B740"/>
+  </g>
+  <g transform="translate(30 0.5)">
+    <g stroke="currentColor" stroke-width="3" stroke-linecap="round">
+      <path d="M11 26V10A5.5 5.5 0 0 1 16.5 4.5"/>
+      <path d="M7 12.5H15.5"/>
+      <path d="M22.5 12.5V26"/>
+      <path d="M28.5 12.5 38.5 26M38.5 12.5 28.5 26"/>
+      <circle cx="51.25" cy="19.25" r="6.75"/>
+      <path d="M58 12.5V26"/>
+    </g>
+    <circle cx="22.5" cy="7" r="2.4" fill="#F4B740"/>
+  </g>
+</svg>
