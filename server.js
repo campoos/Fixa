@@ -407,6 +407,13 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const path = url.pathname;
+    // domínio próprio no ar (PUBLIC_URL ≠ onrender): o endereço antigo redireciona 301 —
+    // exceto /api/* (health do keep-alive e cron dos lembretes continuam batendo no onrender)
+    const host = String(req.headers.host || "");
+    if (host.endsWith(".onrender.com") && !BASE_URL.includes(".onrender.com") && !path.startsWith("/api/") && req.method === "GET") {
+      res.writeHead(301, { Location: `${BASE_URL}${req.url}` });
+      return res.end();
+    }
     if (path === "/robots.txt") {
       res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "public, max-age=3600" });
       return res.end(`User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${BASE_URL}/sitemap.xml\n`);
