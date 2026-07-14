@@ -1,0 +1,34 @@
+# Vigia do fixa.com.br (DECISAO-DOMINIO.md): expira 20/08/2026, titular PF sem site.
+# Checa diariamente via RDAP: liberou (404) → issue "COMPRAR AGORA"; renovou (expiração
+# mudou) → issue "desiste e encerra o vigia". GitHub notifica o dono por e-mail na issue.
+name: watch-fixa-domain
+on:
+  schedule:
+    - cron: "17 12 * * *" # ~9h17 BRT, diário
+  workflow_dispatch:
+permissions:
+  issues: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: RDAP fixa.com.br
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          CODE=$(curl -s -o /tmp/rdap.json -w "%{http_code}" "https://rdap.registro.br/domain/fixa.com.br")
+          echo "rdap http $CODE"
+          if [ "$CODE" = "404" ]; then
+            gh issue create -R "$GITHUB_REPOSITORY" \
+              -t "🚨 fixa.com.br LIBEROU — comprar AGORA no Registro.br" \
+              -b "O RDAP devolveu 404: o domínio saiu da base. Corre no registro.br antes que alguém pegue. Contexto: docs/DECISAO-DOMINIO.md." || true
+            exit 0
+          fi
+          EXP=$(python3 -c "import json;d=json.load(open('/tmp/rdap.json'));print(next((e['eventDate'][:10] for e in d.get('events',[]) if e.get('eventAction')=='expiration'),''))" || echo "")
+          echo "expiração: $EXP"
+          if [ -n "$EXP" ] && [ "$EXP" != "2026-08-20" ]; then
+            gh issue create -R "$GITHUB_REPOSITORY" \
+              -t "fixa.com.br foi RENOVADO (nova expiração: $EXP) — encerrar o vigia" \
+              -b "O titular renovou. Pode desativar o workflow watch-fixa-domain e seguir com fixaestudos.com.br em paz. Contexto: docs/DECISAO-DOMINIO.md." || true
+          fi
