@@ -6,7 +6,7 @@ import { createHmac, timingSafeEqual, scrypt, randomBytes } from "node:crypto";
 import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
 import { buildTutorPrompt } from "./prompt-tutor.js";
-import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry, planSession } from "./review-engine.js";
+import { REVIEW_LADDER, REVIEW_DOSE, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry, planSession } from "./review-engine.js";
 import { buildReminder, reminderCadence, daysInactive } from "./reminders.js";
 import { emailEnabled, sendEmail, emailShell, emailButton } from "./email.js";
 
@@ -146,7 +146,7 @@ async function udata(uid) {
   }
   return dataCache.get(uid);
 }
-const saveU = (uid, part) => kv.set(`u:${uid}:${part}`, dataCache.get(uid)[part]).catch((e) => console.error(`[u:${part}]`, e.message));
+const saveU = (uid, part) => kv.set(`u:${uid}:${part}`, dataCache.get(uid)[part]); // rejeita em falha (QA #7) — endpoints de escrita respondem 500 em vez de fingir ok
 
 // ---- bootstrap: conta fundadora + migração do estado single-user antigo ----
 if (!Object.keys(users).length) {
@@ -218,7 +218,7 @@ function seedReview(s, id, fromDay, targetDate) {
 function markActive(ud, uid) {
   const d = spDay();
   ud.activity[d] = (ud.activity[d] || 0) + 1;
-  saveU(uid, "activity");
+  saveU(uid, "activity").catch((e) => console.error("[activity]", e.message)); // fire-and-forget consciente
 }
 function computeStreak(ud) {
   let s = 0, d = spDay();
@@ -326,7 +326,7 @@ function globalReview(ud) {
     if (left >= 0 && (minDaysLeft === null || left < minDaysLeft)) minDaysLeft = left;
   }
   const plan = planSession(due, today, minDaysLeft);
-  return { due, ladder: REVIEW_LADDER, mode: plan.mode, session: plan.session, rest: plan.rest, daysLeft: minDaysLeft };
+  return { due, ladder: REVIEW_LADDER, mode: plan.mode, session: plan.session, rest: plan.rest, daysLeft: minDaysLeft, dose: REVIEW_DOSE };
 }
 
 // ---- sessão (cookie assinado; payload = id do usuário) ----
@@ -355,7 +355,7 @@ const setSession = (res, code, uid, body) => {
   res.writeHead(code, { "Content-Type": "application/json", "Set-Cookie": `ts_sess=${sign(uid)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000` });
   res.end(JSON.stringify(body));
 };
-const readBody = (req) => new Promise((res) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { try { res(JSON.parse(b || "{}")); } catch { res({}); } }); });
+const readBody = (req) => new Promise((res) => { let b = ""; req.on("data", (c) => { b += c; if (b.length > 262144) { b = ""; req.destroy(); res({}); } }); req.on("end", () => { try { res(JSON.parse(b || "{}")); } catch { res({}); } }); }); // teto 256KB (QA #11)
 
 // ---- estático (SPA + landing pública na raiz) ----
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2" };
@@ -524,15 +524,20 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       }
       return json(res, 200, { ok: true, sent, skipped });
     }
-    // opt-out de lembretes (link assinado do e-mail)
+    // opt-out de lembretes: GET mostra confirmação (scanners de e-mail prefetcham GET — QA #5);
+    // só o POST assinado desliga de verdade
     if (path === "/api/reminders/off") {
       const uid = url.searchParams.get("u"), sig = url.searchParams.get("sig");
       const u = uid && sig === signUid(uid) ? userById(uid) : null;
       if (!u) return json(res, 400, { error: "link inválido" });
-      u.remindersOff = true;
-      await saveUsers();
+      if (req.method === "POST") {
+        u.remindersOff = true;
+        await saveUsers();
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        return res.end(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f5f3fa;color:#1c1533"><div style="text-align:center"><p style="font-weight:600">Lembretes desligados.</p><p style="font-size:14px;color:#5c5480">Você pode continuar revisando em <a href="${BASE_URL}/revisar" style="color:#6c47f0">${BASE_URL.replace("https://", "")}/revisar</a></p></div>`);
+      }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      return res.end(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f5f3fa;color:#1c1533"><div style="text-align:center"><p style="font-weight:600">Lembretes desligados.</p><p style="font-size:14px;color:#5c5480">Você pode continuar revisando em <a href="${BASE_URL}/revisar" style="color:#6c47f0">${BASE_URL.replace("https://", "")}/revisar</a></p></div>`);
+      return res.end(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f5f3fa;color:#1c1533"><form method="POST" action="/api/reminders/off?u=${encodeURIComponent(uid)}&sig=${encodeURIComponent(sig)}" style="text-align:center"><p style="font-weight:600">Parar de receber lembretes?</p><p style="font-size:14px;color:#5c5480">Sua fila continua guardada — só o e-mail diário para.</p><button type="submit" style="margin-top:8px;padding:10px 18px;border:0;border-radius:11px;background:#6c47f0;color:#fff;font-weight:600;cursor:pointer">Parar lembretes</button></form>`);
     }
 
     // daqui pra baixo exige sessão
@@ -620,6 +625,8 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     }
     if (path === "/api/track/restore" && req.method === "POST") {
       const { id } = await readBody(req);
+      if (!isPro && Object.keys(ud.tracks).length >= FREE_THEME_LIMIT)
+        return json(res, 402, { error: `plano free vai até ${FREE_THEME_LIMIT} temas — exclua um tema pra restaurar este` });
       const t = ud.trash[id];
       if (!t) return json(res, 404, { error: "não está na lixeira" });
       const newId = ud.tracks[id] ? freeId(ud, id) : id; // se recriaram um tema com o mesmo id, restaura com sufixo
@@ -754,6 +761,9 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       const p = patch || {};
       const setStr = (k) => { if (typeof p[k] === "string" && p[k].trim()) target[k] = p[k].trim(); };
       const setStrOpt = (k) => { if (k in p) target[k] = typeof p[k] === "string" && p[k].trim() ? p[k].trim() : null; };
+      // campos obrigatórios não aceitam vazio — e o usuário fica sabendo (QA #10)
+      if (typeof p.title === "string" && !p.title.trim()) return json(res, 400, { error: "a task precisa de um título" });
+      if (typeof p.objective === "string" && !p.objective.trim()) return json(res, 400, { error: "a task precisa de um objetivo" });
       setStr("title"); setStr("objective");
       if (p.sample && typeof p.sample.q === "string" && typeof p.sample.a === "string" && p.sample.q.trim() && p.sample.a.trim())
         target.sample = { q: p.sample.q.trim(), a: p.sample.a.trim() };
@@ -761,7 +771,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         if (Array.isArray(p.keyPoints)) target.keyPoints = p.keyPoints.map((s) => String(s).trim()).filter(Boolean);
       } else {
         if (Array.isArray(p.steps)) { const st = p.steps.map((s) => String(s).trim()).filter(Boolean); if (st.length) target.steps = st; }
-        setStr("expected"); setStrOpt("hint"); setStrOpt("snippet"); setStrOpt("language");
+        setStrOpt("expected"); setStrOpt("hint"); setStrOpt("snippet"); setStrOpt("language"); // expected pode ser limpo (QA #10)
       }
       await saveU(me.id, "tracks");
       return json(res, 200, { ok: true });
@@ -809,7 +819,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
 
     // A LIÇÃO (DESIGN-LICAO-UX): envio de um estágio; 'enviado é enviado'; Done automático no final
     if (path === "/api/task/lesson" && req.method === "POST") {
-      const { trackId, taskId, answer, blank, restart, gaps, synthesis } = await readBody(req);
+      const { trackId, taskId, answer, blank, restart, gaps, synthesis, expectedStage } = await readBody(req);
       const track = ud.tracks[trackId];
       if (!track) return json(res, 404, { error: "tema não encontrado" });
       let target = null;
@@ -828,7 +838,9 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         return json(res, 200, { ok: true, stage: 0 });
       }
       if (cur.stage >= maxStages) return json(res, 409, { error: "lição já concluída — use restart pra refazer" });
-      const text = String(answer || "").trim();
+      if (expectedStage !== undefined && Number(expectedStage) !== cur.stage)
+        return json(res, 409, { error: "esta lição avançou em outra aba" }); // QA #6 — o front já trata 409
+      const text = String(answer || "").trim().slice(0, 10000); // teto (QA #11): paste gigante não pode inutilizar o state
       const isFinal = cur.stage === maxStages - 1;
       if (!text && !(blank === true && !isFinal)) {
         return json(res, 400, { error: isFinal ? "a resposta final é a que consolida — escreve com a tua palavra" : "escreve algo, ou toca em 'deu branco' pra seguir" });
@@ -927,7 +939,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         if (body.result !== "pass" && body.result !== "fail") return json(res, 400, { error: "result pass|fail" });
         s.review[taskId] = gradeEntry(rv, body.result, spDay(), track.targetDate);
       } else return json(res, 404, { error: "rota inválida" });
-      if (path === "/api/task/done" || path === "/api/task/review") markActive(ud, me.id); // conta o dia pro streak
+      if ((path === "/api/task/done" && body.done) || path === "/api/task/review") markActive(ud, me.id); // conta o dia pro streak (desmarcar não é estudo)
       await saveU(me.id, "state");
       return json(res, 200, { ok: true });
     }

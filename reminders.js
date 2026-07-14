@@ -42,7 +42,7 @@ const RETORNO = [
 ];
 const PROVA = [
   { s: (v) => `Reta final: ${rev(v.n)} antes da prova — Fixa`, t: (v) => `${rev(v.n)} entre você e a prova.`, b: () => `É a semana em que revisar mais rende — o que você refrescar agora chega vivo no dia. Hoje sem dose: a fila inteira, começando pelas mais frágeis.` },
-  { s: (v) => `Prova em ${v.d} dias — a fila de hoje: ${v.n} — Fixa`, t: (v) => `${v.d} dias. ${v.n} revisões. Dá.`, b: () => `O espaçamento já fez a parte dele; a reta final é garantir que nada esfrie. Vale encarar a fila completa hoje.` },
+  { s: (v) => v.d === 0 ? `A prova é hoje — a fila: ${v.n} — Fixa` : `Prova em ${v.d} ${v.d === 1 ? "dia" : "dias"} — a fila de hoje: ${v.n} — Fixa`, t: (v) => v.d === 0 ? `Hoje. ${v.n} revisões. Dá.` : `${v.d} ${v.d === 1 ? "dia" : "dias"}. ${v.n} revisões. Dá.`, b: () => `O espaçamento já fez a parte dele; a reta final é garantir que nada esfrie. Vale encarar a fila completa hoje.` },
 ];
 
 // ---- copies das cadências reduzidas (§2) ----

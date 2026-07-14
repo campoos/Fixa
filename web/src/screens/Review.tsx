@@ -91,7 +91,7 @@ function EmptyQueue({ ladder }: { ladder: number[] }) {
   );
 }
 
-function SessionDone({ hits, misses, rest, titleRef, onSeeQueue }: { hits: number; misses: number; rest: number; titleRef: RefObject<HTMLParagraphElement | null>; onSeeQueue: () => void }) {
+function SessionDone({ hits, misses, rest, dose, titleRef, onSeeQueue }: { hits: number; misses: number; rest: number; dose: number; titleRef: RefObject<HTMLParagraphElement | null>; onSeeQueue: () => void }) {
   useEffect(() => { localStorage.setItem("fx-hint-ladder", "1"); }, []); // 1ª sessão concluída — o hint da escada já ensinou
   const tiles = [
     { icon: <Check className="h-4 w-4 text-domain" />, value: hits, label: hits === 1 ? "acerto" : "acertos" },
@@ -119,7 +119,7 @@ function SessionDone({ hits, misses, rest, titleRef, onSeeQueue }: { hits: numbe
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
         {rest > 0 && (
-          <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Mais uma dose ({Math.min(12, rest)})</button>
+          <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Mais uma dose ({Math.min(dose, rest)})</button>
         )}
         <button onClick={() => navigate("/")} className={cn(QUIET_BTN, FOCUS)}>Voltar aos temas</button>
         {rest === 0 && <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Ver fila</button>}
@@ -145,6 +145,7 @@ export function Review() {
   const answerRef = useRef<HTMLDivElement>(null);
   const revealRef = useRef<HTMLButtonElement>(null);
   const doneRef = useRef<HTMLParagraphElement>(null);
+  const gradedRef = useRef<Set<string>>(new Set()); // avaliados nesta visita — remontar a fila não os ressuscita (QA #3)
 
   const trackCount = useMemo(() => new Set((data?.due ?? []).map((d) => d.trackId)).size, [data]);
 
@@ -152,7 +153,7 @@ export function Review() {
   // a fila da sessão é a DOSE do plano (FILA-RETORNO §1) — o total continua em data.due
   useEffect(() => {
     if (!data) return;
-    const base = [...(data.session ?? data.due)];
+    const base = [...(data.session ?? data.due)].filter((d) => !gradedRef.current.has(`${d.trackId}:${d.id}`));
     setQueue(mix && trackCount > 1 ? interleave(base) : base);
     setPos(0); setShown(false); setHits(0); setMisses(0);
   }, [data, mix, trackCount]);
@@ -164,6 +165,7 @@ export function Review() {
     setBusy(result);
     try {
       await taskReview(cur.trackId, cur.id, result);
+      gradedRef.current.add(`${cur.trackId}:${cur.id}`);
       window.dispatchEvent(new Event("fx-review-changed")); // badge do header acompanha
       const n = pos + 1;
       const newHits = hits + (result === "pass" ? 1 : 0);
@@ -188,6 +190,7 @@ export function Review() {
       if (!cur) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if ((e.target as HTMLElement)?.closest?.("button,a,select")) return; // Enter/Espaço num botão ativa o botão (QA #4)
       if (!shown && (e.key === " " || e.key === "Enter")) { e.preventDefault(); setShown(true); }
       else if (shown && e.key === "1") { e.preventDefault(); grade("fail"); }
       else if (shown && e.key === "2") { e.preventDefault(); grade("pass"); }
@@ -287,7 +290,7 @@ export function Review() {
       {total === 0 ? (
         <EmptyQueue ladder={ladder} />
       ) : finished ? (
-        <SessionDone hits={hits} misses={misses} rest={data?.rest ?? 0} titleRef={doneRef} onSeeQueue={() => refetch()} />
+        <SessionDone hits={hits} misses={misses} rest={data?.rest ?? 0} dose={data?.dose ?? 12} titleRef={doneRef} onSeeQueue={() => refetch()} />
       ) : cur ? (
         <>
           {/* card de revisão (§4) — min-h segura o pulo entre cards de tamanhos diferentes */}

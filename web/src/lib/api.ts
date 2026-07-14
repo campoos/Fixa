@@ -61,7 +61,7 @@ export interface Story { id: string; title: string; tasks: Task[]; progress: Pro
 export interface Epic { id: string; title: string; goal: string; stories: Story[]; progress: Progress }
 export interface Due { trackId: string; trackTitle?: string; id: string; title: string; sample: Sample; type: "theory" | "practice"; epic: string; story: string; box: number; next: string }
 export interface Track { id: string; title: string; summary: string; icon: string | null; epics: Epic[]; progress: Progress; mastery: number; targetDate: string | null; daysLeft: number | null; dailyGoal: number | null; review: { due: Due[]; ladder: number[] } }
-export interface ReviewList { due: Due[]; ladder: number[]; mode: "normal" | "retorno" | "prova"; session: Due[]; rest: number }
+export interface ReviewList { due: Due[]; ladder: number[]; mode: "normal" | "retorno" | "prova"; session: Due[]; rest: number; dose: number }
 
 // ---- auth ----
 export const getMe = () => api.get<Me>("/api/me");
@@ -119,7 +119,7 @@ export const taskComment = (trackId: string, taskId: string, text: string) => ap
 export const taskCommentDelete = (trackId: string, taskId: string, index: number, at: string) => api.post("/api/task/comment/delete", { trackId, taskId, index, at });
 export const taskReview = (trackId: string, taskId: string, result: "pass" | "fail") => api.post("/api/task/review", { trackId, taskId, result });
 // a Lição: envia um estágio ('enviado é enviado'); blank registra em branco (só intermediário); restart refaz (Done permanece)
-export const lessonSubmit = (trackId: string, taskId: string, p: { answer?: string; blank?: boolean; restart?: boolean; gaps?: string; synthesis?: string }) =>
+export const lessonSubmit = (trackId: string, taskId: string, p: { answer?: string; blank?: boolean; restart?: boolean; gaps?: string; synthesis?: string; expectedStage?: number }) =>
   api.post<{ ok: true; stage: number; done?: boolean; becameDone?: boolean }>("/api/task/lesson", { trackId, taskId, ...p });
 // o Tutor: corrige a jornada completa (409 se incompleta · 402/429 limite · 502 transitório — retry manual)
 export const tutorCorrect = (trackId: string, taskId: string) =>

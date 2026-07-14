@@ -307,6 +307,7 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
     try {
       const r = await lessonSubmit(trackId, taskId, {
         answer: text,
+        expectedStage: stage, // duas abas: o server devolve 409 se a lição avançou (QA #6)
         ...(text ? {} : { blank: true }),
         ...(sendGaps ? { gaps: gapsDraft.trim() } : {}),
         ...(isFinal ? { synthesis: syn } : {}),
