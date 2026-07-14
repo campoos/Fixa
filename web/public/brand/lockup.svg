@@ -1,11 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 91 32" fill="none">
-  <!-- Fixa · lockup horizontal oficial: símbolo (escala 0.84, levemente mais pesado que o texto — hierarquia)
-       + wordmark. Vão símbolo→texto ≈ 11 (0.4× a altura do símbolo). Centros ópticos alinhados (y≈16). -->
-  <g transform="translate(0 2.56) scale(0.84)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 95 32" fill="none">
+  <!-- Fixa · lockup horizontal v2 (DESIGN-LOGO §lockup-v2 — convenções Slack/Spotify):
+       símbolo em escala CHEIA: tinta 26 = 1.06× a altura ascendente→baseline do wordmark (24.5),
+       com overshoot óptico de círculo de 0.75 por lado ("equal size" é sensação, não medida — Slack);
+       centro do símbolo (y 15.25) = ponto médio EXATO ascendente↔baseline do texto;
+       gap 10.5 = o counter do 'a' do wordmark (regra Spotify) ≈ 0.40× a altura do símbolo (o "A" do Slack). -->
+  <g transform="translate(0 -0.75)">
     <path d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="#7C5CFC" stroke-width="4" stroke-linecap="round"/>
     <circle cx="23.78" cy="8.22" r="3.2" fill="#F4B740"/>
   </g>
-  <g transform="translate(30 0.5)">
+  <g transform="translate(34 0)">
     <g stroke="currentColor" stroke-width="3" stroke-linecap="round">
       <path d="M11 26V10A5.5 5.5 0 0 1 16.5 4.5"/>
       <path d="M7 12.5H15.5"/>

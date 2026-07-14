@@ -77,10 +77,10 @@ Letras em `currentColor` (herdam a tinta do contexto — ink escuro no claro, cl
 
 ### 3.d Lockup horizontal (`brand/lockup.svg`) — a marca mista
 
-Símbolo (escala 0.84 → traço efetivo 3.36, deliberadamente um fio mais pesado que o texto:
-hierarquia) + vão de ~11 unidades (0.4× a altura do símbolo) + wordmark, centros ópticos
-alinhados. O ponto âmbar aparece **duas vezes** (no vão do anel e no i) — é a assinatura da
-marca atravessando símbolo e nome; nunca remover um deles.
+> **SUPERSEDED (emenda §8, 14/07):** a proporção 0.84 desta versão deixava o símbolo MENOR
+> que o texto — reprovada pelo dono. A geometria vigente é a do **§8 (lockup-v2)**, baseada
+> em pesquisa de guidelines públicos (Slack/Spotify). O que permanece daqui: o ponto âmbar
+> aparece **duas vezes** (no vão do anel e no i) — assinatura da marca; nunca remover um deles.
 
 ### 3.e Versões
 
@@ -102,8 +102,9 @@ marca atravessando símbolo e nome; nunca remover um deles.
 | Ícone PWA futuro (512px) | `logo.svg` centrado sobre quadrado `#0d0a1a`, símbolo a 60% da largura (padding seguro pra maskable) | quando o manifest existir |
 | E-mails (`email.js` shell) | lockup horizontal como imagem inline futura — fora deste escopo | — |
 
-**Clear space:** mínimo de **¼ da altura do símbolo** em todos os lados (8 unidades no grid
-32) — nada encosta no anel, nem texto nem borda de container.
+**Clear space:** ~~¼~~ → **½ da altura do símbolo** em todos os lados (emenda §8.d, regra
+Spotify); em co-branding, **1 símbolo inteiro** entre as marcas (regra Slack). Nada encosta
+no anel, nem texto nem borda de container.
 **Tamanhos mínimos:** símbolo 14px (abaixo de 20px, usar a variante favicon); lockup 20px de
 altura; wordmark sozinho 12px de altura.
 
@@ -145,3 +146,54 @@ altura; wordmark sozinho 12px de altura.
   arquivo (`#7C5CFC`, `#F4B740`, `currentColor` apenas).
 - [ ] Teste do guardanapo com alguém que nunca viu: descreve "círculo aberto com ponto" e
   desenha de memória.
+
+---
+
+## 8. EMENDA (14/07) — lockup-v2: proporções por convenção de mercado
+
+**Feedback do dono:** símbolo aprovado; o lockup v1 não convenceu ("posicionamento, tamanho
+da logo em relação a texto"). Pedido: pesquisar como marcas famosas fazem e replicar.
+`lockup.svg` foi RECONSTRUÍDO; símbolo e `wordmark.svg` standalone intocados como formas.
+
+### 8.a O que a pesquisa encontrou (fontes)
+
+| Regra | Convenção | Fonte |
+|---|---|---|
+| Tamanho símbolo × texto | "Both logos should feel of equal size" — igualdade **óptica**, não métrica; o octothorpe ocupa a altura ascendente→baseline do logotype | [Slack Brand Guidelines set/2020](https://a.slack-edge.com/4d5bb/marketing/img/media-kit/slack_brand_guidelines_september2020.pdf), pp. 33–35 (páginas lidas) |
+| Gap símbolo↔texto | Slack: distância fixa "A", unidade tirada do próprio desenho (~0.4× o símbolo) · Spotify: **gap = o counter do 'o' do wordmark** | Slack pp. 33–34 · [Spotify Design Guidelines](https://developer.spotify.com/documentation/design) |
+| Alinhamento | Referência é a **baseline óptica do logotype** (Slack p. 35); formas redondas exigem overshoot pra parecerem do mesmo tamanho que formas retas | Slack p. 35 |
+| Clear space | Spotify: **½ altura do ícone** · Slack (co-branding): **1 octothorpe inteiro** | Spotify · Slack p. 35 |
+| Hierarquia ícone/nome | "o ícone pode existir sem o wordmark; o wordmark nunca sem o ícone" | Spotify |
+
+### 8.b Diagnóstico do v1 e a regra adotada
+
+O erro do v1: símbolo a 0.84 → tinta de 21.8 unidades contra 24.5 do wordmark — **o símbolo
+ficava subordinado ao texto**, o inverso da convenção (é o símbolo que carrega a marca e
+existe sozinho). O gap (~11) media contra um símbolo encolhido.
+
+**Regra adotada:** símbolo em tinta = **1.06× a altura ascendente→baseline do wordmark**
+(overshoot óptico de círculo: 0.75 por lado — círculo "do mesmo tamanho" que letra precisa
+vazar); **centro do símbolo cravado no ponto médio exato ascendente↔baseline do texto**;
+**gap = o counter do 'a' do wordmark** (10.5 unidades, regra Spotify) — que converge com o
+"A" do Slack (≈0.40× a altura do símbolo). Duas convenções, o mesmo número.
+
+### 8.c Antes → depois (números do `lockup.svg`)
+
+| Medida | v1 | v2 |
+|---|---|---|
+| Escala do símbolo | 0.84 (tinta 21.8 — MENOR que o texto) | **1.0** (tinta 26 = 1.06× as 24.5 do texto) |
+| Traço efetivo do símbolo | 3.36 | **4** (peso oficial; texto segue 3 — símbolo mais denso, como o octothorpe vs o Hellix do Slack) |
+| Alinhamento vertical | centros "≈" (15.75 vs 16) | centro do símbolo = **15.25 exato** (ponto médio do texto); overshoot simétrico de 0.75 acima e abaixo |
+| Gap símbolo→texto | ~11, medido irregular | **10.5 = counter do 'a'**, tinta a tinta (x 29 → 39.5) |
+| viewBox | 0 0 91 32 | **0 0 95 32** |
+| Wordmark no lockup | idêntico ao standalone | **idêntico ao standalone** — na proporção nova, o traço 3 casou opticamente com o símbolo em 4; nenhum ajuste de peso foi necessário |
+
+### 8.d Ajustes decorrentes no sistema
+
+- **Clear space** (§4 já corrigido): ½ altura do símbolo em todos os lados; 1 símbolo inteiro
+  em co-branding.
+- Lei herdada da Spotify: **o wordmark nunca aparece sem o símbolo** em material oficial novo;
+  o inverso é permitido (o símbolo vive sozinho no favicon e no app).
+- Checklist adicional: [ ] no lockup renderizado, o anel vaza 0.75 acima do topo do "f" e
+  0.75 abaixo da baseline (o overshoot é visível com régua, invisível a olho — se "parecer"
+  maior que o texto, está errado; deve parecer IGUAL).
