@@ -771,16 +771,17 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       const { trackId, taskId } = await readBody(req);
       const track = ud.tracks[trackId];
       if (!track) return json(res, 404, { error: "tema não encontrado" });
-      let removed = false;
+      // valida ANTES de mutar (QA #1): mutar e depois falhar corrompia o cache — e o KV na próxima escrita
+      const ids = taskIdsOf(track);
+      if (!ids.has(taskId)) return json(res, 404, { error: "task não encontrada" });
+      if (ids.size === 1) return json(res, 400, { error: "não dá pra remover a última task do tema — exclua o tema" });
       for (const e of track.epics) for (const st of e.stories) {
         const i = st.tasks.findIndex((t) => t.id === taskId);
-        if (i >= 0) { st.tasks.splice(i, 1); removed = true; }
+        if (i >= 0) st.tasks.splice(i, 1);
       }
-      if (!removed) return json(res, 404, { error: "task não encontrada" });
       // poda stories/epics vazios
       for (const e of track.epics) e.stories = e.stories.filter((st) => st.tasks.length);
       track.epics = track.epics.filter((e) => e.stories.length);
-      if (!track.epics.length) return json(res, 400, { error: "não dá pra remover a última task do tema — exclua o tema" });
       const s = tState(ud, trackId);
       delete s.done[taskId]; delete s.comments[taskId]; delete s.review[taskId];
       await Promise.all([saveU(me.id, "tracks"), saveU(me.id, "state")]);

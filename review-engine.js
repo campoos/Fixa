@@ -19,21 +19,23 @@ export function daysBetween(a, b) {
   return Math.round((p(b) - p(a)) / 86400000);
 }
 export const isGraduated = (rv) => rv.box >= REVIEW_LADDER.length;
-// agenda adaptativa: nenhuma revisão cai DEPOIS da data da prova
-export const clampNext = (next, targetDate) => (targetDate && next && next > targetDate ? targetDate : next);
+// agenda adaptativa: nenhuma revisão cai DEPOIS da data da prova.
+// Prova no passado é ignorada (QA #2): clampar pra trás deixava a fila mentirosa e infinita.
+export const clampNext = (next, targetDate, today = spDay()) =>
+  (targetDate && targetDate > today && next && next > targetDate ? targetDate : next);
 
 // nova entrada na fila (task recém-concluída): caixa 0, revisa amanhã (ou na prova, se antes)
 export function seedEntry(fromDay, targetDate) {
   const day = fromDay || spDay();
-  return { box: 0, last: day, next: clampNext(addDays(day, REVIEW_LADDER[0]), targetDate) };
+  return { box: 0, last: day, next: clampNext(addDays(day, REVIEW_LADDER[0]), targetDate, day) };
 }
 // avalia uma revisão: pass sobe caixa (gradua no topo), fail volta pra caixa 0 (amanhã)
 export function gradeEntry(rv, result, today, targetDate) {
   const day = today || spDay();
-  if (result === "fail") return { box: 0, last: day, next: clampNext(addDays(day, REVIEW_LADDER[0]), targetDate) };
+  if (result === "fail") return { box: 0, last: day, next: clampNext(addDays(day, REVIEW_LADDER[0]), targetDate, day) };
   const nb = rv.box + 1;
   if (nb >= REVIEW_LADDER.length) return { box: REVIEW_LADDER.length, last: day, next: null }; // graduou
-  return { box: nb, last: day, next: clampNext(addDays(day, REVIEW_LADDER[nb]), targetDate) };
+  return { box: nb, last: day, next: clampNext(addDays(day, REVIEW_LADDER[nb]), targetDate, day) };
 }
 
 // anti-burnout (DESIGN-FILA-RETORNO): a sessão do dia. Dose fixa quando há backlog;
