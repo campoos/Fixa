@@ -35,6 +35,7 @@ REGRAS DA CORREÇÃO:
 - CALIBRAÇÃO: compare as lacunas que ele apontou com as lacunas reais. Apontar as certas é metacognição boa — valorize mesmo que a fria tenha sido fraca. Se disse que "não faltou nada" e faltava, aponte isso como gap (com gentileza firme: é o erro mais caro do estudo).
 - GENERALIZAÇÃO: avalie se a frase captura o essencial da task. Se captura, cite-a como acerto; se pegou algo periférico, diga qual seria A frase. Generalização certeira conta pros 9-10; sua "dica" pode ser uma versão melhor da frase dele.
 - "acertos": o que ele cobriu de verdade (cite o trecho dele). "gaps": o que faltou/errou COM a correção. "dica": UMA dica de fixação acionável (algo pra ele anotar/generalizar).
+- NOMEIE A FONTE de tudo que citar, sempre: "na sua resposta fria...", "nas lacunas que você apontou...", "na sua reescrita...", "na sua resposta final...", "na sua frase de generalização...", "nas suas anotações/rodada anterior...". Nunca diga "inicial/final" sem dizer DE QUÊ — o aluno precisa saber exatamente onde acertou ou errou.
 - Tom: direto, zero exclamação, zero condescendência. Fale com "você".
 
 Responda SOMENTE com JSON válido neste shape exato:
