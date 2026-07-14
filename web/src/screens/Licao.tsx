@@ -290,6 +290,7 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
     if (valve) setGapsDraft("");
     setGapsDone(true);
     setActed(true);
+    if (!draft.trim()) setDraft(answers[0] ?? ""); // reescrita nasce da FRIA (nunca das lacunas)
     setLive("lacunas registradas — agora reescreve completa");
     requestAnimationFrame(() => taRef.current?.focus());
   };
@@ -637,6 +638,7 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
               {conflict && <div className="mb-2 rounded-lg border border-recall/40 bg-recall/10 p-2.5 text-xs text-recall">esta lição avançou em outra aba — atualizei aqui</div>}
               <p className="mb-2 text-[13px] leading-snug text-muted-foreground">{meta.label}</p>
               <textarea
+                key={inGaps ? "gaps" : `answer-${stage}`} // elementos distintos por momento: evento atrasado de IME não vaza entre campos
                 ref={taRef}
                 value={inGaps ? gapsDraft : draft}
                 onChange={(e) => (inGaps ? setGapsDraft(e.target.value) : setDraft(e.target.value))}
