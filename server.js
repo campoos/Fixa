@@ -7,6 +7,7 @@ import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
 import { buildTutorPrompt } from "./prompt-tutor.js";
 import { REVIEW_LADDER, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry, planSession } from "./review-engine.js";
+import { buildReminder, reminderCadence, daysInactive } from "./reminders.js";
 import { emailEnabled, sendEmail, emailShell, emailButton } from "./email.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -325,7 +326,7 @@ function globalReview(ud) {
     if (left >= 0 && (minDaysLeft === null || left < minDaysLeft)) minDaysLeft = left;
   }
   const plan = planSession(due, today, minDaysLeft);
-  return { due, ladder: REVIEW_LADDER, mode: plan.mode, session: plan.session, rest: plan.rest };
+  return { due, ladder: REVIEW_LADDER, mode: plan.mode, session: plan.session, rest: plan.rest, daysLeft: minDaysLeft };
 }
 
 // ---- sessão (cookie assinado; payload = id do usuário) ----
@@ -493,18 +494,17 @@ ${emailButton(link, "Criar nova senha")}
         const due = gr.due.length;
         if (!due) continue;
         const offLink = `${BASE_URL}/api/reminders/off?u=${u.id}&sig=${signUid(u.id)}`;
-        // modos do plano (DESIGN-FILA-RETORNO §5): retorno lidera com a dose; prova lidera com a fila inteira
-        const subject = gr.mode === "retorno"
-          ? `Sua dose de hoje: ${gr.session.length} revisões — Fixa`
-          : gr.mode === "prova"
-            ? `Reta final: ${due} revisões antes da prova — Fixa`
-            : `${due} ${due === 1 ? "revisão te espera" : "revisões te esperam"} hoje — Fixa`;
-        const title = gr.mode === "retorno" ? `${gr.session.length} revisões — a dose de hoje.` : `${due} ${due === 1 ? "revisão" : "revisões"} no ponto certo.`;
-        const bodyP = gr.mode === "retorno"
-          ? `A fila cresceu enquanto você esteve fora — acontece, e ela não cobra juros. A Fixa separou as ${gr.session.length} mais frágeis pra hoje; as outras ${gr.rest} vão em doses, no seu ritmo. Leva poucos minutos.`
-          : gr.mode === "prova"
-            ? `Essas tasks voltaram hoje porque é agora que revisar rende mais — pouco antes de o cérebro soltar. Prova chegando — vale encarar a fila inteira.`
-            : `Essas tasks voltaram hoje porque é agora que revisar rende mais — pouco antes de o cérebro soltar. Leva poucos minutos, e o dia conta pra sua consistência.`;
+        // Lembretes v2 (DESIGN-LEMBRETES-V2): cadência derivada da atividade (smart pause honesto)
+        // + pool com rotação determinística por (usuário, dia); streak só quando vivo
+        const inactive = daysInactive(ud, u.createdAt);
+        const cadence = reminderCadence(inactive);
+        if (cadence === "silent") { skipped++; continue; }
+        const m = buildReminder({
+          cadence, mode: gr.mode, n: due, dose: gr.session.length, rest: gr.rest,
+          daysLeft: gr.daysLeft, streak: computeStreak(ud), userId: u.id, ymd: spDay(),
+        });
+        if (!m) { skipped++; continue; }
+        const { subject, title, bodyP } = m;
         const r = await sendEmail({
           to: u.email,
           subject,
