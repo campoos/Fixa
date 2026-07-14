@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { ChevronRight, Eye, EyeOff, PenLine, RotateCcw } from "lucide-react";
+import { ChevronRight, Download, Eye, EyeOff, LogOut, PenLine, RotateCcw } from "lucide-react";
+import type { Me } from "@/lib/api";
+import { QUIET_BTN } from "@/lib/lesson";
 import { FOCUS } from "@/App";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -146,7 +148,7 @@ function FaqItem({ q, a }: Faq) {
   );
 }
 
-export function Ajuda() {
+export function Ajuda({ me, onLogout }: { me: Me; onLogout: () => void }) {
   return (
     <div className="space-y-8">
       <div>
@@ -208,6 +210,19 @@ export function Ajuda() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* a casa da conta (DESCOBRIBILIDADE §2): as ações com PALAVRA — o ícone do header vira atalho */}
+      <section className="mt-10">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">sua conta</h2>
+        <Card className="mt-3 gap-0 p-4">
+          <p className="text-sm">logado como <span className="font-medium">{me.email}</span></p>
+          <div className="mt-3 flex flex-wrap items-center gap-2.5">
+            <a href="/api/export" download className={cn(QUIET_BTN, FOCUS)}><Download className="h-4 w-4" /> exportar meus dados</a>
+            <button onClick={onLogout} className={cn(QUIET_BTN, FOCUS)}><LogOut className="h-4 w-4" /> sair da conta</button>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground/70">o export baixa um JSON com todos os seus temas, respostas e progresso — seus dados são seus, sempre.</p>
+        </Card>
       </section>
     </div>
   );

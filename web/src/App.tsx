@@ -135,7 +135,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
         {(route.name === "home" || route.name === "redefinir") && <Home />}
         {route.name === "novo" && <NewTheme />}
         {route.name === "revisar" && <Review />}
-        {route.name === "ajuda" && <Ajuda />}
+        {route.name === "ajuda" && <Ajuda me={me} onLogout={onLogout} />}
         {route.name === "pro" && <Pro me={me} />}
         {route.name === "track" && <Track id={route.id} me={me} />}
         {route.name === "licao" && <Licao key={`${route.trackId}/${route.taskId}`} trackId={route.trackId} taskId={route.taskId} />}

@@ -92,6 +92,7 @@ function EmptyQueue({ ladder }: { ladder: number[] }) {
 }
 
 function SessionDone({ hits, misses, rest, titleRef, onSeeQueue }: { hits: number; misses: number; rest: number; titleRef: RefObject<HTMLParagraphElement | null>; onSeeQueue: () => void }) {
+  useEffect(() => { localStorage.setItem("fx-hint-ladder", "1"); }, []); // 1ª sessão concluída — o hint da escada já ensinou
   const tiles = [
     { icon: <Check className="h-4 w-4 text-domain" />, value: hits, label: hits === 1 ? "acerto" : "acertos" },
     { icon: <RotateCcw className="h-4 w-4 text-recall" />, value: misses, label: misses === 1 ? "erro" : "erros" },
@@ -354,6 +355,10 @@ export function Review() {
 
           {/* hint de atalhos (§4.f) — desktop only; no mobile o método já mora no slot oculto */}
           <p className="mt-3 hidden text-center font-mono text-[11px] text-muted-foreground/70 sm:block">espaço revela · 1 errei · 2 acertei</p>
+          {/* hint de primeira sessão (DESCOBRIBILIDADE §3): ensina a escada UMA vez, depois some pra sempre */}
+          {!localStorage.getItem("fx-hint-ladder") && (
+            <p className="mt-3 text-center font-mono text-[11px] text-muted-foreground/70">a escada âmbar é a caixa da task — acertou sobe (espaça mais), errou volta pra 1</p>
+          )}
         </>
       ) : null}
     </div>

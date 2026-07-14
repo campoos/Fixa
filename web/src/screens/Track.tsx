@@ -24,7 +24,12 @@ function Bar({ p, className }: { p: Progress; className?: string }) {
 }
 function DoneBox({ done, busy, onToggle }: { done: boolean; busy: boolean; onToggle: () => void }) {
   return (
-    <button onClick={(e) => { e.stopPropagation(); onToggle(); }} disabled={busy} className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md border transition disabled:opacity-50", done ? "border-domain bg-domain text-domain-foreground" : "border-border hover:bg-accent", FOCUS)}>
+    <button
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      disabled={busy}
+      title={done ? "reabrir a task" : "concluir sem estudar — a Lição registra a jornada"}
+      aria-label={done ? "reabrir a task" : "concluir sem estudar — a Lição registra a jornada"}
+      className={cn("relative grid h-7 w-7 shrink-0 place-items-center rounded-md border transition disabled:opacity-50 before:absolute before:-inset-1.5 before:content-['']", done ? "border-domain bg-domain text-domain-foreground" : "border-border hover:bg-accent", FOCUS)}>
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : done && <Check className="h-4 w-4" />}
     </button>
   );
@@ -60,7 +65,7 @@ function Comments({ list, meName, onAdd, onDelete }: { list: Comment[]; meName: 
 
 /* peek de leitura da task (DESIGN-LICAO-UX §1.3 / UI §7.b): só objetivo, estado da lição + CTA e anotações.
    Conteúdo pedagógico (questão, pontos-chave, resposta) mora SÓ na Lição — mostrar aqui é regressão. */
-function TaskPeek({ task, meName, onStudy, onCorrection, onComment, onDeleteComment }: { task: Task; meName: string; onStudy: () => void; onCorrection: () => void; onComment: (t: string) => Promise<void>; onDeleteComment: (i: number, at: string) => Promise<void> }) {
+function TaskPeek({ task, meName, onStudy, onCorrection, onEdit, onComment, onDeleteComment }: { task: Task; meName: string; onStudy: () => void; onCorrection: () => void; onEdit: () => void; onComment: (t: string) => Promise<void>; onDeleteComment: (i: number, at: string) => Promise<void> }) {
   const total = lessonStages(task);
   const stage = task.lesson?.stage ?? 0;
   const inProgress = stage > 0 && stage < total;
@@ -68,7 +73,10 @@ function TaskPeek({ task, meName, onStudy, onCorrection, onComment, onDeleteComm
   const concludedAt = task.completedAt ?? task.lesson?.updatedAt ?? null;
   return (
     <div className="space-y-3 border-t border-border px-3 py-3">
-      <Section title="Objetivo"><p className="text-sm leading-relaxed">{task.objective}</p></Section>
+      <div className="flex items-start justify-between gap-3">
+        <Section title="Objetivo"><p className="text-sm leading-relaxed">{task.objective}</p></Section>
+        <button onClick={onEdit} className={cn("shrink-0 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline", FOCUS)}>editar conteúdo</button>
+      </div>
       {/* estado da lição + CTA contextual — mesmo destino da row, redundância intencional */}
       <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -77,7 +85,7 @@ function TaskPeek({ task, meName, onStudy, onCorrection, onComment, onDeleteComm
             <span>você parou no passo <span className="font-mono tabular-nums">{stage + 1}</span> de <span className="font-mono tabular-nums">{total}</span>{task.lesson?.updatedAt && <> · {timeAgo(task.lesson.updatedAt)}</>}</span>
           ) : concluded ? (
             <>
-              <span>concluída{concludedAt && <> em <span className="font-mono tabular-nums">{shortDate(concludedAt)}</span></>}</span>
+              <span>{stage >= total ? "concluída" : "concluída sem registro de estudo"}{concludedAt && <> em <span className="font-mono tabular-nums">{shortDate(concludedAt)}</span></>}</span>
               {task.tutor && (
                 <>
                   <span aria-hidden="true">·</span>
@@ -165,11 +173,20 @@ export function TaskEditor({ trackId, task, onDone, onChanged }: { trackId: stri
   );
 }
 
-function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: Task; meName: string; onChanged: () => void }) {
-  const [open, setOpen] = useState(false);
+function TaskRow({ trackId, task, meName, defaultOpen = false, onChanged }: { trackId: string; task: Task; meName: string; defaultOpen?: boolean; onChanged: () => void }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const toggleDone = async () => { setBusy(true); try { await taskDone(trackId, task.id, !task.done); onChanged(); } finally { setBusy(false); } };
+  const [announce, setAnnounce] = useState("");
+  const toggleDone = async () => {
+    setBusy(true);
+    try {
+      await taskDone(trackId, task.id, !task.done);
+      const total = lessonStages(task);
+      if (!task.done && (task.lesson?.stage ?? 0) < total) setAnnounce("concluída sem registro de estudo");
+      onChanged();
+    } finally { setBusy(false); }
+  };
   const addC = async (t: string) => { await taskComment(trackId, task.id, t); onChanged(); };
   const delC = async (i: number, at: string) => { await taskCommentDelete(trackId, task.id, i, at); onChanged(); };
   // a row inteira é o convite pra Lição (UX §1.3): tocar no título ABRE a Lição; o chevron só espia
@@ -180,8 +197,9 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
   return (
     <div className="rounded-lg border border-border bg-card">
       <div className="flex items-center gap-2 p-2.5">
+        <span aria-live="polite" className="sr-only">{announce}</span>
         <DoneBox done={task.done} busy={busy} onToggle={toggleDone} />
-        <button onClick={goLesson} title="abrir a lição" className={`flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left ${FOCUS}`}>
+        <button onClick={goLesson} title="abrir a lição" className={`-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 text-left transition-colors hover:bg-accent/60 ${FOCUS}`}>
           <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{task.id}</span>
           {task.type === "practice" && <span className="shrink-0" title="prática"><FlaskConical className="h-3.5 w-3.5 text-muted-foreground" aria-label="prática" /></span>}
           <span className={cn("min-w-0 flex-1 truncate text-sm", task.done && "text-muted-foreground line-through")}>{task.title}</span>
@@ -199,23 +217,18 @@ function TaskRow({ trackId, task, meName, onChanged }: { trackId: string; task: 
           )}
           {task.review?.graduated && <span className="shrink-0 text-domain" title="dominada"><GraduationCap className="h-3.5 w-3.5" aria-label="dominada" /></span>}
         </button>
-        {open && (
-          <button onClick={() => setEditing(!editing)} aria-label="editar task" title={editing ? "fechar edição" : "editar task"} className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-accent", editing && "border-primary text-primary", FOCUS)}>
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <button onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "fechar detalhes" : "ver detalhes"} title={open ? "fechar detalhes" : "ver detalhes"} className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground", FOCUS)}>
+        <button onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "fechar detalhes" : "ver detalhes"} title={open ? "fechar detalhes" : "ver detalhes"} className={cn("relative grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition-colors before:absolute before:-inset-1.5 before:content-[''] hover:bg-accent hover:text-foreground", FOCUS)}>
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>
       </div>
       {open && (editing
         ? <TaskEditor trackId={trackId} task={task} onDone={() => setEditing(false)} onChanged={onChanged} />
-        : <TaskPeek task={task} meName={meName} onStudy={goLesson} onCorrection={() => navigate(`/t/${encodeURIComponent(trackId)}/l/${encodeURIComponent(task.id)}?correcao=1`)} onComment={addC} onDeleteComment={delC} />)}
+        : <TaskPeek task={task} meName={meName} onStudy={goLesson} onEdit={() => setEditing(true)} onCorrection={() => navigate(`/t/${encodeURIComponent(trackId)}/l/${encodeURIComponent(task.id)}?correcao=1`)} onComment={addC} onDeleteComment={delC} />)}
     </div>
   );
 }
 
-function StoryBlock({ trackId, story, meName, defaultOpen, onChanged }: { trackId: string; story: Story; meName: string; defaultOpen: boolean; onChanged: () => void }) {
+function StoryBlock({ trackId, story, meName, defaultOpen, openTaskId, onChanged }: { trackId: string; story: Story; meName: string; defaultOpen: boolean; openTaskId?: string; onChanged: () => void }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="rounded-lg border border-border bg-muted/30">
@@ -228,12 +241,12 @@ function StoryBlock({ trackId, story, meName, defaultOpen, onChanged }: { trackI
         <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{story.progress.done}/{story.progress.total}</span>
         {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" />}
       </button>
-      {open && <div className="space-y-2 px-1.5 pb-1.5 sm:px-2 sm:pb-2">{story.tasks.map((t) => <TaskRow key={t.id} trackId={trackId} task={t} meName={meName} onChanged={onChanged} />)}</div>}
+      {open && <div className="space-y-2 px-1.5 pb-1.5 sm:px-2 sm:pb-2">{story.tasks.map((t) => <TaskRow key={t.id} trackId={trackId} task={t} meName={meName} defaultOpen={t.id === openTaskId} onChanged={onChanged} />)}</div>}
     </div>
   );
 }
 
-function EpicCard({ trackId, epic, meName, defaultOpen, openStoryId, onChanged }: { trackId: string; epic: Epic; meName: string; defaultOpen: boolean; openStoryId?: string; onChanged: () => void }) {
+function EpicCard({ trackId, epic, meName, defaultOpen, openStoryId, openTaskId, onChanged }: { trackId: string; epic: Epic; meName: string; defaultOpen: boolean; openStoryId?: string; openTaskId?: string; onChanged: () => void }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Card className="overflow-hidden p-0">
@@ -252,7 +265,7 @@ function EpicCard({ trackId, epic, meName, defaultOpen, openStoryId, onChanged }
           <Bar p={epic.progress} className="mt-1.5" />
         </div>
       </button>
-      {open && <div className="space-y-2 border-t border-border bg-background/40 p-2 sm:p-3">{epic.stories.map((s) => <StoryBlock key={s.id} trackId={trackId} story={s} meName={meName} defaultOpen={s.id === openStoryId} onChanged={onChanged} />)}</div>}
+      {open && <div className="space-y-2 border-t border-border bg-background/40 p-2 sm:p-3">{epic.stories.map((s) => <StoryBlock key={s.id} trackId={trackId} story={s} meName={meName} defaultOpen={s.id === openStoryId} openTaskId={s.id === openStoryId ? openTaskId : undefined} onChanged={onChanged} />)}</div>}
     </Card>
   );
 }
@@ -421,12 +434,12 @@ export function Track({ id, me }: { id: string; me: Me }) {
             aria-haspopup="dialog"
             aria-label="escolher ícone do tema"
             title="escolher ícone do tema"
-            className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-colors hover:bg-primary/15", FOCUS)}
+            className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-all hover:bg-primary/15 hover:ring-2 hover:ring-primary/30", FOCUS)}
           >
             <TrackIcon name={data.icon} className="h-5 w-5" />
           </button>
           <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{data.title}</h1>
-          <button onClick={() => setRenaming(!renaming)} title="renomear tema" className={`grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-accent ${FOCUS}`}>
+          <button onClick={() => setRenaming(!renaming)} title="renomear tema" aria-label="renomear tema" className={`grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-accent ${FOCUS}`}>
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <span className="font-mono text-sm text-muted-foreground tabular-nums">{data.progress.done}/{data.progress.total} · {pct(data.progress)}%</span>
@@ -442,7 +455,7 @@ export function Track({ id, me }: { id: string; me: Me }) {
         <TargetControl track={data} onChange={changed} />
       </Card>
       {data.epics.map((e) => (
-        <EpicCard key={e.id} trackId={id} epic={e} meName={me.name} defaultOpen={e.id === firstPending?.e} openStoryId={e.id === firstPending?.e ? firstPending?.s : undefined} onChanged={changed} />
+        <EpicCard key={e.id} trackId={id} epic={e} meName={me.name} defaultOpen={e.id === firstPending?.e} openStoryId={e.id === firstPending?.e ? firstPending?.s : undefined} openTaskId={e.id === firstPending?.e ? firstPending?.t.id : undefined} onChanged={changed} />
       ))}
       <AppendBlock trackId={id} onChanged={changed} />
       {picking && <IconPicker track={data} onChanged={changed} onClose={closePicker} />}
