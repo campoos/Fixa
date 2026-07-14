@@ -23,8 +23,8 @@ const LABEL = "mb-1.5 block text-[13px] font-medium";
 export function Logo({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <path d="M16 3a13 13 0 1 0 11.5 7" stroke="var(--primary)" strokeWidth="3.4" strokeLinecap="round" />
-      <circle cx="27" cy="6.5" r="3.6" fill="#f4b740" />
+      <path d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round" />
+      <circle cx="23.78" cy="8.22" r="3.2" fill="#F4B740" />
     </svg>
   );
 }

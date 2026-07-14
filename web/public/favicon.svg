@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <path d="M16 3a13 13 0 1 0 11.5 7" stroke="#7c5cfc" stroke-width="3.6" stroke-linecap="round"/>
-  <circle cx="27" cy="6.5" r="4" fill="#f4b740"/>
+  <!-- Fixa · favicon (otimizado 16–32px): mesmo símbolo, mais denso — anel 270°, traço 5, ponto r 4. -->
+  <path d="M26.5 16A10.5 10.5 0 1 1 16 5.5" stroke="#7C5CFC" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="23.42" cy="8.58" r="4" fill="#F4B740"/>
 </svg>
