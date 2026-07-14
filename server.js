@@ -102,6 +102,15 @@ const kv = {
     try { return JSON.parse(await readFile(KV_FILE, "utf8"))[key] ?? null; } catch { return null; }
   },
   _writeQ: Promise.resolve(),
+  async incr(key) {
+    if (UPSTASH_URL) { await this._cmd(["INCR", key]); return; }
+    const run = async () => {
+      let all = {}; try { all = JSON.parse(await readFile(KV_FILE, "utf8")); } catch { /* primeiro */ }
+      all[key] = (all[key] || 0) + 1; await writeFile(KV_FILE, JSON.stringify(all, null, 2));
+    };
+    this._writeQ = this._writeQ.then(run, run);
+    return this._writeQ;
+  },
   async set(key, val) {
     if (UPSTASH_URL) { await this._cmd(["SET", key, JSON.stringify(val)]); return; }
     // serializa TODAS as escritas de arquivo (evita read-modify-write concorrente corromper o kv-store.json)
@@ -359,6 +368,8 @@ const readBody = (req) => new Promise((res) => { let b = ""; req.on("data", (c) 
 
 // ---- estático (SPA + landing pública na raiz) ----
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2" };
+// utm_source saneado pra chave de contador ([a-z0-9-], máx 24)
+const cleanSrc = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24);
 async function serveStatic(url, res, authed) {
   let p = normalize(url.pathname).replace(/^(\.\.[/\\])+/, "");
   // visitante deslogado na raiz vê a landing; logado cai no app
@@ -366,11 +377,26 @@ async function serveStatic(url, res, authed) {
   let file = join(DIST, p === "/" ? "index.html" : p);
   if (!file.startsWith(DIST)) file = join(DIST, "index.html");
   try {
-    const data = await readFile(file);
-    res.writeHead(200, { "Content-Type": MIME[extname(file)] || "application/octet-stream" });
+    let data = await readFile(file);
+    const ext = extname(file);
+    // cache na edge (LAUNCH §5): assets hasheados e marca são imutáveis; HTML nunca cacheia
+    const cache = p.startsWith("/assets/") || p.startsWith("/brand/") || p === "/apple-touch-icon.png"
+      ? "public, max-age=31536000, immutable"
+      : ext === ".html" || p === "/" ? "no-cache" : "public, max-age=3600";
+    if (file.endsWith("fixa.html")) {
+      // landing: og:url/canonical nascem certos pra qualquer domínio (LAUNCH §1) + funil (§2)
+      data = data.toString("utf8").replaceAll("__BASE_URL__", BASE_URL);
+      const src = cleanSrc(url.searchParams.get("utm_source"));
+      const day = spDay();
+      kv.incr(`lp:${day}`).catch(() => {});
+      if (src) kv.incr(`lp:${day}:src:${src}`).catch(() => {});
+    }
+    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream", "Cache-Control": cache });
     return res.end(data);
   } catch {
-    try { const html = await readFile(join(DIST, "index.html")); res.writeHead(200, { "Content-Type": "text/html" }); return res.end(html); }
+    // arquivo com extensão inexistente = 404 de verdade (LAUNCH §6); rota de app cai no SPA
+    if (extname(p)) { res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("404"); }
+    try { const html = await readFile(join(DIST, "index.html")); res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" }); return res.end(html); }
     catch { res.writeHead(404); return res.end("build ausente — rode: cd web && npm run build"); }
   }
 }
@@ -381,17 +407,37 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const path = url.pathname;
+    if (path === "/robots.txt") {
+      res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "public, max-age=3600" });
+      return res.end(`User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${BASE_URL}/sitemap.xml\n`);
+    }
+    if (path === "/sitemap.xml") {
+      res.writeHead(200, { "Content-Type": "application/xml", "Cache-Control": "public, max-age=3600" });
+      return res.end(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE_URL}/</loc></url></urlset>\n`);
+    }
     if (!path.startsWith("/api/")) return serveStatic(url, res, Boolean(sessionUser(req)));
 
     if (path === "/api/health") return json(res, 200, { ok: true });
+    // beacon do funil (LAUNCH §2): contadores agregados por dia, sem cookie/UA/IP — LGPD-friendly
+    if (path === "/api/e" && req.method === "POST") {
+      const n = cleanSrc(url.searchParams.get("n"));
+      const src = cleanSrc(url.searchParams.get("src"));
+      if (n === "cta") { const day = spDay(); kv.incr(`cta:${day}`).catch(() => {}); if (src) kv.incr(`cta:${day}:src:${src}`).catch(() => {}); }
+      res.writeHead(204); return res.end();
+    }
     if (path === "/api/signup" && req.method === "POST") {
-      const { name, email, pass } = await readBody(req);
+      const { name, email, pass, src } = await readBody(req);
       const em = String(email || "").trim().toLowerCase();
       if (!String(name || "").trim()) return json(res, 400, { error: "nome obrigatório" });
       if (!validEmail(em)) return json(res, 400, { error: "e-mail inválido" });
       if (String(pass || "").length < 6) return json(res, 400, { error: "senha precisa de 6+ caracteres" });
       if (users[em]) return json(res, 409, { error: "já existe conta com esse e-mail — faça login" });
       const u = await createUser(em, String(name).trim(), pass, "free");
+      const source = cleanSrc(src);
+      if (source) { u.src = source; saveUsers(); } // atribuição de canal (LAUNCH §2 / CPO #3)
+      const day = spDay();
+      kv.incr(`signup:${day}`).catch(() => {});
+      if (source) kv.incr(`signup:${day}:src:${source}`).catch(() => {});
       return setSession(res, 200, u.id, { name: u.name, email: u.email, plan: u.plan });
     }
     if (path === "/api/login" && req.method === "POST") {
@@ -710,6 +756,26 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         freeLimit: { atLimit: free.filter((r) => r.themes >= FREE_THEME_LIMIT).length, of: free.length },
         rows: rows.sort((a, b) => (a.signup < b.signup ? 1 : -1)),
       });
+    }
+    // funil da landing (founder-only, LAUNCH §2): visitas → cliques de CTA → signups, por dia e por canal
+    if (path === "/api/admin/funnel") {
+      if (me.email !== FOUNDER_EMAIL) return json(res, 403, { error: "só o fundador" });
+      const today = spDay();
+      const SRCS = [...new Set([...Object.values(users).map((u) => u.src).filter(Boolean), "linkedin", "reddit", "telegram", "twitter", "devto", "tabnews"])];
+      const days = [];
+      for (let i = 13; i >= 0; i--) {
+        const day = addDays(today, -i);
+        const [lp, cta, signup] = await Promise.all([kv.get(`lp:${day}`), kv.get(`cta:${day}`), kv.get(`signup:${day}`)]);
+        const bySrc = {};
+        for (const src of SRCS) {
+          const [l, c, g] = await Promise.all([kv.get(`lp:${day}:src:${src}`), kv.get(`cta:${day}:src:${src}`), kv.get(`signup:${day}:src:${src}`)]);
+          if (l || c || g) bySrc[src] = { lp: l || 0, cta: c || 0, signup: g || 0 };
+        }
+        days.push({ day, lp: lp || 0, cta: cta || 0, signup: signup || 0, bySrc });
+      }
+      const signupsBySrc = {};
+      for (const u of Object.values(users)) if (u.src) signupsBySrc[u.src] = (signupsBySrc[u.src] || 0) + 1;
+      return json(res, 200, { at: new Date().toISOString(), days, signupsBySrc });
     }
     // export completo dos dados do usuário (a promessa "seus dados são exportáveis, sempre")
     if (path === "/api/export") {

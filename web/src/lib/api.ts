@@ -66,7 +66,12 @@ export interface ReviewList { due: Due[]; ladder: number[]; mode: "normal" | "re
 // ---- auth ----
 export const getMe = () => api.get<Me>("/api/me");
 export const login = (email: string, pass: string) => api.post<Me>("/api/login", { email, pass });
-export const signup = (name: string, email: string, pass: string) => api.post<Me>("/api/signup", { name, email, pass });
+// src = canal de origem guardado pela landing (funil first-party)
+export const signup = (name: string, email: string, pass: string) => {
+  let src = "";
+  try { src = localStorage.getItem("fx-src") || ""; } catch { /* sem storage */ }
+  return api.post<Me>("/api/signup", { name, email, pass, ...(src ? { src } : {}) });
+};
 export const logout = () => api.post("/api/logout");
 export const forgotPass = (email: string) => api.post<{ ok: true }>("/api/forgot", { email });
 export const resetPass = (token: string, pass: string) => api.post<Me>("/api/reset", { token, pass });

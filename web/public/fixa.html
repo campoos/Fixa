@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Recall ativo e revisão espaçada pra quem tem prova com data. Nasceu na certificação do Claude (Anthropic): do zero ao escopo da prova em 1,5 semana. Grátis."><title>Fixa — estude pra certificação de um jeito que fixa</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"></head><body>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Recall ativo e revisão espaçada pra quem tem prova com data. Nasceu na certificação do Claude (Anthropic): do zero ao escopo da prova em 1,5 semana. Grátis."><title>Fixa — estude pra certificação de um jeito que fixa</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="canonical" href="__BASE_URL__/"><meta property="og:type" content="website"><meta property="og:locale" content="pt_BR"><meta property="og:site_name" content="Fixa"><meta property="og:title" content="Fixa — estude pra certificação de um jeito que fixa"><meta property="og:description" content="Recall ativo e revisão espaçada pra quem tem prova com data. Nasceu na certificação do Claude (Anthropic): do zero ao escopo da prova em 1,5 semana. Grátis."><meta property="og:url" content="__BASE_URL__/"><meta property="og:image" content="__BASE_URL__/brand/og-image.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="__BASE_URL__/brand/og-image.png"></head><body>
 <style>
   :root {
     --bg: #0d0a1a; --bg-2: #141026; --card: #171231; --line: #2a2246;
@@ -692,4 +692,19 @@
     requestAnimationFrame(loop);
   })();
 </script>
-</body></html>
+<script>
+// funil first-party (LAUNCH §2): guarda o canal de origem e conta cliques de CTA — sem cookie, sem terceiros
+(function () {
+  try {
+    var src = new URLSearchParams(location.search).get("utm_source");
+    if (src) localStorage.setItem("fx-src", src.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24));
+  } catch (e) {}
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest('a[href^="/temas"]');
+    if (!a || !navigator.sendBeacon) return;
+    var src = "";
+    try { src = localStorage.getItem("fx-src") || ""; } catch (e2) {}
+    navigator.sendBeacon("/api/e?n=cta" + (src ? "&src=" + src : ""));
+  });
+})();
+</script></body></html>
