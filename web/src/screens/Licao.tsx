@@ -388,6 +388,9 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
       setStudying(true);
       setJustConcluded(false); setBornStage(null); setActed(true); setReused(false); setDraft("");
       setGapsDraft(""); setSynDraft(""); setGapsDone(false);
+      // o server apagou a correção no restart — a cópia local também morre, senão a rodada nova
+      // "devolve" a nota velha em vez de oferecer o Tutor (bug real: 2.1.3 do dono, 14/07)
+      setTutorLocal(null); setDicaSaved(false);
       setLive("lição reiniciada — responda de cabeça");
       refetch(true);
       requestAnimationFrame(() => taRef.current?.focus());
