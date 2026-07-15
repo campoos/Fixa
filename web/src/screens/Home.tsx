@@ -86,15 +86,15 @@ function ContinueCard({ next }: { next: TrackSummary | undefined }) {
 function StatTiles({ s }: { s: Stats }) {
   const today = s.days[s.days.length - 1]?.count ?? 0;
   const tiles = [
-    { icon: <Flame className="h-4 w-4 text-recall" />, value: s.streak, label: s.streak === 1 ? "dia seguido" : "dias seguidos" },
-    { icon: <Activity className="h-4 w-4 text-primary" />, value: today, label: today === 1 ? "ação hoje" : "ações hoje" },
-    { icon: <GraduationCap className="h-4 w-4 text-domain" />, value: s.mastered, label: s.mastered === 1 ? "dominada" : "dominadas" },
-    { icon: <Layers className="h-4 w-4 text-muted-foreground" />, value: s.tasksDone, label: `de ${s.tasksTotal} tasks` },
+    { icon: <Flame className="h-4 w-4 text-recall" />, value: s.streak, label: s.streak === 1 ? "dia seguido" : "dias seguidos", hint: "dias seguidos com atividade" },
+    { icon: <Activity className="h-4 w-4 text-primary" />, value: today, label: today === 1 ? "ação hoje" : "ações hoje", hint: "avaliações e conclusões de hoje" },
+    { icon: <GraduationCap className="h-4 w-4 text-domain" />, value: s.mastered, label: s.mastered === 1 ? "dominada" : "dominadas", hint: "tasks que graduaram na revisão espaçada" },
+    { icon: <Layers className="h-4 w-4 text-muted-foreground" />, value: s.tasksDone, label: `de ${s.tasksTotal} tasks`, hint: "tasks concluídas do total" },
   ];
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
       {tiles.map((t) => (
-        <div key={t.label} className="rounded-lg border border-border bg-card px-3.5 py-3">
+        <div key={t.label} title={t.hint} className="rounded-lg border border-border bg-card px-3.5 py-3">
           <div className="flex items-center gap-1.5">
             {t.icon}
             <span className="font-mono text-xl font-semibold tabular-nums text-foreground">{t.value}</span>

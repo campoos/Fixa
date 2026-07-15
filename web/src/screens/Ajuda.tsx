@@ -89,7 +89,7 @@ const FAQ_GROUPS: { label: string; items: Faq[] }[] = [
         q: "De onde vem o conteúdo dos temas?",
         a: (
           <>
-            Da IA, do jeito que você preferir. <B>"Gerar tema"</B> cria a trilha inteira em 1 clique (no grátis você tem 1 geração de degustação; no Pro, 30 por mês). O <B>fluxo manual</B> é grátis e sem limite: a Fixa monta um prompt, você cola no seu chat (ChatGPT, Gemini…) e importa o JSON que ele devolve. Nos dois casos tudo é editável depois — lápis na task, e dá pra anexar epics novos no fim da trilha.
+            Da IA, do jeito que você preferir. <B>"Gerar tema"</B> cria a trilha inteira em 1 clique (no grátis você tem 1 geração de degustação; no Pro, 30 por mês). O <B>fluxo manual</B> é grátis e sem limite: a Fixa monta um prompt, você cola no seu chat (ChatGPT, Gemini…) e importa o JSON que ele devolve. Nos dois casos tudo é editável depois — abra o detalhe da task (setinha à direita) e toque em <B>editar conteúdo</B>; e dá pra anexar epics novos no fim da trilha.
           </>
         ),
       },
@@ -126,7 +126,7 @@ const FAQ_GROUPS: { label: string; items: Faq[] }[] = [
         q: "Esqueci minha senha — e agora?",
         a: (
           <>
-            Por enquanto <B>não existe recuperação automática</B> de senha — guarde a sua num gerenciador. A recuperação por e-mail está no plano; até lá, não dá pra redefinir sozinho.
+            Na tela de entrar, toque em <B>esqueci a senha</B>: enviamos um link por e-mail pra criar uma nova (vale <B>1 hora</B>). Não chegou? Confira o spam — e dá pra pedir outro link quando quiser. Logado, a troca de senha ainda não existe: saia da conta e use o mesmo fluxo.
           </>
         ),
       },

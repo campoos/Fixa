@@ -123,9 +123,12 @@ function StepImport({ json, setJson, errors, busy, atThemeLimit, onImport }: {
         </div>
       )}
       <div>
-        <button onClick={onImport} disabled={!json.trim() || busy || atThemeLimit} className={`inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 ${FOCUS}`}>
+        <button onClick={onImport} disabled={!json.trim() || busy || atThemeLimit} title={atThemeLimit ? "limite de temas do plano atingido" : undefined} className={`inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 ${FOCUS}`}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Importar tema
         </button>
+        {atThemeLimit && (
+          <p className="mt-1.5 text-xs text-recall">limite de 2 temas do grátis — exclua um tema ou <button onClick={() => navigate("/pro")} className={LINK}>veja o Pro</button></p>
+        )}
       </div>
     </Card>
   );

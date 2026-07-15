@@ -127,7 +127,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
             </button>
             <button onClick={() => navigate("/novo")} className={`grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 sm:hidden ${FOCUS}`} title="Novo tema"><Plus className="h-4 w-4" /></button>
             <ThemeButton />
-            <button onClick={onLogout} title="sair" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}><LogOut className="h-4 w-4" /></button>
+            <button onClick={onLogout} title="sair" aria-label="sair da conta" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}><LogOut className="h-4 w-4" /></button>
           </div>
         </div>
       </header>
