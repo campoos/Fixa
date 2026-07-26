@@ -168,3 +168,45 @@ Falta — e cada um depende de uma decisão ou de uma conta que é sua:
       `web/public/privacidade.html` e vai também na ficha da loja.
 - [ ] **`ANDROID_CERT_FINGERPRINTS` no Render** com as duas impressões digitais — só dá
       pra fazer depois do primeiro AAB subir, porque a segunda chave nasce lá (§1).
+
+---
+
+## 8. Testar no celular antes de subir na loja
+
+Três caminhos, do mais rápido ao mais parecido com o que o usuário final recebe.
+
+### a) PWA pelo Chrome do Android — 30 segundos, sem arquivo nenhum
+
+Abra `https://fixaestudos.com.br/app` no Chrome do celular → menu (⋮) → **Instalar app**.
+Vira ícone na tela inicial e roda em tela cheia, no mesmo "modo app" do TWA: sem landing,
+login em tela cheia, aba Plano sem CTA de compra. Testa o produto inteiro. O que ele
+**não** testa é o invólucro: ícone da Play, splash nativo e a verificação de domínio.
+
+### b) APK direto (sideload) — testa o invólucro de verdade
+
+O `.apk` está assinado com a chave de upload, cuja impressão digital já está publicada em
+`/.well-known/assetlinks.json`. Ou seja: instala e abre **sem a barra do navegador** —
+é exatamente o app da loja, só que fora dela.
+
+Na sua máquina (não na VM):
+
+```bash
+scp root@72.62.133.194:/root/git/engagement/fixa/android/app-release-signed.apk ~/Downloads/fixa.apk
+```
+
+Depois passe o arquivo pro celular (cabo, Drive, ou mande pra você mesmo), toque nele e
+autorize "instalar de fonte desconhecida". Sinal de que a verificação de domínio deu
+certo: **nenhuma barra de endereço no topo**. Se aparecer barra, o `assetlinks.json` não
+bateu — confira a impressão digital do §1.
+
+### c) Teste interno da Play — o mais fiel
+
+Depois da conta criada: **Play Console → Testes → Teste interno**, sobe o `.aab`, adiciona
+seu e-mail na lista e instala pelo link que a própria loja gera. Aqui já entra o Play App
+Signing, então é o momento de pegar o segundo SHA-256 e completar o
+`ANDROID_CERT_FINGERPRINTS` (§1). Vale até 100 testadores e não tem espera de revisão.
+
+> **Expo/React Native não entra nessa história.** O Fixa é web (React + Vite) embrulhado
+> num TWA — o app roda o site de verdade. Fazer versão Expo seria reescrever o produto
+> em React Native e manter dois códigos. Pra testar antes da loja, (a) e (b) acima já
+> dão o mesmo que um build de desenvolvimento daria.
