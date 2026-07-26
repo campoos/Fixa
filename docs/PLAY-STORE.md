@@ -60,6 +60,21 @@ se a verificação de domínio funcionou.
 com `appVersionCode` maior — o Bubblewrap incrementa sozinho a cada build. Mudança no
 site não exige nada disso.
 
+### O splash é feito à mão — `bubblewrap update` apaga
+
+`app/src/main/res/drawable-*/splash.png` **não** é o ícone gerado pelo Bubblewrap: é o
+anel vazio, quadro inicial da animação da marca (o `LogoBoot` de `web/src/App.tsx`
+desenha o roxo por cima quando o site abre). A biblioteca do Google converte esse
+drawable em bitmap e entrega pro Chrome desenhar, então ali não roda animação — a
+continuidade é o truque.
+
+`bubblewrap update` regenera esses PNG a partir do ícone e desfaz isso. Depois de todo
+`update`, refaça os cinco: fundo `#12101B`, o SVG ocupando a imagem inteira com
+`viewBox="0 0 32 32"` e `<circle cx=16 cy=16 r=11 stroke=#7C5CFC stroke-opacity=.22
+stroke-width=4 />`, nos tamanhos 140 (mdpi), 210 (hdpi), 280 (xhdpi), 420 (xxhdpi) e
+560 (xxxhdpi) px. O 140dp precisa bater com o `size` do `LogoBoot`, senão a marca
+"pula" de tamanho na troca do splash nativo pro site.
+
 ---
 
 ## 3. Conta e faixas de teste
