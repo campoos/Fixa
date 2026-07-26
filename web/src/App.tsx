@@ -186,11 +186,13 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
         {route.name === "licao" && <Licao key={`${route.trackId}/${route.taskId}`} trackId={route.trackId} taskId={route.taskId} />}
       </main>
       {/* bottom tab bar mobile — some nos players /revisar e na Lição (o dock é dono do fundo — DESIGN-LICAO-UI §1.1).
-          64 de barra + no mínimo 8 de respiro embaixo: nativo usa 72–83 (M3 80dp, iOS 49+34pt) e com
-          56 rente à borda o rodapé caía na faixa do gesto do Android */}
+          72 de conteúdo + 1 de borda = 73 no total (M3 usa 80dp, iOS 49+34pt). O respiro mora DENTRO
+          dos 72: bloco de 39 (ícone 22 + gap 6 + rótulo 11) centralizado = 16,5 em cima e embaixo.
+          Nada de piso em px no pb: sem viewport-fit=cover o env() vale 0 e um max(...,8px) viraria
+          folga só embaixo — foi exatamente o que deixou o rodapé torto. */}
       {route.name !== "revisar" && route.name !== "licao" && (
-        <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/92 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-[0_-2px_10px_-4px_oklch(0.235_0.03_290/0.18)] backdrop-blur-md md:hidden">
-          <div className="mx-auto grid h-16 max-w-4xl grid-cols-4">
+        <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/92 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_-4px_oklch(0.235_0.03_290/0.18)] backdrop-blur-md md:hidden">
+          <div className="mx-auto grid h-[72px] max-w-4xl grid-cols-4">
             <TabBtn to="/" active={route.name === "home" || route.name === "track"} icon={<Library className="h-[22px] w-[22px]" />} label="Temas" />
             <TabBtn to="/revisar" active={false} icon={<Layers className="h-[22px] w-[22px]" />} label="Revisar" badge={dueCount} />
             <TabBtn to="/ajuda" active={route.name === "ajuda"} icon={<CircleHelp className="h-[22px] w-[22px]" />} label="Ajuda" />

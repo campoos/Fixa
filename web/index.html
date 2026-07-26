@@ -8,9 +8,11 @@
     <meta name="theme-color" content="#12101b" />
     <meta name="mobile-web-app-capable" content="yes" />
     <!-- interactive-widget=resizes-content: teclado mobile encolhe o layout viewport → dock sticky pousa acima dele (DESIGN-LICAO-UI §5.d)
-         viewport-fit=cover: sem ele todo env(safe-area-inset-*) vale 0 e a barra de baixo encosta na
-         faixa do gesto do Android — é o que faz o safe-area do shell existir de verdade -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+         SEM viewport-fit=cover de propósito: ele põe a página edge-to-edge no Android e o sistema
+         desenha um scrim claro atrás da barra de gestos (faixa fina esquisita embaixo do rodapé).
+         Dentro do TWA a faixa do sistema já é pintada por navigationColor (android/twa-manifest.json),
+         então não há nada a ganhar — env(safe-area-inset-*) fica 0 e o shell não depende dele. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="dark light" />
     <title>Fixa — aprenda de um jeito que fixa</title>
     <script>

@@ -27,7 +27,7 @@ Na rota `/revisar` (em `<md`) **a tab bar não renderiza** e o dock sticky do pl
 
 ## 2. Header mobile (`<md`)
 
-Mesmo elemento `header` atual (sticky, `h-14`, vidro `bg-background/92 backdrop-blur-md` + `pt-[env(safe-area-inset-top)]`, `z-30`). Muda só o conteúdo em `<md`:
+Mesmo elemento `header` atual (sticky, `h-14`, vidro `bg-background/92 backdrop-blur-md` + `pt-[env(safe-area-inset-top)]`, `z-30`). O `pt-[env(safe-area-inset-top)]` resolve 0 sem `viewport-fit=cover` — fica como seguro, e sem `max()` nunca vira folga fantasma. Muda só o conteúdo em `<md`:
 
 ```
 [ Logo + Fixa ]                    [ (+) Novo tema ] [ tema ] [ sair ]
@@ -48,8 +48,8 @@ Nada muda em ≥`md`: pills, badge no pill Revisar, CTA completo, tudo como hoje
 
 ```tsx
 {route.name !== "revisar" && (
-  <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/92 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-[0_-2px_10px_-4px_oklch(0.235_0.03_290/0.18)] backdrop-blur-md md:hidden">
-    <div className="mx-auto grid h-16 max-w-4xl grid-cols-4">
+  <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/92 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_-4px_oklch(0.235_0.03_290/0.18)] backdrop-blur-md md:hidden">
+    <div className="mx-auto grid h-[72px] max-w-4xl grid-cols-4">
       {/* 4 TabBtn */}
     </div>
   </nav>
@@ -57,9 +57,9 @@ Nada muda em ≥`md`: pills, badge no pill Revisar, CTA completo, tudo como hoje
 ```
 
 - `fixed` (não sticky): a bar nunca sai da tela ao rolar. Mesma linguagem de vidro do header; `border-t` espelha o `border-b` do topo. `z-30` (nunca coexiste com o dock `z-10` — rota `/revisar` não tem bar).
-- Altura de conteúdo **h-16 (64px)** + no mínimo **8px** embaixo (`max(safe-area, 0.5rem)`), fora do grid: 72px no total, entre a navigation bar do Material 3 (80dp) e a tab bar do iOS (49+34pt). Com 56px rente à borda o rodapé caía na faixa do gesto do Android — e em aparelho sem entalhe a safe-area é 0, por isso o piso de 8px.
+- Altura de conteúdo **72px** + `border-t` 1px = **73px**. O respiro fica **dentro** dos 72 (bloco de 39px centralizado → 16,5px em cima e embaixo), nunca como `padding-bottom` externo — padding fora do grid dá folga só embaixo e o rodapé lê torto. Fica entre a navigation bar do Material 3 (80dp) e a tab bar do iOS (49+34pt).
 - **Vidro a 92%, não 85%**: a 85% sobre fundo claro a barra ficava quase da cor do conteúdo e o card cortado lia como colisão. A sombra rasa pra cima é a pista de que o conteúdo passa por baixo.
-- Nada disso existe sem **`viewport-fit=cover`** na meta viewport (`web/index.html`): sem ele todo `env(safe-area-inset-*)` vale 0.
+- **Não usar `viewport-fit=cover`**. Ele põe a página edge-to-edge no Android e o sistema desenha um scrim claro atrás da barra de gestos — faixa fina visível embaixo do rodapé. No TWA a faixa já é pintada por `navigationColor` (`android/twa-manifest.json`), então o `cover` não compra nada. Consequência assumida: `env(safe-area-inset-*)` vale 0; os `env()` que restam no shell são seguro, **sempre sem piso em px**.
 - `md:hidden` — desktop nunca vê a bar.
 
 ### 3.2 Aba (`TabBtn`)
@@ -97,7 +97,7 @@ const TabBtn = ({ to, active, icon, label, badge }: { to: string; active: boolea
 - **Inativa**: `text-muted-foreground` (AA garantido pelo token), `hover:text-foreground` (desktop estreito/pointer).
 - **Foco**: `FOCUS` (anel violeta padrão do app) sobre o `rounded-lg`.
 - **Peso constante**: `font-medium` sempre (ativa muda só cor) — troca de peso mexeria na largura do label.
-- **Alvo de toque**: a célula inteira do grid (≈ 82–96px × 64px em 330–390px de viewport) — ≥48px com folga, sem gap fantasma entre abas.
+- **Alvo de toque**: a célula inteira do grid (≈ 82–96px × 72px em 330–390px de viewport) — ≥48px com folga, sem gap fantasma entre abas.
 
 ### 3.3 Badge do Revisar
 
@@ -113,7 +113,7 @@ A bar é `fixed`, então o conteúdo precisa de respiro embaixo em `<md` (exceto
 <main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" ? "pb-6" : "pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
 ```
 
-- `6rem` = 64px da bar + 8px do piso de respiro + 24px do `py-6` original; ≥`md` volta ao `pb-6` de sempre.
+- `6rem` = 72px da bar + 24px de respiro; ≥`md` volta ao `pb-6` de sempre.
 - `scroll-margin`/âncoras: não há âncoras no app — nada a fazer.
 
 ---
@@ -122,7 +122,7 @@ A bar é `fixed`, então o conteúdo precisa de respiro embaixo em `<md` (exceto
 
 **Nenhuma linha muda.** Invariantes que esta spec preserva (e que o dev deve conferir, não "corrigir"):
 
-- O dock sticky (`bottom-0 z-10` + `pb-[max(env(safe-area-inset-bottom),0.75rem)]`) continua dono do fundo da tela em `/revisar` — a bar não renderiza nessa rota.
+- O dock sticky (`bottom-0 z-10` + `pb-[max(env(safe-area-inset-bottom),0.75rem)]`) continua dono do fundo da tela em `/revisar` — a bar não renderiza nessa rota. (Sem `cover`, esse `max()` resolve nos 12px de piso — o comportamento pré-safe-area, que é o correto.)
 - O `min-h-[calc(100svh-6.5rem)]` do player continua correto: header 56px + paddings do `main` (o `main` mantém `pb-6` em `/revisar`).
 - `fx-review-changed` segue sendo a fonte do badge — agora alimenta pill (desktop) **e** aba (mobile) pelo mesmo `dueCount` do `Shell`.
 
@@ -146,7 +146,7 @@ Tom herdado: sem exclamação, sem emoji; números em mono `tabular-nums`.
 ## 6. Acessibilidade
 
 - **Dois `nav`s, papéis claros**: o desktop (pills) e a bar mobile nunca são visíveis ao mesmo tempo, mas ambos ficam no DOM — dar `aria-label="navegação principal"` à bar e manter o `nav` do header sem conflito (opcional: `aria-label="navegação"` nele). `aria-current="page"` na aba/pill ativa, como hoje.
-- **Alvos**: 64px de altura × ≥82px de largura por aba; nada de alvos de 36px na navegação primária mobile.
+- **Alvos**: 72px de altura × ≥82px de largura por aba; nada de alvos de 36px na navegação primária mobile.
 - **Foco visível**: `FOCUS` em todas as abas (anel violeta, offset sobre o vidro).
 - **Leitor de tela**: badge `aria-hidden` + contagem no `aria-label` do botão (um anúncio só, sem número solto).
 - **Contraste**: só tokens existentes — `muted-foreground`, `primary` e `recall` já são AA nos dois temas em 10–11px (foi o critério de cunhagem deles).
@@ -172,6 +172,6 @@ Tom herdado: sem exclamação, sem emoji; números em mono `tabular-nums`.
 - [ ] **Bar some em `/revisar`**: na sessão de revisão o dock Revelar/Errei/Acertei fica colado no fundo com safe-area, sem bar atrás nem por cima; ao navegar de volta (logo ou `Voltar aos temas`) a bar reaparece.
 - [ ] **Badge**: com 7 pendentes, aba Revisar mostra `7` em âmbar tint mono no canto do ícone; ao avaliar um card e voltar, o número caiu (evento `fx-review-changed`); com 0, sem badge; com 120, `99+`; leitor de tela anuncia "Revisar, 7 pendentes".
 - [ ] **Ativa certa em toda rota**: `/` e `/t/:id` → Temas; `/revisar` → (sem bar); `/ajuda` → Ajuda; `/pro` → Pro (agora alcançável no mobile); `/novo` → nenhuma aba ativa, bar visível.
-- [ ] **Sem conteúdo engolido**: no fim da Home (e de `/pro`, a mais longa) o último elemento rola pra cima da bar (`pb` do `main` correto), inclusive com safe-area de iPhone.
+- [ ] **Sem conteúdo engolido**: no fim da Home (e de `/pro`, a mais longa) o último elemento rola pra cima da bar (`pb` do `main` correto); e conferir no aparelho que **não há faixa clara** abaixo do rodapé, no claro e no escuro.
 - [ ] **Desktop intacto (≥768px)**: header idêntico ao atual (pills + badge + CTA completo), zero bar, `main` com `pb-6`.
 - [ ] **A11y/identidade**: abas com anel `FOCUS` no teclado, `aria-current` na ativa, ativa em violeta tinta (sem fundo), nenhum emoji/exclamação, números mono `tabular-nums`.
