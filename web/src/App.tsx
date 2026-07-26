@@ -464,6 +464,15 @@ function ResetScreen({ onLogin }: { onLogin: (me: Me) => void }) {
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [booting, setBooting] = useState(true);
+  // com o servidor quente o boot dura ~200ms e a animação da marca era cortada no meio.
+  // Segura o mínimo pra ela terminar (desenho 900ms + plim 520ms) — só no app; na web
+  // ninguém espera splash.
+  const [splash, setSplash] = useState(isAppMode);
+  useEffect(() => {
+    if (!splash) return;
+    const t = setTimeout(() => setSplash(false), 1400);
+    return () => clearTimeout(t);
+  }, [splash]);
   // deslogado ninguém escuta rota (Shell não montou) — re-render pra "pedir um novo link" (§B4) sair de /redefinir
   const [, setTick] = useState(0);
   useEffect(() => assinarRota(() => setTick((n) => n + 1)), []);
@@ -473,7 +482,7 @@ export default function App() {
   return (
     <ThemeProvider>
       {/* no app o boot emenda no splash do Android: só o logo, sem "carregando…" piscando (§2) */}
-      {booting ? (isAppMode
+      {booting || splash ? (isAppMode
         ? <div className="grid min-h-[100svh] place-items-center"><LogoBoot size={56} /></div>
         : <div className="grid min-h-full place-items-center text-sm text-muted-foreground">carregando…</div>)
         : parseRoute().name === "redefinir" && !me ? <ResetScreen onLogin={setMe} />
