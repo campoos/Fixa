@@ -13,8 +13,8 @@
   "backgroundColor": "#12101B",
   "enableNotifications": false,
   "startUrl": "/app",
-  "iconUrl": "http://localhost:4099/icons/icon-512.png",
-  "maskableIconUrl": "http://localhost:4099/icons/maskable-512.png",
+  "iconUrl": "https://fixaestudos.com.br/icons/icon-512.png",
+  "maskableIconUrl": "https://fixaestudos.com.br/icons/maskable-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "/root/git/engagement/fixa/android/android.keystore",
@@ -24,7 +24,7 @@
   "appVersionCode": 2,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "http://localhost:4099/manifest.webmanifest",
+  "webManifestUrl": "https://fixaestudos.com.br/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {},
   "alphaDependencies": {
