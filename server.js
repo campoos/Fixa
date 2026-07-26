@@ -43,8 +43,8 @@ const BASE_URL = (process.env.PUBLIC_URL || process.env.BASE_URL || "https://fix
 const ANDROID_CERT_FALLBACK = "7D:0E:A7:FE:AE:D5:3E:FF:57:81:66:B8:57:8A:A5:92:BE:AD:CB:08:FF:38:03:1C:BA:08:6D:5C:5B:92:2C:AF";
 // billing (Mercado Pago Assinaturas) — env-gated: sem credenciais, o /pro segue com a lista de espera
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || "";
-const MP_PLAN_ID = process.env.MP_PLAN_ID || "";
-const BILLING_ENABLED = Boolean(MP_ACCESS_TOKEN && MP_PLAN_ID);
+const MP_PRICE = Number(process.env.MP_PRICE || 19.9); // PRICING.md: R$ 19,90/mês
+const BILLING_ENABLED = Boolean(MP_ACCESS_TOKEN);
 const CRON_SECRET = process.env.CRON_SECRET || "";
 // limites de geração por IA (PRICING.md): free = 1 degustação lifetime; pro = fair use 30/mês, máx 10/dia
 const GEN_FREE_LIFETIME = Number(process.env.GEN_FREE_LIFETIME || 1);
@@ -743,11 +743,17 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         const r = await fetch("https://api.mercadopago.com/preapproval", {
           method: "POST",
           headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+          // assinatura sem plano associado: o MP só devolve init_point (checkout hospedado) quando
+          // o preço vem inline e o status nasce "pending". Com preapproval_plan_id ele exige
+          // card_token_id, o que obrigaria a coletar cartão aqui dentro. O external_reference é o
+          // que amarra a assinatura ao usuário no webhook.
           body: JSON.stringify({
-            preapproval_plan_id: MP_PLAN_ID,
+            reason: "Fixa Pro",
+            auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: MP_PRICE, currency_id: "BRL" },
             payer_email: me.email,
             external_reference: me.id,
             back_url: `${BASE_URL}/pro`,
+            status: "pending",
           }),
         });
         const pre = await r.json();
