@@ -100,7 +100,7 @@ export const appendTrack = (id: string, jsonStr: string) => {
 export interface GenUsage { used: number; limit: number; dayUsed?: number; dayLimit?: number }
 // tutor: uso das correções do Tutor — free: lifetime (degustação); pro: no mês
 export interface TutorUsage { used: number; limit: number }
-export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage }
+export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage; price: number; fullPrice: number; founderLeft: number }
 export const getConfig = () => api.get<Config>("/api/config");
 // lista do Pro (pré-billing) — guarda o e-mail pra avisar quando abrir
 export const joinWaitlist = (email: string) => api.post<{ ok: true }>("/api/waitlist", { email });

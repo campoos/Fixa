@@ -44,6 +44,11 @@ const ANDROID_CERT_FALLBACK = "7D:0E:A7:FE:AE:D5:3E:FF:57:81:66:B8:57:8A:A5:92:B
 // billing (Mercado Pago Assinaturas) — env-gated: sem credenciais, o /pro segue com a lista de espera
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || "";
 const MP_PRICE = Number(process.env.MP_PRICE || 19.9); // PRICING.md: R$ 19,90/mês
+// oferta de fundador (PRICING.md §"Oferta de fundador"): os 100 primeiros que assinarem travam
+// R$ 14,90 pra sempre — a assinatura do Mercado Pago guarda o valor com que nasceu, então
+// "pra sempre" sai de graça: basta o checkout nascer com o preço certo.
+const MP_PRICE_FOUNDER = Number(process.env.MP_PRICE_FOUNDER || 14.9);
+const FOUNDER_SEATS = Number(process.env.FOUNDER_SEATS || 100);
 const BILLING_ENABLED = Boolean(MP_ACCESS_TOKEN);
 const CRON_SECRET = process.env.CRON_SECRET || "";
 // limites de geração por IA (PRICING.md): free = 1 degustação lifetime; pro = fair use 30/mês, máx 10/dia
@@ -130,6 +135,11 @@ const kv = {
 let users = (await kv.get("users")) || {}; // emailLower -> { id, email, name, hash, salt, plan, createdAt }
 const saveUsers = () => kv.set("users", users).catch((e) => console.error("[users]", e.message));
 const userById = (id) => Object.values(users).find((u) => u.id === id) || null;
+// vagas de fundador queimadas: conta quem já assinou algum dia (o id da assinatura fica gravado),
+// não quem está Pro agora — quem cancelou não devolve a vaga, e a conta fundadora, que nasce Pro
+// sem passar pelo Mercado Pago, não consome nenhuma.
+const foundersUsed = () => Object.values(users).filter((u) => u.mpPreapprovalId).length;
+const founderPrice = () => (foundersUsed() < FOUNDER_SEATS ? MP_PRICE_FOUNDER : MP_PRICE);
 const hashPass = (pass, salt) => new Promise((resolve, reject) => scrypt(String(pass), salt, 64, (e, k) => (e ? reject(e) : resolve(k.toString("hex")))));
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 async function createUser(email, name, pass, plan = "free") {
@@ -627,7 +637,9 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     const isPro = me.plan === "pro";
 
     if (path === "/api/me") return json(res, 200, { name: me.name, email: me.email, plan: me.plan });
-    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me) });
+    // price/founderLeft: a tela do Pro mostra o preço que o checkout vai cobrar de verdade,
+    // e a promessa dos 100 primeiros some sozinha quando as vagas acabam
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me), price: founderPrice(), fullPrice: MP_PRICE, founderLeft: Math.max(0, FOUNDER_SEATS - foundersUsed()) });
     // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
     // free: 1 degustação lifetime · pro: fair use 30/mês + máx 10/dia (PRICING.md)
     if (path === "/api/generate" && req.method === "POST") {
@@ -748,8 +760,8 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
           // card_token_id, o que obrigaria a coletar cartão aqui dentro. O external_reference é o
           // que amarra a assinatura ao usuário no webhook.
           body: JSON.stringify({
-            reason: "Fixa Pro",
-            auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: MP_PRICE, currency_id: "BRL" },
+            reason: founderPrice() < MP_PRICE ? "Fixa Pro — preço de fundador" : "Fixa Pro",
+            auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: founderPrice(), currency_id: "BRL" },
             payer_email: me.email,
             external_reference: me.id,
             back_url: `${BASE_URL}/pro`,

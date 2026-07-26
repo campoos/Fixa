@@ -143,22 +143,35 @@ function FreeCard({ isPro }: { isPro: boolean }) {
   );
 }
 
-function ProCard({ me, billing }: { me: Me; billing: boolean }) {
+// preço e vagas vêm do servidor: é o mesmo número que o checkout vai cobrar, e a promessa
+// dos 100 primeiros desaparece sozinha quando as vagas acabam (PRICING.md)
+function ProCard({ me, billing, cfg }: { me: Me; billing: boolean; cfg?: Config }) {
   const isPro = me.plan === "pro";
+  const cheio = cfg?.fullPrice ?? 19.9;
+  const preco = cfg?.price ?? cheio;
+  const fundador = preco < cheio;
+  const emReais = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
   return (
     <Card className="relative gap-0 border-primary/50 p-6 shadow-xl shadow-primary/10 max-md:order-first">
       <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-primary-foreground">
-        {isPro ? "seu plano" : "preço de fundador"}
+        {isPro ? "seu plano" : fundador ? "preço de fundador" : "assinatura"}
       </span>
       <p className="text-sm font-semibold">Pro</p>
-      <Price value="R$ 19,90" suffix="/mês" />
-      <p className="mt-2 font-mono text-[12px] tabular-nums text-muted-foreground">ou R$ 149/ano — R$ 12,42/mês (~2,5 meses grátis)</p>
+      <Price value={emReais(preco)} suffix="/mês" />
+      {fundador && <p className="mt-2 font-mono text-[12px] tabular-nums text-muted-foreground">depois das 100 primeiras assinaturas, {emReais(cheio)}/mês</p>}
       <p className="mt-2 min-h-[2.5rem] text-[13px] text-muted-foreground">sem teto de temas, trilha pronta em 1 clique — menos de R$ 0,85 por dia.</p>
       {isPro ? (
         <StaticSlot tone="domain"><Check className="h-4 w-4" /> plano ativo na sua conta</StaticSlot>
       ) : (
         <>
-          <p className="mt-3 text-[13px] leading-relaxed"><b className="font-semibold text-recall">Primeiros 100: R$ 14,90/mês, pra sempre.</b></p>
+          {fundador && (
+            <p className="mt-3 text-[13px] leading-relaxed">
+              <b className="font-semibold text-recall">
+                {cfg?.founderLeft === 100 ? "Primeiros 100: " : `Restam ${cfg?.founderLeft} vagas: `}
+                {emReais(preco)}/mês, pra sempre.
+              </b>
+            </p>
+          )}
           {billing ? <SubscribeCta /> : <WaitlistCta email={me.email} />}
         </>
       )}
@@ -297,7 +310,7 @@ export function Pro({ me }: { me: Me }) {
         <FreeCard isPro={isPro} />
         {/* no app Android o checkout externo é proibido (conteúdo digital exige Google Play
             Billing) — o CTA de assinatura só existe na web até o billing do Play entrar */}
-        <ProCard me={me} billing={!isAppMode && (cfg?.billingEnabled ?? false)} />
+        <ProCard me={me} billing={!isAppMode && (cfg?.billingEnabled ?? false)} cfg={cfg ?? undefined} />
       </div>
 
       <p className="mx-auto mt-8 max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
