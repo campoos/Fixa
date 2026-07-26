@@ -15,6 +15,9 @@ loja. O que a loja revisa é o invólucro.
   app, com outra listagem, do zero.
 - Ela está fora do git (`android/.gitignore`) e **precisa de backup fora desta VM**:
   gerenciador de senhas ou cofre. Junto com ela, a senha do keystore.
+- A senha está em `.secrets.env` na raiz do projeto (também fora do git), junto das
+  demais credenciais. Esse arquivo é backup, não runtime — o servidor local roda com
+  `--env-file=.env`, porque o `.secrets.env` carrega o Upstash de **produção**.
 - Impressão digital SHA-256 da chave de upload:
   `7D:0E:A7:FE:AE:D5:3E:FF:57:81:66:B8:57:8A:A5:92:BE:AD:CB:08:FF:38:03:1C:BA:08:6D:5C:5B:92:2C:AF`
 
@@ -71,6 +74,22 @@ site não exige nada disso.
   D-U-N-S), essa exigência não se aplica.
 - Ordem prática: teste interno (imediato, até 100 pessoas) → teste fechado (a contagem
   dos 14 dias) → produção.
+
+### Os 12 testadores, na prática
+
+O relógio dos 14 dias **só começa** com o app publicado na faixa de teste fechado e as
+12 contas já inscritas nela. Testar o PWA antes não conta pra Play — conta pro produto,
+que é motivo suficiente pra mandar `https://fixaestudos.com.br/app` pra essas pessoas
+desde já e chegar no teste fechado sem bug bobo.
+
+O que se cadastra é uma **lista de e-mails** (direta ou via grupo do Google); só quem
+está nela enxerga o app. O convite não sai automático: a Play gera um link de opt-in que
+**você** distribui, a pessoa aceita e aí o app aparece na Play Store dela.
+
+> Armadilha: o e-mail tem que ser a conta Google **logada na Play Store do celular**
+> dela. Se for outra, o link responde "app não disponível" e parece defeito do app.
+> Ao pedir, peça exatamente assim: "me manda o Gmail que tá logado na Play Store do teu
+> celular".
 
 ---
 
@@ -158,7 +177,13 @@ Feito:
 - [x] AAB e APK assinados a partir do manifesto de produção.
 - [x] Voltar do Android (`DESIGN-APP-MODE.md` §4) — camadas de histórico, 22/22 no teste
       com Chrome de verdade dirigindo `history.back()`.
-- [x] Screenshots de celular (5, 1080×1920) e gráfico de destaque.
+- [x] Screenshots de celular (5, 1080×1920) e gráfico de destaque — refeitos depois de
+      `3c7fb21`, com o rodapé simétrico e sem a faixa clara.
+- [x] AAB e APK reconstruídos a partir do manifesto atual (26/07 20:42): splash confere
+      pixel a pixel com `app/src/main/res/`, assinatura `7d0ea7fe…922caf` bate com o
+      `assetlinks.json` em produção. (Comparar **pixels**, não tamanho de arquivo: o
+      aapt2 recomprime os PNGs e o byte count sempre difere da origem.)
+- [x] Conta de desenvolvedor criada e paga — pessoal, ID `8488305067244215434`.
 
 Falta — e cada um depende de uma decisão ou de uma conta que é sua:
 
