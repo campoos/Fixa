@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, Eye, GraduationCap, Lightbulb, Loader2, Pencil, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { ApiError, getConfig, getTrack, lessonSubmit, taskComment, tutorCorrect, type Epic, type Story, type Task, type Track as TrackData, type Tutor } from "@/lib/api";
+import { isAppMode } from "@/lib/app-mode";
 import { useApi } from "@/lib/useApi";
 import { usePersistentState } from "@/lib/usePersistentState";
 import { fmtNota, lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
@@ -453,7 +454,10 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
       {isPro ? (
         <>correções do mês esgotadas — renova no dia 1º</>
       ) : (
-        <>correções da degustação esgotadas · <button onClick={() => navigate("/pro")} className={cn("text-primary underline-offset-2 hover:underline", FOCUS)}>conhecer o Pro</button></>
+        // no app o upsell não pode virar link pra tela de compra (DESIGN-APP-MODE §3.2)
+        isAppMode
+          ? <>correções da degustação esgotadas</>
+          : <>correções da degustação esgotadas · <button onClick={() => navigate("/pro")} className={cn("text-primary underline-offset-2 hover:underline", FOCUS)}>conhecer o Pro</button></>
       )}
     </div>
   );

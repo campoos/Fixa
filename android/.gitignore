@@ -1,0 +1,14 @@
+# A chave de assinatura NUNCA entra no repositório: quem tem ela consegue publicar
+# atualizações se passando pelo app. Backup dela é fora do git (ver docs/PLAY-STORE.md).
+android.keystore
+*.jks
+*.keystore
+
+# artefatos e cache de build
+app/build/
+build/
+.gradle/
+*.aab
+*.apk
+*.idsig
+local.properties

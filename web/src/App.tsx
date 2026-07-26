@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CircleHelp, Eye, EyeOff, Gem, Layers, Library, Loader2, LogOut, Moon, Plus, Sun } from "lucide-react";
 import { ApiError, forgotPass, getMe, getReview, login, logout, resetPass, signup, type Me } from "@/lib/api";
+import { isAppMode, raiz } from "@/lib/app-mode";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { useApi } from "@/lib/useApi";
 import { Home } from "@/screens/Home";
@@ -15,9 +16,30 @@ import { Pro } from "@/screens/Pro";
 export const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 // campos das telas de auth (spec DESIGN-AUTH-EMAIL §B2.4)
-const INPUT = "h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-ring/25";
+// em modo app o campo cresce pra 48px (alvo de toque) e a fonte vai a 16px, que é o
+// que impede o Android de dar zoom no foco (DESIGN-APP-MODE §1.1)
+const INPUT_BASE = "w-full border border-input bg-background px-3 outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-ring/25";
+const INPUT = isAppMode
+  ? `${INPUT_BASE} h-12 rounded-xl text-[16px] scroll-mb-4 scroll-mt-4`
+  : `${INPUT_BASE} h-10 rounded-md text-sm`;
 const INPUT_ERR = "border-destructive focus:border-destructive focus:ring-destructive/25";
 const LABEL = "mb-1.5 block text-[13px] font-medium";
+
+// abrir o teclado antes da tela pintar dá flicker no TWA: no app o foco inicial espera
+// o primeiro paint; na troca de modo (e sempre na web) ele é imediato (§1.4)
+let primeiroPaint = true;
+function useAutoFocus<T extends HTMLElement>(active: boolean, token: string = "") {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    if (!active || !isAppMode) return;
+    if (!primeiroPaint) { ref.current?.focus(); return; }
+    primeiroPaint = false;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => ref.current?.focus()); });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+  }, [active, token]);
+  return ref;
+}
 
 // marca Fixa: um "loop" que fecha (o ciclo do método) com o ponto de recall
 export function Logo({ size = 24 }: { size?: number }) {
@@ -32,6 +54,7 @@ export function Logo({ size = 24 }: { size?: number }) {
 type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "pro" } | { name: "track"; id: string } | { name: "licao"; trackId: string; taskId: string } | { name: "redefinir" };
 function parseRoute(): Route {
   const p = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  if (p === "app") return { name: "home" }; // porta de entrada do app Android (start_url)
   if (p === "novo") return { name: "novo" };
   if (p === "revisar") return { name: "revisar" };
   if (p === "ajuda") return { name: "ajuda" };
@@ -147,7 +170,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
             <TabBtn to="/" active={route.name === "home" || route.name === "track"} icon={<Library className="h-5 w-5" />} label="Temas" />
             <TabBtn to="/revisar" active={false} icon={<Layers className="h-5 w-5" />} label="Revisar" badge={dueCount} />
             <TabBtn to="/ajuda" active={route.name === "ajuda"} icon={<CircleHelp className="h-5 w-5" />} label="Ajuda" />
-            <TabBtn to="/pro" active={route.name === "pro"} icon={<Gem className="h-5 w-5" />} label="Pro" />
+            <TabBtn to="/pro" active={route.name === "pro"} icon={<Gem className="h-5 w-5" />} label={isAppMode ? "Plano" : "Pro"} />
           </div>
         </nav>
       )}
@@ -158,24 +181,30 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
 /* ── telas de auth (spec DESIGN-AUTH-EMAIL.md parte B) ── */
 
 // shell comum aos 4 modos (§B2.1/§B2.2): glow de marca + bloco de marca + card
+// no app o card deixa de ser caixa e vira a própria tela: marca à esquerda no topo,
+// CTA no rodapé acima da safe-area, e o vazio entre eles (DESIGN-APP-MODE §1.1)
 function AuthShell({ children }: { children: ReactNode }) {
   return (
-    <div className="relative grid min-h-full place-items-center overflow-hidden px-4 py-10">
+    <div className={isAppMode
+      ? "relative flex min-h-[100svh] flex-col overflow-x-hidden overflow-y-auto px-5"
+      : "relative grid min-h-full place-items-center overflow-hidden px-4 py-10"}>
       {/* glow de marca — decorativo, some pra leitores de tela */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-72"
         style={{ background: "radial-gradient(560px 280px at 50% -80px, color-mix(in srgb, var(--primary) 16%, transparent), transparent 70%)" }}
       />
-      <div className="relative w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-2">
+      <div className={isAppMode
+        ? "relative mx-auto flex w-full max-w-sm flex-1 flex-col pb-[calc(env(safe-area-inset-bottom)+20px)] pt-[calc(env(safe-area-inset-top)+48px)]"
+        : "relative w-full max-w-sm"}>
+        <div className={isAppMode ? "flex flex-col items-start gap-2" : "mb-6 flex flex-col items-center gap-2"}>
           <div className="flex items-center gap-2.5">
-            <Logo size={32} />
-            <span className="text-[22px] font-extrabold tracking-[-0.03em]">Fixa</span>
+            <Logo size={isAppMode ? 36 : 32} />
+            <span className={`font-extrabold tracking-[-0.03em] ${isAppMode ? "text-[26px]" : "text-[22px]"}`}>Fixa</span>
           </div>
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">aprenda de um jeito que fixa</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">{children}</div>
+        <div className={isAppMode ? "flex flex-1 flex-col" : "rounded-xl border border-border bg-card p-6 shadow-sm"}>{children}</div>
       </div>
     </div>
   );
@@ -191,16 +220,18 @@ function PasswordInput({ id, value, onChange, autoComplete, autoFocus = false, i
   invalid?: boolean;
 }) {
   const [show, setShow] = useState(false);
+  const ref = useAutoFocus<HTMLInputElement>(autoFocus);
   return (
     <div className="relative">
       <input
+        ref={ref}
         id={id} name={id} type={show ? "text" : "password"} value={value} onChange={(e) => onChange(e.target.value)}
-        placeholder="••••••••" autoComplete={autoComplete} autoFocus={autoFocus}
-        className={`${INPUT} pr-10 ${invalid ? INPUT_ERR : ""}`}
+        placeholder="••••••••" autoComplete={autoComplete} autoFocus={!isAppMode && autoFocus} enterKeyHint="done"
+        className={`${INPUT} ${isAppMode ? "pr-12" : "pr-10"} ${invalid ? INPUT_ERR : ""}`}
       />
       <button
         type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "ocultar senha" : "mostrar senha"}
-        className={`absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground ${FOCUS}`}
+        className={`absolute top-1/2 grid -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground ${isAppMode ? "right-0.5 h-11 w-11" : "right-1 h-8 w-8"} ${FOCUS}`}
       >
         {show ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
       </button>
@@ -213,7 +244,7 @@ function AuthCta({ busy, disabled, busyLabel, label }: { busy: boolean; disabled
   return (
     <button
       disabled={disabled}
-      className={`mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 ${FOCUS}`}
+      className={`inline-flex w-full items-center justify-center gap-2 bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 ${isAppMode ? "h-13 rounded-xl text-[15px] font-semibold" : "mt-5 h-10 rounded-lg text-sm font-medium"} ${FOCUS}`}
     >
       {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
       {busy ? busyLabel : label}
@@ -228,7 +259,7 @@ function FormAlert({ children }: { children: ReactNode }) {
 
 // link de troca de modo no rodapé do card (§B3)
 function ModeLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return <button type="button" onClick={onClick} className={`font-medium text-primary underline-offset-2 hover:underline ${FOCUS}`}>{children}</button>;
+  return <button type="button" onClick={onClick} className={`font-medium text-primary underline-offset-2 hover:underline ${isAppMode ? "inline-flex min-h-11 items-center px-1 py-2.5" : ""} ${FOCUS}`}>{children}</button>;
 }
 
 type AuthMode = "login" | "signup" | "forgot";
@@ -241,9 +272,10 @@ const AUTH_COPY: Record<AuthMode, { h1: string; sub: string; cta: string; busy: 
 
 function Login({ onLogin }: { onLogin: (me: Me) => void }) {
   // ?m=cadastro|esqueci abre já no modo certo (§B4) — lido só na montagem
+  // no app não existe landing: a maioria chega sem conta, então o modo inicial é signup (§2)
   const [mode, setMode] = useState<AuthMode>(() => {
     const m = new URLSearchParams(window.location.search).get("m");
-    return m === "cadastro" ? "signup" : m === "esqueci" ? "forgot" : "login";
+    return m === "cadastro" ? "signup" : m === "esqueci" ? "forgot" : isAppMode ? "signup" : "login";
   });
   const [sent, setSent] = useState(false);
   const [name, setName] = useState("");
@@ -266,14 +298,18 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
   };
   const copy = AUTH_COPY[mode];
   const badCreds = mode === "login" && !!err; // no login, o culpado é o par e-mail+senha
+  const nameRef = useAutoFocus<HTMLInputElement>(mode === "signup", mode);
+  const emailRef = useAutoFocus<HTMLInputElement>(mode !== "signup", mode);
   return (
     <AuthShell>
-      <form onSubmit={submit} aria-labelledby="auth-title">
+      <form onSubmit={submit} aria-labelledby="auth-title" className={isAppMode ? "flex flex-1 flex-col" : undefined}>
+        {/* 3ª linha de contexto da primeira abertura do app (§2) */}
+        {isAppMode && <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">Recall ativo e revisão espaçada, com data da prova.</p>}
         {/* miolo com key={mode}: remonta (re-aplica autofocus) e anima a troca (§B5) */}
-        <div key={mode} className="animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
-          <div className="mb-5">
-            <h1 id="auth-title" className="text-[17px] font-semibold tracking-[-0.01em]">{copy.h1}</h1>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{copy.sub}</p>
+        <div key={mode} className={`animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none ${isAppMode ? "flex flex-1 flex-col" : ""}`}>
+          <div className={isAppMode ? "mt-8" : "mb-5"}>
+            <h1 id="auth-title" className={isAppMode ? "text-2xl font-bold tracking-[-0.02em]" : "text-[17px] font-semibold tracking-[-0.01em]"}>{copy.h1}</h1>
+            <p className={`leading-relaxed text-muted-foreground ${isAppMode ? "mt-1.5 text-sm" : "mt-1 text-[13px]"}`}>{copy.sub}</p>
           </div>
           {err && <FormAlert>{err}</FormAlert>}
           {mode === "forgot" && sent ? (
@@ -285,24 +321,27 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
               <p className="mt-3 text-xs text-muted-foreground">
                 Não chegou? Confira o spam ou <button type="button" onClick={() => setSent(false)} className={`underline underline-offset-2 hover:text-foreground ${FOCUS}`}>tentar com outro e-mail</button>.
               </p>
-              <button type="button" onClick={() => switchMode("login")} className={`mt-5 h-10 w-full rounded-lg border border-border text-sm font-medium text-foreground transition-colors hover:bg-accent ${FOCUS}`}>
+              {isAppMode && <div className="min-h-6 flex-1" />}
+              <button type="button" onClick={() => switchMode("login")} className={`w-full border border-border font-medium text-foreground transition-colors hover:bg-accent ${isAppMode ? "h-13 rounded-xl text-[15px]" : "mt-5 h-10 rounded-lg text-sm"} ${FOCUS}`}>
                 voltar pra entrar
               </button>
             </>
           ) : (
             <>
-              <div className="space-y-4">
+              <div className={`space-y-4 ${isAppMode ? "mt-7" : ""}`}>
                 {mode === "signup" && (
                   <div>
                     <label htmlFor="name" className={LABEL}>Nome</label>
-                    <input id="name" name="name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="como quer ser chamado" autoComplete="name" className={INPUT} />
+                    <input ref={nameRef} id="name" name="name" autoFocus={!isAppMode} value={name} onChange={(e) => setName(e.target.value)} placeholder="como quer ser chamado" autoComplete="name" enterKeyHint="next" className={INPUT} />
                   </div>
                 )}
                 <div>
                   <label htmlFor="email" className={LABEL}>E-mail</label>
                   <input
-                    id="email" name="email" type="email" autoFocus={mode !== "signup"} value={email} onChange={(e) => setEmail(e.target.value)}
+                    ref={emailRef}
+                    id="email" name="email" type="email" autoFocus={!isAppMode && mode !== "signup"} value={email} onChange={(e) => setEmail(e.target.value)}
                     placeholder="voce@email.com" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email"
+                    enterKeyHint={mode === "forgot" ? "done" : "next"}
                     className={`${INPUT} ${badCreds ? INPUT_ERR : ""}`}
                   />
                 </div>
@@ -311,7 +350,7 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
                     <div className={mode === "login" ? "flex items-baseline justify-between" : undefined}>
                       <label htmlFor="pass" className={LABEL}>Senha</label>
                       {mode === "login" && (
-                        <button type="button" onClick={() => switchMode("forgot")} className={`text-xs font-medium text-muted-foreground underline-offset-2 hover:text-primary hover:underline ${FOCUS}`}>
+                        <button type="button" onClick={() => switchMode("forgot")} className={`font-medium text-muted-foreground underline-offset-2 hover:text-primary hover:underline ${isAppMode ? "text-[13px] py-2" : "text-xs"} ${FOCUS}`}>
                           esqueci a senha
                         </button>
                       )}
@@ -321,11 +360,13 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
                   </div>
                 )}
               </div>
+              {/* o vazio fica aqui: com o teclado aberto ele colapsa e o CTA sobe (§1.2) */}
+              {isAppMode && <div className="min-h-6 flex-1" />}
               <AuthCta busy={busy} disabled={busy || !canSubmit} busyLabel={copy.busy} label={copy.cta} />
             </>
           )}
         </div>
-        <p className="mt-5 border-t border-border pt-4 text-center text-[13px] text-muted-foreground">
+        <p className={`text-center text-[13px] text-muted-foreground ${isAppMode ? "mt-4" : "mt-5 border-t border-border pt-4"}`}>
           {mode === "login" && <>Não tem conta? <ModeLink onClick={() => switchMode("signup")}>Criar conta</ModeLink></>}
           {mode === "signup" && <>Já tem conta? <ModeLink onClick={() => switchMode("login")}>Entrar</ModeLink></>}
           {mode === "forgot" && <>Lembrou a senha? <ModeLink onClick={() => switchMode("login")}>Voltar pra entrar</ModeLink></>}
@@ -354,22 +395,23 @@ function ResetScreen({ onLogin }: { onLogin: (me: Me) => void }) {
   const tokenErr = !!err && err.includes("link inválido"); // resposta da API em §B4
   return (
     <AuthShell>
-      <form onSubmit={submit} aria-labelledby="auth-title">
-        <div className="mb-5">
-          <h1 id="auth-title" className="text-[17px] font-semibold tracking-[-0.01em]">Crie sua nova senha.</h1>
-          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">Ela vale a partir de agora, em todos os seus aparelhos.</p>
+      <form onSubmit={submit} aria-labelledby="auth-title" className={isAppMode ? "flex flex-1 flex-col" : undefined}>
+        <div className={isAppMode ? "mt-8" : "mb-5"}>
+          <h1 id="auth-title" className={isAppMode ? "text-2xl font-bold tracking-[-0.02em]" : "text-[17px] font-semibold tracking-[-0.01em]"}>Crie sua nova senha.</h1>
+          <p className={`leading-relaxed text-muted-foreground ${isAppMode ? "mt-1.5 text-sm" : "mt-1 text-[13px]"}`}>Ela vale a partir de agora, em todos os seus aparelhos.</p>
         </div>
         {err && <FormAlert>{err}</FormAlert>}
-        <div className="space-y-4">
+        <div className={`space-y-4 ${isAppMode ? "mt-7" : ""}`}>
           <div>
             <label htmlFor="new-pass" className={LABEL}>Nova senha</label>
             <PasswordInput id="new-pass" value={pass} onChange={setPass} autoComplete="new-password" autoFocus />
             <p className="mt-1.5 text-xs text-muted-foreground">mínimo de 6 caracteres</p>
           </div>
         </div>
+        {isAppMode && <div className="min-h-6 flex-1" />}
         <AuthCta busy={busy} disabled={busy || pass.length < 6} busyLabel="salvando…" label="Salvar e entrar" />
         {tokenErr && (
-          <button type="button" onClick={() => navigate("/?m=esqueci")} className={`mt-2 h-10 w-full rounded-lg border border-border text-sm font-medium text-foreground transition-colors hover:bg-accent ${FOCUS}`}>
+          <button type="button" onClick={() => navigate("/?m=esqueci")} className={`mt-2 w-full border border-border font-medium text-foreground transition-colors hover:bg-accent ${isAppMode ? "h-13 rounded-xl text-[15px]" : "h-10 rounded-lg text-sm"} ${FOCUS}`}>
             pedir um novo link
           </button>
         )}
@@ -389,10 +431,14 @@ export default function App() {
     return () => window.removeEventListener("popstate", on);
   }, []);
   useEffect(() => { getMe().then(setMe).catch(() => setMe(null)).finally(() => setBooting(false)); }, []);
-  const doLogout = async () => { await logout().catch(() => {}); setMe(null); navigate("/"); };
+  // no app, "/" é a landing pra quem não tem sessão — sair tem que cair na porta do app
+  const doLogout = async () => { await logout().catch(() => {}); setMe(null); navigate(raiz); };
   return (
     <ThemeProvider>
-      {booting ? <div className="grid min-h-full place-items-center text-sm text-muted-foreground">carregando…</div>
+      {/* no app o boot emenda no splash do Android: só o logo, sem "carregando…" piscando (§2) */}
+      {booting ? (isAppMode
+        ? <div className="grid min-h-[100svh] place-items-center opacity-60"><Logo size={48} /></div>
+        : <div className="grid min-h-full place-items-center text-sm text-muted-foreground">carregando…</div>)
         : parseRoute().name === "redefinir" && !me ? <ResetScreen onLogin={setMe} />
         : me ? <Shell me={me} onLogout={doLogout} /> : <Login onLogin={setMe} />}
     </ThemeProvider>

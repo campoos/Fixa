@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Check, Crown, Loader2 } from "lucide-react";
-import { ApiError, billingCheckout, getConfig, joinWaitlist, type Me } from "@/lib/api";
+import { ApiError, billingCheckout, getConfig, joinWaitlist, type Config, type Me } from "@/lib/api";
+import { isAppMode } from "@/lib/app-mode";
 import { useApi } from "@/lib/useApi";
 import { FOCUS } from "@/App";
 import { Card } from "@/components/ui/card";
@@ -166,6 +167,87 @@ function ProCard({ me, billing }: { me: Me; billing: boolean }) {
   );
 }
 
+/* ── modo app: a tela não vende, informa o plano da conta (DESIGN-APP-MODE §3) ── */
+
+// medidor de consumo: mono tabular, âmbar quando o limite estourou
+function UsageRow({ label, used, limit }: { label: string; used: number; limit: number }) {
+  const full = used >= limit;
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-[13px] text-muted-foreground">{label}</span>
+      <span className={`font-mono text-[13px] tabular-nums ${full ? "text-recall" : "text-foreground"}`}>{used}/{limit}</span>
+    </div>
+  );
+}
+
+function UsageMeters({ cfg }: { cfg: Config }) {
+  return (
+    <div className="mt-4 space-y-2">
+      <UsageRow label="temas ativos" used={cfg.themes} limit={cfg.freeLimit} />
+      <UsageRow label="gerações por IA" used={cfg.gen.used} limit={cfg.gen.limit} />
+      <UsageRow label="correções do Tutor" used={cfg.tutor.used} limit={cfg.tutor.limit} />
+    </div>
+  );
+}
+
+function ProAppScreen({ me, cfg }: { me: Me; cfg: Config }) {
+  const isPro = me.plan === "pro";
+  const temasNoTeto = !isPro && cfg.themes >= cfg.freeLimit;
+  return (
+    <div className="mx-auto w-full max-w-3xl">
+      <div className="text-center">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">plano</p>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight md:text-[28px]">{isPro ? "Você é Pro" : "Seu plano"}</h1>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          {isPro
+            ? "Temas ilimitados e geração direta por IA liberados na sua conta."
+            : "Revisões diárias ilimitadas, com o método completo."}
+        </p>
+        {isPro && (
+          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-primary/12 px-2.5 py-0.5 font-mono text-[11px] font-medium text-primary"><Crown className="h-3 w-3" /> pro</span>
+        )}
+      </div>
+
+      <div className="mt-8">
+        {isPro ? (
+          <Card className="gap-0 border-primary/50 p-6">
+            <p className="text-sm font-semibold">Pro</p>
+            <StaticSlot tone="domain"><Check className="h-4 w-4" /> plano ativo na sua conta</StaticSlot>
+            <Features items={PRO_FEATURES} />
+          </Card>
+        ) : (
+          <>
+            <Card className="gap-0 p-6">
+              <p className="text-sm font-semibold">Grátis</p>
+              <StaticSlot tone="muted">Seu plano atual</StaticSlot>
+              <UsageMeters cfg={cfg} />
+              {temasNoTeto && (
+                <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+                  Limite de temas ativos atingido. Arquive um tema para criar outro.
+                </p>
+              )}
+              <Features items={FREE_FEATURES} />
+            </Card>
+            <div className="mt-4 rounded-xl border border-border p-4">
+              <p className="text-sm font-semibold">Fixa Pro</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+                Temas ilimitados, geração por IA em 1 clique e correção do Tutor. Disponível para contas Pro.
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">A assinatura é administrada fora do aplicativo.</p>
+            </div>
+          </>
+        )}
+      </div>
+
+      {isPro && <p className="mt-6 text-center text-xs text-muted-foreground">Assinatura administrada fora do aplicativo.</p>}
+      <p className="mx-auto mt-4 max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
+        Seus dados são{" "}
+        <a href="/api/export" download className={`underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-foreground ${FOCUS}`}>exportáveis</a>, sempre.
+      </p>
+    </div>
+  );
+}
+
 /* ── estados da página ── */
 
 function ProSkeleton() {
@@ -188,6 +270,8 @@ export function Pro({ me }: { me: Me }) {
   const isPro = me.plan === "pro";
   if (loading && !cfg) return <ProSkeleton />;
   if (error && !cfg) return <div className="mx-auto w-full max-w-3xl"><Card className="p-4 text-sm text-destructive">erro: {error}</Card></div>;
+  // no app Android nada pode empurrar pra checkout externo: a tela vira status do plano
+  if (isAppMode && cfg) return <ProAppScreen me={me} cfg={cfg} />;
   return (
     <div className="mx-auto w-full max-w-3xl">
       <div className="text-center">
@@ -211,7 +295,9 @@ export function Pro({ me }: { me: Me }) {
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         <FreeCard isPro={isPro} />
-        <ProCard me={me} billing={cfg?.billingEnabled ?? false} />
+        {/* no app Android o checkout externo é proibido (conteúdo digital exige Google Play
+            Billing) — o CTA de assinatura só existe na web até o billing do Play entrar */}
+        <ProCard me={me} billing={!isAppMode && (cfg?.billingEnabled ?? false)} />
       </div>
 
       <p className="mx-auto mt-8 max-w-xl text-center text-xs leading-relaxed text-muted-foreground">

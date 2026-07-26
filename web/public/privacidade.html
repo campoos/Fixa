@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixa — Política de Privacidade</title>
+<meta name="description" content="Como o Fixa trata seus dados: o que coleta, por quê, com quem compartilha e como você apaga tudo.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="canonical" href="__BASE_URL__/privacidade">
+<meta name="theme-color" content="#12101b">
+<style>
+  :root { color-scheme: dark; --bg:#12101b; --fg:#efedf6; --muted:#a9a4bd; --line:#2a2637; --primary:#7C5CFC; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width: 46rem; margin:0 auto; padding: 40px 20px 72px; }
+  a { color: var(--primary); }
+  h1 { font-size: 28px; line-height:1.2; letter-spacing:-0.02em; margin:24px 0 4px; }
+  h2 { font-size: 18px; margin:36px 0 8px; letter-spacing:-0.01em; }
+  p, li { color: var(--muted); }
+  li { margin: 6px 0; }
+  .marca { display:flex; align-items:center; gap:10px; font-weight:800; font-size:18px; color:var(--fg); text-decoration:none; }
+  .data { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; margin-top:8px; display:block; overflow-x:auto; }
+  th, td { border-bottom:1px solid var(--line); padding:10px 12px 10px 0; text-align:left; font-size:14px; vertical-align:top; }
+  th { color:var(--fg); font-weight:600; white-space:nowrap; }
+  td { color:var(--muted); }
+  footer { margin-top:48px; border-top:1px solid var(--line); padding-top:20px; font-size:13px; }
+</style>
+</head><body><main>
+
+<a class="marca" href="/">
+  <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+    <path d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="#7C5CFC" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="23.78" cy="8.22" r="3.2" fill="#F4B740"/>
+  </svg> Fixa
+</a>
+
+<h1>Política de Privacidade</h1>
+<p class="data">Vigente desde 26 de julho de 2026 · vale para o site fixaestudos.com.br e para o aplicativo Android Fixa.</p>
+
+<h2>Quem trata seus dados</h2>
+<p>O Fixa é um produto independente, mantido por seu desenvolvedor. Para falar sobre privacidade, pedir seus dados ou pedir exclusão, escreva para <a href="mailto:__EMAIL_CONTATO__">__EMAIL_CONTATO__</a>.</p>
+
+<h2>O que é coletado</h2>
+<table>
+  <tr><th>Dado</th><th>Para quê</th></tr>
+  <tr><td>Nome e e-mail</td><td>Identificar sua conta, enviar recuperação de senha e o lembrete diário de estudo (que você pode desligar).</td></tr>
+  <tr><td>Senha</td><td>Guardada apenas como hash (scrypt). Ninguém, inclusive o desenvolvedor, consegue lê-la.</td></tr>
+  <tr><td>Seu conteúdo de estudo</td><td>Temas, trilhas, respostas que você escreve, anotações, notas do Tutor e o histórico de revisões — é o que faz o app funcionar.</td></tr>
+  <tr><td>Cookie de sessão</td><td>Manter você logado. É um cookie próprio, sem rastreamento entre sites.</td></tr>
+  <tr><td>Contadores de uso</td><td>Números agregados de visitas e cadastros por dia, para saber se o produto está sendo usado. Não formam perfil individual.</td></tr>
+</table>
+<p>O Fixa não pede acesso a contatos, localização, câmera, microfone, arquivos, nem a lista de aplicativos do aparelho. Não há anúncios e não há rastreadores de terceiros no aplicativo.</p>
+
+<h2>Com quem os dados são compartilhados</h2>
+<p>Só com a infraestrutura necessária para o app existir, e apenas o mínimo que cada uma precisa:</p>
+<ul>
+  <li><b>Render</b> — hospedagem do serviço.</li>
+  <li><b>Upstash</b> — banco de dados onde sua conta e seus estudos ficam guardados.</li>
+  <li><b>Google (API Gemini)</b> — quando você usa a geração de trilha por IA ou a correção do Tutor, o texto do tema e a sua resposta são enviados para o modelo gerar o retorno.</li>
+  <li><b>Brevo</b> — envio dos e-mails de recuperação de senha e dos lembretes.</li>
+</ul>
+<p>Seus dados não são vendidos e não são cedidos a anunciantes ou corretores de dados.</p>
+
+<h2>Por quanto tempo ficam guardados</h2>
+<p>Enquanto sua conta existir. Ao pedir exclusão, a conta e o conteúdo vinculado a ela são apagados; contadores agregados, que não identificam ninguém, permanecem.</p>
+
+<h2>Seus direitos (LGPD)</h2>
+<ul>
+  <li><b>Ver e exportar</b> — a tela de plano tem um link que baixa tudo o que é seu em JSON.</li>
+  <li><b>Corrigir</b> — nome, e-mail e conteúdo dos temas são editáveis dentro do app.</li>
+  <li><b>Apagar</b> — peça por e-mail e a conta é excluída.</li>
+  <li><b>Parar os e-mails</b> — todo lembrete tem link de descadastro, e sair da lista não afeta o uso do app.</li>
+</ul>
+
+<h2>Crianças</h2>
+<p>O Fixa é destinado a maiores de 13 anos e não coleta dados de crianças de forma intencional.</p>
+
+<h2>Segurança</h2>
+<p>O acesso é por HTTPS, a senha é guardada como hash e a sessão usa cookie <code>HttpOnly</code>. Nenhum sistema é imune a falhas: se acontecer um incidente que afete seus dados, os usuários atingidos serão avisados por e-mail.</p>
+
+<h2>Mudanças nesta política</h2>
+<p>Se algo relevante mudar, a data no topo muda junto e o aviso aparece no app antes de a mudança valer.</p>
+
+<footer><a href="/">Voltar para o Fixa</a></footer>
+</main></body></html>

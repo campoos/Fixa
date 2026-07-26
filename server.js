@@ -38,6 +38,9 @@ const APP_USER = process.env.APP_USER || "João";           // nome da conta fun
 const FOUNDER_EMAIL = (process.env.FOUNDER_EMAIL || "joao@fixa.app").toLowerCase();
 const FREE_THEME_LIMIT = Number(process.env.FREE_THEME_LIMIT || 2); // plano free: nº máx de temas
 const BASE_URL = (process.env.PUBLIC_URL || process.env.BASE_URL || "https://fixa-hbn1.onrender.com").replace(/\/+$/, "");
+// impressão digital da chave de upload (android/android.keystore, alias fixa) — a do Play
+// App Signing entra depois por ANDROID_CERT_FINGERPRINTS, sem novo deploy de código
+const ANDROID_CERT_FALLBACK = "7D:0E:A7:FE:AE:D5:3E:FF:57:81:66:B8:57:8A:A5:92:BE:AD:CB:08:FF:38:03:1C:BA:08:6D:5C:5B:92:2C:AF";
 // billing (Mercado Pago Assinaturas) — env-gated: sem credenciais, o /pro segue com a lista de espera
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || "";
 const MP_PLAN_ID = process.env.MP_PLAN_ID || "";
@@ -374,6 +377,8 @@ async function serveStatic(url, res, authed) {
   let p = normalize(url.pathname).replace(/^(\.\.[/\\])+/, "");
   // visitante deslogado na raiz vê a landing; logado cai no app
   if (p === "/" && !authed) p = "/fixa.html";
+  // política de privacidade: página própria, exigida pela Google Play (URL pública)
+  if (p === "/privacidade") p = "/privacidade.html";
   let file = join(DIST, p === "/" ? "index.html" : p);
   if (!file.startsWith(DIST)) file = join(DIST, "index.html");
   try {
@@ -386,6 +391,9 @@ async function serveStatic(url, res, authed) {
       : p.startsWith("/assets/") || p.startsWith("/brand/") || p.startsWith("/icons/") || p === "/apple-touch-icon.png"
       ? "public, max-age=31536000, immutable"
       : ext === ".html" || p === "/" ? "no-cache" : "public, max-age=3600";
+    if (file.endsWith("privacidade.html")) {
+      data = data.toString("utf8").replaceAll("__BASE_URL__", BASE_URL);
+    }
     if (file.endsWith("fixa.html")) {
       // landing: og:url/canonical nascem certos pra qualquer domínio (LAUNCH §1) + funil (§2)
       data = data.toString("utf8").replaceAll("__BASE_URL__", BASE_URL);
@@ -416,6 +424,19 @@ const server = createServer(async (req, res) => {
     if (host.endsWith(".onrender.com") && !BASE_URL.includes(".onrender.com") && !path.startsWith("/api/") && req.method === "GET") {
       res.writeHead(301, { Location: `${BASE_URL}${req.url}` });
       return res.end();
+    }
+    // Digital Asset Links: prova pro Android que este site e o app br.com.fixaestudos.app
+    // são do mesmo dono. Sem isso o TWA abre com a barra do navegador por cima.
+    // Aceita várias impressões digitais porque o Play re-assina o app: a chave local
+    // (upload) e a que o Google gera no Play App Signing precisam valer as duas.
+    if (path === "/.well-known/assetlinks.json") {
+      const fps = (process.env.ANDROID_CERT_FINGERPRINTS || ANDROID_CERT_FALLBACK)
+        .split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" });
+      return res.end(JSON.stringify([{
+        relation: ["delegate_permission/common.handle_all_urls"],
+        target: { namespace: "android_app", package_name: process.env.ANDROID_PACKAGE_ID || "br.com.fixaestudos.app", sha256_cert_fingerprints: fps },
+      }], null, 2));
     }
     if (path === "/robots.txt") {
       res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "public, max-age=3600" });
