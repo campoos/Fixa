@@ -647,16 +647,27 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       const { theme, level, mode, depth } = await readBody(req);
       if (!theme || !String(theme).trim()) return json(res, 400, { error: "tema obrigatório" });
       const prompt = buildPrompt({ theme, level, mode, depth });
-      const g = await callGemini(prompt, { temperature: 0.4, timeoutMs: 120000, tries: 2 });
-      if (!g.ok) {
-        if (g.status === 429) return json(res, 429, { error: "limite do Gemini atingido — tenta de novo em instantes ou usa o fluxo manual" });
-        return json(res, 502, { error: g.status === 504 ? "geração demorou demais (timeout) — tenta de novo" : `${g.error} — tenta de novo` });
+      // abordagem pedida é contrato: em "só teórico"/"só prático" o gerador às vezes devolve
+      // misto. Confere o que voltou e dá UMA segunda chance apontando o desvio, em vez de
+      // gravar a trilha errada (a geração só é contabilizada quando o tema entra de fato).
+      const tipoExigido = mode === "practice" ? "practice" : mode === "theory" ? "theory" : null;
+      let v = null;
+      for (let tentativa = 0; tentativa < (tipoExigido ? 2 : 1); tentativa++) {
+        const reforco = tentativa === 0 ? "" : `\n\nATENÇÃO: a resposta anterior misturou os tipos de task. Refaça a trilha inteira com "type": "${tipoExigido}" em TODAS as tasks, sem nenhuma exceção.`;
+        const g = await callGemini(prompt + reforco, { temperature: 0.4, timeoutMs: 120000, tries: 2 });
+        if (!g.ok) {
+          if (g.status === 429) return json(res, 429, { error: "limite do Gemini atingido — tenta de novo em instantes ou usa o fluxo manual" });
+          return json(res, 502, { error: g.status === 504 ? "geração demorou demais (timeout) — tenta de novo" : `${g.error} — tenta de novo` });
+        }
+        // remove cercas de markdown se vierem, e valida
+        const cleaned = g.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+        const parcial = validateTrack(cleaned);
+        if (!parcial.ok) return json(res, 422, { error: "o conteúdo gerado veio fora do formato — tenta de novo ou usa o fluxo manual", errors: parcial.errors.slice(0, 8) });
+        v = parcial;
+        if (!tipoExigido) break;
+        const c = trackCounts(parcial.track);
+        if ((tipoExigido === "practice" ? c.theory : c.practice) === 0) break;
       }
-      const text = g.text;
-      // remove cercas de markdown se vierem, e valida
-      const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
-      const v = validateTrack(cleaned);
-      if (!v.ok) return json(res, 422, { error: "o conteúdo gerado veio fora do formato — tenta de novo ou usa o fluxo manual", errors: v.errors.slice(0, 8) });
       const id = freeId(ud, v.track.id);
       v.track.id = id;
       v.track.createdAt = new Date().toISOString();
