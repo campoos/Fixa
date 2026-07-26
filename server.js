@@ -367,7 +367,7 @@ const setSession = (res, code, uid, body) => {
 const readBody = (req) => new Promise((res) => { let b = ""; req.on("data", (c) => { b += c; if (b.length > 262144) { b = ""; req.destroy(); res({}); } }); req.on("end", () => { try { res(JSON.parse(b || "{}")); } catch { res({}); } }); }); // teto 256KB (QA #11)
 
 // ---- estático (SPA + landing pública na raiz) ----
-const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2" };
+const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json" };
 // utm_source saneado pra chave de contador ([a-z0-9-], máx 24)
 const cleanSrc = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24);
 async function serveStatic(url, res, authed) {
@@ -380,7 +380,10 @@ async function serveStatic(url, res, authed) {
     let data = await readFile(file);
     const ext = extname(file);
     // cache na edge (LAUNCH §5): assets hasheados e marca são imutáveis; HTML nunca cacheia
-    const cache = p.startsWith("/assets/") || p.startsWith("/brand/") || p === "/apple-touch-icon.png"
+    // sw.js nunca cacheia: com cache longo o app fica preso numa versão velha do service worker
+    const cache = p === "/sw.js"
+      ? "no-cache"
+      : p.startsWith("/assets/") || p.startsWith("/brand/") || p.startsWith("/icons/") || p === "/apple-touch-icon.png"
       ? "public, max-age=31536000, immutable"
       : ext === ".html" || p === "/" ? "no-cache" : "public, max-age=3600";
     if (file.endsWith("fixa.html")) {
