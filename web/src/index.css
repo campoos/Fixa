@@ -251,15 +251,15 @@ body {
 }
 .logo-traco {
   stroke-dasharray: 1; /* pathLength=1 no SVG → o traço todo cabe em "1" */
-  animation: logo-desenha 900ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation: logo-desenha 1400ms cubic-bezier(0.55, 0, 0.35, 1) forwards;
 }
 .logo-ponto {
   transform-box: fill-box; /* sem isso o scale gira em torno da origem do viewBox, não da bolinha */
   transform-origin: center;
   opacity: 0;
   animation:
-    logo-plim 520ms cubic-bezier(0.2, 0.8, 0.3, 1) 820ms forwards,
-    logo-respira 2.4s ease-in-out 1400ms infinite;
+    logo-plim 620ms cubic-bezier(0.2, 0.8, 0.3, 1) 1280ms forwards,
+    logo-respira 2.4s ease-in-out 1950ms infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .logo-traco,
