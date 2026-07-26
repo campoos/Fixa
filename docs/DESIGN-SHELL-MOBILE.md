@@ -19,7 +19,7 @@
 
 Na rota `/revisar` (em `<md`) **a tab bar não renderiza** e o dock sticky do player continua dono do `bottom-0` + safe-area, como hoje.
 
-- **Por quê esconder e não empilhar**: dock (h-12 + paddings ≈ 72px) sobre bar (56px + safe-area) = ~130px+ de cromo no rodapé da tela mais focada do app, com Errei/Acertei encostados nas abas — um toque fantasma em "Temas" no meio da sessão é inaceitável. Sessão de revisão é imersiva (a spec do player já a trata como começo-meio-fim); esconder tabs durante a "lição" é o padrão consagrado dos apps de estudo.
+- **Por quê esconder e não empilhar**: dock (h-12 + paddings ≈ 72px) sobre bar (64px + safe-area) = ~130px+ de cromo no rodapé da tela mais focada do app, com Errei/Acertei encostados nas abas — um toque fantasma em "Temas" no meio da sessão é inaceitável. Sessão de revisão é imersiva (a spec do player já a trata como começo-meio-fim); esconder tabs durante a "lição" é o padrão consagrado dos apps de estudo.
 - **Por quê a rota inteira** (e não "só com card ativo"): o estado da sessão vive dentro do `Review`; vazar `cur !== null` pro Shell criaria acoplamento (evento/contexto novo) pra ganhar quase nada. Nos estados vazio/fim, a saída já existe na própria tela (`Continuar estudando` / `Voltar aos temas`) e o logo do header sempre leva pra Home.
 - Em `/novo`, `/ajuda`, `/pro`, `/`, `/t/:id` a bar aparece normalmente (em `/novo` nenhuma aba fica ativa — ok, é uma tela de ação alcançada pelo CTA).
 
@@ -27,7 +27,7 @@ Na rota `/revisar` (em `<md`) **a tab bar não renderiza** e o dock sticky do pl
 
 ## 2. Header mobile (`<md`)
 
-Mesmo elemento `header` atual (sticky, `h-14`, vidro `bg-background/85 backdrop-blur-md`, `z-30`). Muda só o conteúdo em `<md`:
+Mesmo elemento `header` atual (sticky, `h-14`, vidro `bg-background/92 backdrop-blur-md` + `pt-[env(safe-area-inset-top)]`, `z-30`). Muda só o conteúdo em `<md`:
 
 ```
 [ Logo + Fixa ]                    [ (+) Novo tema ] [ tema ] [ sair ]
@@ -48,8 +48,8 @@ Nada muda em ≥`md`: pills, badge no pill Revisar, CTA completo, tudo como hoje
 
 ```tsx
 {route.name !== "revisar" && (
-  <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
-    <div className="mx-auto grid h-14 max-w-4xl grid-cols-4">
+  <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/92 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-[0_-2px_10px_-4px_oklch(0.235_0.03_290/0.18)] backdrop-blur-md md:hidden">
+    <div className="mx-auto grid h-16 max-w-4xl grid-cols-4">
       {/* 4 TabBtn */}
     </div>
   </nav>
@@ -57,7 +57,9 @@ Nada muda em ≥`md`: pills, badge no pill Revisar, CTA completo, tudo como hoje
 ```
 
 - `fixed` (não sticky): a bar nunca sai da tela ao rolar. Mesma linguagem de vidro do header; `border-t` espelha o `border-b` do topo. `z-30` (nunca coexiste com o dock `z-10` — rota `/revisar` não tem bar).
-- Altura de conteúdo **h-14 (56px)** + `pb-[env(safe-area-inset-bottom)]` fora do grid (a safe-area estende o vidro, não os alvos).
+- Altura de conteúdo **h-16 (64px)** + no mínimo **8px** embaixo (`max(safe-area, 0.5rem)`), fora do grid: 72px no total, entre a navigation bar do Material 3 (80dp) e a tab bar do iOS (49+34pt). Com 56px rente à borda o rodapé caía na faixa do gesto do Android — e em aparelho sem entalhe a safe-area é 0, por isso o piso de 8px.
+- **Vidro a 92%, não 85%**: a 85% sobre fundo claro a barra ficava quase da cor do conteúdo e o card cortado lia como colisão. A sombra rasa pra cima é a pista de que o conteúdo passa por baixo.
+- Nada disso existe sem **`viewport-fit=cover`** na meta viewport (`web/index.html`): sem ele todo `env(safe-area-inset-*)` vale 0.
 - `md:hidden` — desktop nunca vê a bar.
 
 ### 3.2 Aba (`TabBtn`)
@@ -68,34 +70,34 @@ const TabBtn = ({ to, active, icon, label, badge }: { to: string; active: boolea
     onClick={() => navigate(to)}
     aria-current={active ? "page" : undefined}
     aria-label={badge ? `${label}, ${badge} ${badge === 1 ? "pendente" : "pendentes"}` : label}
-    className={`relative flex h-full flex-col items-center justify-center gap-1 rounded-lg transition-colors ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"} ${FOCUS}`}
+    className={`relative flex h-full flex-col items-center justify-center gap-1.5 rounded-lg transition-colors ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"} ${FOCUS}`}
   >
     <span className="relative">
-      {icon /* h-5 w-5 */}
+      {icon /* h-[22px] w-[22px] */}
       {badge ? (
         <span aria-hidden="true" className="absolute -right-3.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-recall/15 px-1 font-mono text-[10px] tabular-nums text-recall">
           {badge > 99 ? "99+" : badge}
         </span>
       ) : null}
     </span>
-    <span className="text-[10px] font-medium leading-none">{label}</span>
+    <span className="text-[11px] font-medium leading-none">{label}</span>
   </button>
 );
 ```
 
 | Aba | `to` | `active` | Ícone (lucide) | Racional do ícone |
 |---|---|---|---|---|
-| **Temas** | `/` | `home \|\| track` | `Library` `h-5 w-5` | coleção de temas/trilhas |
-| **Revisar** | `/revisar` | `revisar` | `Layers` `h-5 w-5` | eco das caixas Leitner (identidade da revisão) |
-| **Ajuda** | `/ajuda` | `ajuda` | `CircleHelp` `h-5 w-5` | convenção universal |
-| **Pro** | `/pro` | `pro` | `Gem` `h-5 w-5` | premium sem gritar (nada de coroa dourada) |
+| **Temas** | `/` | `home \|\| track` | `Library` `h-[22px] w-[22px]` | coleção de temas/trilhas |
+| **Revisar** | `/revisar` | `revisar` | `Layers` `h-[22px] w-[22px]` | eco das caixas Leitner (identidade da revisão) |
+| **Ajuda** | `/ajuda` | `ajuda` | `CircleHelp` `h-[22px] w-[22px]` | convenção universal |
+| **Pro** | `/pro` | `pro` | `Gem` `h-[22px] w-[22px]` | premium sem gritar (nada de coroa dourada) |
 
 **Estados:**
 - **Ativa**: `text-primary` (ícone + label juntos) + `aria-current="page"`. Violeta em volume baixo — só tinta, **sem** pill/fundo/sublinha (a pill `bg-secondary` fica sendo vocabulário do desktop).
 - **Inativa**: `text-muted-foreground` (AA garantido pelo token), `hover:text-foreground` (desktop estreito/pointer).
 - **Foco**: `FOCUS` (anel violeta padrão do app) sobre o `rounded-lg`.
 - **Peso constante**: `font-medium` sempre (ativa muda só cor) — troca de peso mexeria na largura do label.
-- **Alvo de toque**: a célula inteira do grid (≈ 82–96px × 56px em 330–390px de viewport) — ≥48px com folga, sem gap fantasma entre abas.
+- **Alvo de toque**: a célula inteira do grid (≈ 82–96px × 64px em 330–390px de viewport) — ≥48px com folga, sem gap fantasma entre abas.
 
 ### 3.3 Badge do Revisar
 
@@ -108,10 +110,10 @@ const TabBtn = ({ to, active, icon, label, badge }: { to: string; active: boolea
 A bar é `fixed`, então o conteúdo precisa de respiro embaixo em `<md` (exceto em `/revisar`, onde não há bar):
 
 ```tsx
-<main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" ? "pb-6" : "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
+<main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" ? "pb-6" : "pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
 ```
 
-- `5rem` = 56px da bar + 24px do `py-6` original; ≥`md` volta ao `pb-6` de sempre.
+- `6rem` = 64px da bar + 8px do piso de respiro + 24px do `py-6` original; ≥`md` volta ao `pb-6` de sempre.
 - `scroll-margin`/âncoras: não há âncoras no app — nada a fazer.
 
 ---
@@ -144,7 +146,7 @@ Tom herdado: sem exclamação, sem emoji; números em mono `tabular-nums`.
 ## 6. Acessibilidade
 
 - **Dois `nav`s, papéis claros**: o desktop (pills) e a bar mobile nunca são visíveis ao mesmo tempo, mas ambos ficam no DOM — dar `aria-label="navegação principal"` à bar e manter o `nav` do header sem conflito (opcional: `aria-label="navegação"` nele). `aria-current="page"` na aba/pill ativa, como hoje.
-- **Alvos**: 56px de altura × ≥82px de largura por aba; nada de alvos de 36px na navegação primária mobile.
+- **Alvos**: 64px de altura × ≥82px de largura por aba; nada de alvos de 36px na navegação primária mobile.
 - **Foco visível**: `FOCUS` em todas as abas (anel violeta, offset sobre o vidro).
 - **Leitor de tela**: badge `aria-hidden` + contagem no `aria-label` do botão (um anúncio só, sem número solto).
 - **Contraste**: só tokens existentes — `muted-foreground`, `primary` e `recall` já são AA nos dois temas em 10–11px (foi o critério de cunhagem deles).

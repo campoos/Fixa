@@ -130,7 +130,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
       onClick={() => navigate(to)}
       aria-current={active ? "page" : undefined}
       aria-label={badge ? `${label}, ${badge} ${badge === 1 ? "pendente" : "pendentes"}` : label}
-      className={`relative flex h-full flex-col items-center justify-center gap-1 rounded-lg transition-colors ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"} ${FOCUS}`}
+      className={`relative flex h-full flex-col items-center justify-center gap-1.5 rounded-lg transition-colors ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"} ${FOCUS}`}
     >
       <span className="relative">
         {icon}
@@ -140,12 +140,14 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
           </span>
         ) : null}
       </span>
-      <span className="text-[10px] font-medium leading-none">{label}</span>
+      <span className="text-[11px] font-medium leading-none">{label}</span>
     </button>
   );
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
+      {/* barras do shell (DESIGN-SHELL-MOBILE §3): translúcidas a 92% — a 85% ficavam quase da cor
+          do fundo e o card cortado no meio lia como colisão, não como "passa por baixo" */}
+      <header className="sticky top-0 z-30 border-b border-border bg-background/92 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-4xl items-center gap-2 px-4">
           <button onClick={() => navigate("/")} className={`mr-2 flex items-center gap-2 rounded-lg ${FOCUS}`}>
             <Logo />
@@ -174,7 +176,7 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
           </div>
         </div>
       </header>
-      <main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" || route.name === "licao" ? "pb-6" : "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
+      <main className={`mx-auto max-w-4xl px-4 pt-6 ${route.name === "revisar" || route.name === "licao" ? "pb-6" : "pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6"}`}>
         {(route.name === "home" || route.name === "redefinir") && <Home />}
         {route.name === "novo" && <NewTheme />}
         {route.name === "revisar" && <Review />}
@@ -183,14 +185,16 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
         {route.name === "track" && <Track id={route.id} me={me} />}
         {route.name === "licao" && <Licao key={`${route.trackId}/${route.taskId}`} trackId={route.trackId} taskId={route.taskId} />}
       </main>
-      {/* bottom tab bar mobile — some nos players /revisar e na Lição (o dock é dono do fundo — DESIGN-LICAO-UI §1.1) */}
+      {/* bottom tab bar mobile — some nos players /revisar e na Lição (o dock é dono do fundo — DESIGN-LICAO-UI §1.1).
+          64 de barra + no mínimo 8 de respiro embaixo: nativo usa 72–83 (M3 80dp, iOS 49+34pt) e com
+          56 rente à borda o rodapé caía na faixa do gesto do Android */}
       {route.name !== "revisar" && route.name !== "licao" && (
-        <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
-          <div className="mx-auto grid h-14 max-w-4xl grid-cols-4">
-            <TabBtn to="/" active={route.name === "home" || route.name === "track"} icon={<Library className="h-5 w-5" />} label="Temas" />
-            <TabBtn to="/revisar" active={false} icon={<Layers className="h-5 w-5" />} label="Revisar" badge={dueCount} />
-            <TabBtn to="/ajuda" active={route.name === "ajuda"} icon={<CircleHelp className="h-5 w-5" />} label="Ajuda" />
-            <TabBtn to="/pro" active={route.name === "pro"} icon={<Gem className="h-5 w-5" />} label={isAppMode ? "Plano" : "Pro"} />
+        <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/92 pb-[max(env(safe-area-inset-bottom),0.5rem)] shadow-[0_-2px_10px_-4px_oklch(0.235_0.03_290/0.18)] backdrop-blur-md md:hidden">
+          <div className="mx-auto grid h-16 max-w-4xl grid-cols-4">
+            <TabBtn to="/" active={route.name === "home" || route.name === "track"} icon={<Library className="h-[22px] w-[22px]" />} label="Temas" />
+            <TabBtn to="/revisar" active={false} icon={<Layers className="h-[22px] w-[22px]" />} label="Revisar" badge={dueCount} />
+            <TabBtn to="/ajuda" active={route.name === "ajuda"} icon={<CircleHelp className="h-[22px] w-[22px]" />} label="Ajuda" />
+            <TabBtn to="/pro" active={route.name === "pro"} icon={<Gem className="h-[22px] w-[22px]" />} label={isAppMode ? "Plano" : "Pro"} />
           </div>
         </nav>
       )}
