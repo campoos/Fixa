@@ -150,10 +150,21 @@ e passa a usar a cobrança do Google (que fica com 15% do primeiro US$ 1M/ano).
 
 ## 7. Pendências antes de publicar
 
-- [ ] Deploy do PWA em produção (manifest, sw, ícones, `/privacidade`, assetlinks).
-- [ ] Conta de desenvolvedor criada e paga.
-- [ ] Backup do keystore + senha fora da VM.
-- [ ] `ANDROID_CERT_FINGERPRINTS` no Render com as duas impressões digitais.
-- [ ] E-mail de contato público definido.
-- [ ] Screenshots e gráfico de destaque.
-- [ ] Voltar do Android (`DESIGN-APP-MODE.md` §4) — não implementado ainda.
+Feito:
+
+- [x] Deploy do PWA em produção (manifest, sw, ícones, `/privacidade`, assetlinks).
+- [x] Verificação de domínio confirmada na API do Google (`digitalassetlinks.googleapis.com`)
+      para `br.com.fixaestudos.app` com a impressão digital da chave de upload.
+- [x] AAB e APK assinados a partir do manifesto de produção.
+- [x] Voltar do Android (`DESIGN-APP-MODE.md` §4) — camadas de histórico, 22/22 no teste
+      com Chrome de verdade dirigindo `history.back()`.
+- [x] Screenshots de celular (5, 1080×1920) e gráfico de destaque.
+
+Falta — e cada um depende de uma decisão ou de uma conta que é sua:
+
+- [ ] **Conta de desenvolvedor** criada e paga (US$ 25) em play.google.com/console.
+- [ ] **Backup do keystore + senha** fora da VM (sem isso, o app não tem futuro — §1).
+- [ ] **E-mail de contato público** definido: some `__EMAIL_CONTATO__` de
+      `web/public/privacidade.html` e vai também na ficha da loja.
+- [ ] **`ANDROID_CERT_FINGERPRINTS` no Render** com as duas impressões digitais — só dá
+      pra fazer depois do primeiro AAB subir, porque a segunda chave nasce lá (§1).
