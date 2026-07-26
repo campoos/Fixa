@@ -12,3 +12,4 @@ build/
 *.apk
 *.idsig
 local.properties
+manifest-checksum.txt
