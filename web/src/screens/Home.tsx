@@ -29,7 +29,7 @@ function ReviewCard({ s }: { s: Stats }) {
   const due = s.dueToday;
   if (due === 0)
     return (
-      <div className="flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex min-h-[76px] min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-domain/12 text-domain"><Check className="h-[18px] w-[18px]" /></span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Fila limpa</p>
@@ -38,7 +38,7 @@ function ReviewCard({ s }: { s: Stats }) {
       </div>
     );
   return (
-    <button onClick={() => navigate("/revisar")} className={`flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-recall/50 ${FOCUS}`}>
+    <button onClick={() => navigate("/revisar")} className={`flex min-h-[76px] min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-recall/50 ${FOCUS}`}>
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-recall/12 text-recall"><RotateCcw className="h-[18px] w-[18px]" /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold">{s.dueMode === "retorno" ? "Retomar revisões" : "Revisar hoje"}</span>
@@ -59,7 +59,7 @@ function ContinueCard({ next }: { next: TrackSummary | undefined }) {
   return (
     <button
       onClick={() => navigate(next ? `/t/${encodeURIComponent(next.id)}` : "/novo")}
-      className={`flex min-h-[76px] items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/50 ${FOCUS}`}
+      className={`flex min-h-[76px] min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/50 ${FOCUS}`}
     >
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
         {next ? <TrackIcon name={next.icon} className="h-[18px] w-[18px]" /> : <Plus className="h-[18px] w-[18px]" />}
@@ -121,8 +121,17 @@ function Heatmap({ days }: { days: Stats["days"] }) {
     const r = e.currentTarget.getBoundingClientRect();
     setTip({ text, x: r.left + r.width / 2, y: r.top });
   };
+  // ancora nas semanas recentes. Refaz no frame seguinte e a cada resize: no celular o
+  // layout ainda mexe depois da montagem, e sem isso a última coluna (hoje) fica cortada.
   useEffect(() => {
-    scrollerRef.current?.scrollTo({ left: scrollerRef.current.scrollWidth });
+    const el = scrollerRef.current;
+    if (!el) return;
+    const aoFim = () => { el.scrollLeft = el.scrollWidth; };
+    aoFim();
+    const raf = requestAnimationFrame(aoFim);
+    const ro = new ResizeObserver(aoFim);
+    ro.observe(el);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [days]);
   if (!days.length) return null;
 
@@ -143,12 +152,14 @@ function Heatmap({ days }: { days: Stats["days"] }) {
 
   return (
     <Card className="gap-0 p-4">
+      {/* a última trilha do grid (4px) é a folga do contorno de "hoje": padding não entra no
+          scroll horizontal quando as colunas transbordam a caixa do grid */}
       <div ref={scrollerRef} onScroll={() => setTip(null)} onMouseLeave={() => setTip(null)} className="scroll-custom overflow-x-auto pb-1">
         <div
           role="img"
           aria-label={`Consistência: ${total} ${total === 1 ? "ação" : "ações"} nas últimas 52 semanas`}
           className="grid gap-[3px]"
-          style={{ gridTemplateColumns: `28px repeat(${weekCount}, minmax(10px, 1fr))`, gridTemplateRows: "14px repeat(7, auto)" }}
+          style={{ gridTemplateColumns: `28px repeat(${weekCount}, minmax(10px, 1fr)) 4px`, gridTemplateRows: "14px repeat(7, auto)" }}
         >
           {segments.filter((seg) => seg.len >= 3).map((seg) => (
             <div key={seg.start} style={{ gridRow: 1, gridColumn: `${seg.start + 2} / span ${Math.min(seg.len, 4)}` }} className="font-mono text-[10px] lowercase text-muted-foreground">
@@ -173,6 +184,9 @@ function Heatmap({ days }: { days: Stats["days"] }) {
               />
             );
           })}
+          {/* ocupa a trilha de folga: trilha vazia não entra no overflow, e sem isso o
+              contorno de "hoje" (a última coluna) fica cortado na borda do scroller */}
+          <div aria-hidden="true" style={{ gridRow: 2, gridColumn: weekCount + 2 }} className="h-px w-1" />
           {Array.from({ length: trailing }).map((_, i) => {
             const slot = startDow + days.length + i;
             return (
@@ -233,7 +247,9 @@ function ThemeCard({ t, onDelete }: { t: TrackSummary; onDelete: (e: MouseEvent<
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{t.title}</h3>
+            {/* basis-40: em tela estreita os selos quebram pra linha de baixo em vez de
+                espremer o título até virar "AWS …" */}
+            <h3 className="min-w-0 flex-1 basis-40 truncate text-[15px] font-semibold">{t.title}</h3>
             {t.targetDate && t.daysLeft != null && <ExamBadge daysLeft={t.daysLeft} />}
             {t.due > 0 && (
               <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-recall" title="pra revisar hoje">
