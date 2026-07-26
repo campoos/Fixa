@@ -154,7 +154,7 @@ function Heatmap({ days }: { days: Stats["days"] }) {
     <Card className="gap-0 p-4">
       {/* a última trilha do grid (4px) é a folga do contorno de "hoje": padding não entra no
           scroll horizontal quando as colunas transbordam a caixa do grid */}
-      <div ref={scrollerRef} onScroll={() => setTip(null)} onMouseLeave={() => setTip(null)} className="scroll-custom overflow-x-auto pb-1">
+      <div ref={scrollerRef} onScroll={() => setTip(null)} onMouseLeave={() => setTip(null)} className="scroll-custom overflow-x-auto pb-3">
         <div
           role="img"
           aria-label={`Consistência: ${total} ${total === 1 ? "ação" : "ações"} nas últimas 52 semanas`}

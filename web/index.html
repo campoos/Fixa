@@ -11,6 +11,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="dark light" />
     <title>Fixa — aprenda de um jeito que fixa</title>
+    <script>
+      // aplica o tema antes do primeiro pixel: sem isso pisca claro até o React montar.
+      // Mesma regra do ThemeProvider (src/lib/theme.tsx) — escolha salva manda, senão o aparelho.
+      try {
+        var t = localStorage.getItem("tv2-theme");
+        var escuro = t === "dark" || (t !== "light" && !matchMedia("(prefers-color-scheme: light)").matches);
+        if (escuro) document.documentElement.classList.add("dark");
+        document.querySelector('meta[name="theme-color"]').content = escuro ? "#12101b" : "#f8f7fb";
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -94,6 +94,12 @@ body,
 #root {
   height: 100%;
 }
+/* modo app: sem esticada no fim do scroll e sem puxar-pra-recarregar. Como o cabeçalho e a
+   barra de baixo vivem no mesmo scroller da página, a esticada arrastava os dois junto —
+   coisa que app nativo não faz. No navegador o comportamento continua o do navegador. */
+html[data-app="1"] {
+  overscroll-behavior: none;
+}
 body {
   margin: 0;
   background: var(--background);
@@ -224,6 +230,44 @@ body {
 .scroll-custom::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--foreground) 32%, transparent);
   background-clip: padding-box;
+}
+
+/* abertura do app: o traço roxo desenha o círculo, o ponto amarelo entra num plim com bounce
+   e depois respira — o boot pode demorar se o servidor estiver acordando, e logo parado
+   parece travado. Usado só na tela de boot do modo app (LogoBoot em App.tsx). */
+@keyframes logo-desenha {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes logo-plim {
+  0% { transform: scale(0); opacity: 0; }
+  55% { transform: scale(1.45); opacity: 1; }
+  78% { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes logo-respira {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+.logo-traco {
+  stroke-dasharray: 1; /* pathLength=1 no SVG → o traço todo cabe em "1" */
+  animation: logo-desenha 900ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.logo-ponto {
+  transform-box: fill-box; /* sem isso o scale gira em torno da origem do viewBox, não da bolinha */
+  transform-origin: center;
+  opacity: 0;
+  animation:
+    logo-plim 520ms cubic-bezier(0.2, 0.8, 0.3, 1) 820ms forwards,
+    logo-respira 2.4s ease-in-out 1400ms infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-traco,
+  .logo-ponto {
+    animation: none;
+    opacity: 1;
+    stroke-dasharray: none;
+  }
 }
 
 /* skeleton com shimmer (varredura), bem mais visível que o pulse de opacidade no dark */

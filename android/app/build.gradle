@@ -26,11 +26,11 @@ def twaManifest = [
     launchUrl: '/app', // The start path for the TWA. Must be relative to the domain.
     name: 'Fixa: Estude e Memorize', // The application name.
     launcherName: 'Fixa', // The name shown on the Android Launcher.
-    themeColor: '#12101B', // The color used for the status bar.
+    themeColor: '#F8F7FB', // The color used for the status bar.
     themeColorDark: '#12101B', // The color used for the dark status bar.
-    navigationColor: '#12101B', // The color used for the navigation bar.
+    navigationColor: '#F8F7FB', // The color used for the navigation bar.
     navigationColorDark: '#12101B', // The color used for the dark navbar.
-    navigationDividerColor: '#12101B', // The navbar divider color.
+    navigationDividerColor: '#F8F7FB', // The navbar divider color.
     navigationDividerColorDark: '#12101B', // The dark navbar divider color.
     backgroundColor: '#12101B', // The color used for the splash screen background.
     enableNotifications: false, // Set to true to enable notification delegation.
@@ -57,7 +57,7 @@ android {
         applicationId "br.com.fixaestudos.app"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 2
+        versionCode 3
         versionName "1.0.0"
 
         // The name for the application

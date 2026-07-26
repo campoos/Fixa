@@ -51,6 +51,19 @@ export function Logo({ size = 24 }: { size?: number }) {
   );
 }
 
+// mesma marca, desenhando: o traço roxo fecha o círculo e o ponto de recall entra num plim.
+// Só no boot do app — enquanto o backend acorda a tela ficaria parada, e o ponto respirando
+// no fim mostra que não travou. Quem pediu menos movimento (prefers-reduced-motion) vê o
+// logo estático, via CSS.
+function LogoBoot({ size = 48 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path className="logo-traco" pathLength={1} d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round" />
+      <circle className="logo-ponto" cx="23.78" cy="8.22" r="3.2" fill="#F4B740" />
+    </svg>
+  );
+}
+
 type Route = { name: "home" } | { name: "novo" } | { name: "revisar" } | { name: "ajuda" } | { name: "pro" } | { name: "track"; id: string } | { name: "licao"; trackId: string; taskId: string } | { name: "redefinir" };
 function parseRoute(): Route {
   const p = window.location.pathname.replace(/^\/+|\/+$/g, "");
@@ -461,7 +474,7 @@ export default function App() {
     <ThemeProvider>
       {/* no app o boot emenda no splash do Android: só o logo, sem "carregando…" piscando (§2) */}
       {booting ? (isAppMode
-        ? <div className="grid min-h-[100svh] place-items-center opacity-60"><Logo size={48} /></div>
+        ? <div className="grid min-h-[100svh] place-items-center"><LogoBoot size={56} /></div>
         : <div className="grid min-h-full place-items-center text-sm text-muted-foreground">carregando…</div>)
         : parseRoute().name === "redefinir" && !me ? <ResetScreen onLogin={setMe} />
         : me ? <Shell me={me} onLogout={doLogout} /> : <Login onLogin={setMe} />}
