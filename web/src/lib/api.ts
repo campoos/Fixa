@@ -76,6 +76,8 @@ export const logout = () => api.post("/api/logout");
 export const forgotPass = (email: string) => api.post<{ ok: true }>("/api/forgot", { email });
 export const resetPass = (token: string, pass: string) => api.post<Me>("/api/reset", { token, pass });
 export const billingCheckout = () => api.post<{ ok: true; url: string }>("/api/billing/checkout");
+// Pix: compra avulsa de prazo (1 mês ou 1 ano) — o retorno é o checkout hospedado do Mercado Pago
+export const billingPix = (plano: "mes" | "ano") => api.post<{ ok: true; url: string; valor: number; dias: number }>("/api/billing/pix", { plano });
 
 // ---- temas ----
 export const getTracks = () => api.get<{ tracks: TrackSummary[] }>("/api/tracks").then((r) => r.tracks);
@@ -100,7 +102,7 @@ export const appendTrack = (id: string, jsonStr: string) => {
 export interface GenUsage { used: number; limit: number; dayUsed?: number; dayLimit?: number }
 // tutor: uso das correções do Tutor — free: lifetime (degustação); pro: no mês
 export interface TutorUsage { used: number; limit: number }
-export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage; price: number; fullPrice: number; founderLeft: number }
+export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage; price: number; fullPrice: number; yearPrice: number; fullYearPrice: number; founderLeft: number; proUntil: string | null }
 export const getConfig = () => api.get<Config>("/api/config");
 // lista do Pro (pré-billing) — guarda o e-mail pra avisar quando abrir
 export const joinWaitlist = (email: string) => api.post<{ ok: true }>("/api/waitlist", { email });

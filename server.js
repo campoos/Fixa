@@ -49,6 +49,13 @@ const MP_PRICE = Number(process.env.MP_PRICE || 19.9); // PRICING.md: R$ 19,90/m
 // "pra sempre" sai de graça: basta o checkout nascer com o preço certo.
 const MP_PRICE_FOUNDER = Number(process.env.MP_PRICE_FOUNDER || 14.9);
 const FOUNDER_SEATS = Number(process.env.FOUNDER_SEATS || 100);
+// Pix: assinatura do Mercado Pago só aceita cartão ou saldo, e a maior parte de quem estuda pra
+// concurso não tem cartão. Então o Pix entra como COMPRA AVULSA de prazo (PRICING.md): paga uma
+// vez, a conta fica Pro até a data (u.proUntil) e acaba — sem cobrança recorrente pra administrar.
+const MP_PRICE_YEAR = Number(process.env.MP_PRICE_YEAR || 149); // PRICING.md: R$ 149/ano
+const MP_PRICE_YEAR_FOUNDER = Number(process.env.MP_PRICE_YEAR_FOUNDER || 119); // 8 meses de fundador
+const PIX_DAYS_MONTH = 31;
+const PIX_DAYS_YEAR = 365;
 const BILLING_ENABLED = Boolean(MP_ACCESS_TOKEN);
 const CRON_SECRET = process.env.CRON_SECRET || "";
 // limites de geração por IA (PRICING.md): free = 1 degustação lifetime; pro = fair use 30/mês, máx 10/dia
@@ -138,8 +145,32 @@ const userById = (id) => Object.values(users).find((u) => u.id === id) || null;
 // vagas de fundador queimadas: conta quem já assinou algum dia (o id da assinatura fica gravado),
 // não quem está Pro agora — quem cancelou não devolve a vaga, e a conta fundadora, que nasce Pro
 // sem passar pelo Mercado Pago, não consome nenhuma.
-const foundersUsed = () => Object.values(users).filter((u) => u.mpPreapprovalId).length;
-const founderPrice = () => (foundersUsed() < FOUNDER_SEATS ? MP_PRICE_FOUNDER : MP_PRICE);
+const hasSeat = (u) => Boolean(u.mpPreapprovalId || u.founderSeat);
+const foundersUsed = () => Object.values(users).filter(hasSeat).length;
+// quem já pegou a vaga nunca perde o preço — é isso que faz o "pra sempre" valer também no Pix,
+// que não é recorrente: na hora de renovar, a conta com vaga vê de novo o preço de fundador.
+const founderOpen = (u) => Boolean(u && hasSeat(u)) || foundersUsed() < FOUNDER_SEATS;
+const priceFor = (u) => (founderOpen(u) ? MP_PRICE_FOUNDER : MP_PRICE);
+const yearPriceFor = (u) => (founderOpen(u) ? MP_PRICE_YEAR_FOUNDER : MP_PRICE_YEAR);
+// o Pix compra prazo, não assinatura: vencido o prazo (e sem assinatura ativa por trás), a conta
+// volta pro free sozinha na primeira requisição depois do vencimento. Preguiçoso de propósito —
+// não existe job varrendo usuários, e quem não abre o app não precisa ser rebaixado.
+function checkExpiry(u) {
+  if (!u || u.plan !== "pro" || !u.proUntil || u.mpPreapprovalId) return u;
+  if (new Date(u.proUntil).getTime() > Date.now()) return u;
+  u.plan = "free";
+  console.log(`[billing] ${u.email} → free (prazo do Pix venceu em ${u.proUntil})`);
+  saveUsers();
+  return u;
+}
+// soma prazo a partir do que ainda resta (renovar antes de vencer não queima os dias que sobraram)
+function grantDays(u, dias, { fundador, paymentId, valor }) {
+  const base = Math.max(Date.now(), u.proUntil ? new Date(u.proUntil).getTime() : 0);
+  u.proUntil = new Date(base + dias * 86400000).toISOString();
+  u.plan = "pro";
+  if (fundador) u.founderSeat = true;
+  u.pixPaid = { ...(u.pixPaid || {}), [paymentId]: { at: new Date().toISOString(), dias, valor } };
+}
 const hashPass = (pass, salt) => new Promise((resolve, reject) => scrypt(String(pass), salt, 64, (e, k) => (e ? reject(e) : resolve(k.toString("hex")))));
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 async function createUser(email, name, pass, plan = "free") {
@@ -547,11 +578,31 @@ ${emailButton(link, "Criar nova senha")}
       await kv.set(`reset:${token}`, { exp: 0 }); // invalida
       return setSession(res, 200, u.id, { name: u.name, email: u.email, plan: u.plan });
     }
-    // webhook do Mercado Pago: confirma/cancela assinatura → plan pro/free
+    // webhook do Mercado Pago: assinatura → plan pro/free · pagamento avulso (Pix) → prazo
     if (path === "/api/billing/webhook" && req.method === "POST") {
       const body = await readBody(req);
       const preId = body?.data?.id;
       const type = body?.type || body?.action || "";
+      // "payment" é o avulso do Pix; "subscription_authorized_payment" é a mensalidade do cartão,
+      // que já é tratada pelo evento de preapproval — por isso o match é exato, não includes()
+      const ehPagamento = String(type) === "payment" || String(type).startsWith("payment.");
+      if (BILLING_ENABLED && preId && ehPagamento) {
+        try {
+          const r = await fetch(`https://api.mercadopago.com/v1/payments/${preId}`, { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } });
+          if (r.ok) {
+            const p = await r.json();
+            const [uid, dias, valor] = String(p.external_reference || "").split(":");
+            const u = userById(uid);
+            // idempotente: o MP reenvia o mesmo evento várias vezes e prazo não pode ser somado duas vezes
+            if (p.status === "approved" && u && !(u.pixPaid || {})[p.id]) {
+              grantDays(u, Number(dias) || PIX_DAYS_MONTH, { fundador: Number(valor) < MP_PRICE, paymentId: p.id, valor: p.transaction_amount });
+              await saveUsers();
+              console.log(`[billing] ${u.email} → pro até ${u.proUntil} (pix ${p.id}, R$ ${p.transaction_amount})`);
+            }
+          }
+        } catch (e) { console.error("[billing] webhook pix:", e.message); }
+        return json(res, 200, { ok: true });
+      }
       if (BILLING_ENABLED && preId && String(type).includes("preapproval")) {
         try {
           const r = await fetch(`https://api.mercadopago.com/preapproval/${preId}`, { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } });
@@ -631,7 +682,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     }
 
     // daqui pra baixo exige sessão
-    const me = sessionUser(req);
+    const me = checkExpiry(sessionUser(req));
     if (!me) return json(res, 401, { error: "login requerido" });
     const ud = await udata(me.id);
     const isPro = me.plan === "pro";
@@ -639,7 +690,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     if (path === "/api/me") return json(res, 200, { name: me.name, email: me.email, plan: me.plan });
     // price/founderLeft: a tela do Pro mostra o preço que o checkout vai cobrar de verdade,
     // e a promessa dos 100 primeiros some sozinha quando as vagas acabam
-    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me), price: founderPrice(), fullPrice: MP_PRICE, founderLeft: Math.max(0, FOUNDER_SEATS - foundersUsed()) });
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me), price: priceFor(me), fullPrice: MP_PRICE, yearPrice: yearPriceFor(me), fullYearPrice: MP_PRICE_YEAR, founderLeft: Math.max(0, FOUNDER_SEATS - foundersUsed()), proUntil: me.proUntil || null });
     // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
     // free: 1 degustação lifetime · pro: fair use 30/mês + máx 10/dia (PRICING.md)
     if (path === "/api/generate" && req.method === "POST") {
@@ -760,8 +811,8 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
           // card_token_id, o que obrigaria a coletar cartão aqui dentro. O external_reference é o
           // que amarra a assinatura ao usuário no webhook.
           body: JSON.stringify({
-            reason: founderPrice() < MP_PRICE ? "Fixa Pro — preço de fundador" : "Fixa Pro",
-            auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: founderPrice(), currency_id: "BRL" },
+            reason: priceFor(me) < MP_PRICE ? "Fixa Pro — preço de fundador" : "Fixa Pro",
+            auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: priceFor(me), currency_id: "BRL" },
             payer_email: me.email,
             external_reference: me.id,
             back_url: `${BASE_URL}/pro`,
@@ -777,6 +828,50 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       } catch (e) {
         console.error("[billing] checkout:", e.message);
         return json(res, 502, { error: "não deu pra iniciar o checkout — tenta de novo" });
+      }
+    }
+    // billing por Pix: compra avulsa de prazo (1 mês ou 1 ano). Checkout Pro hospedado com os
+    // meios de cartão excluídos — sobra Pix e saldo em conta, e o MP cuida de QR, CPF e conciliação.
+    // Quem paga não precisa de conta no Mercado Pago: a tela do Pix abre pra qualquer um.
+    if (path === "/api/billing/pix" && req.method === "POST") {
+      if (!BILLING_ENABLED) return json(res, 400, { error: "pagamento ainda não está aberto" });
+      // conta com assinatura no cartão não compra prazo por cima (viraria cobrança dobrada);
+      // já quem está Pro por Pix pode renovar antes de vencer — os dias somam
+      if (me.mpPreapprovalId) return json(res, 400, { error: "sua conta já tem assinatura ativa" });
+      const { plano } = (await readBody(req)) || {};
+      const ano = plano === "ano";
+      const valor = ano ? yearPriceFor(me) : priceFor(me);
+      const dias = ano ? PIX_DAYS_YEAR : PIX_DAYS_MONTH;
+      try {
+        const r = await fetch("https://api.mercadopago.com/checkout/preferences", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: [{
+              id: ano ? "fixa-pro-ano" : "fixa-pro-mes",
+              title: ano ? "Fixa Pro — 1 ano" : "Fixa Pro — 1 mês",
+              description: ano ? "Acesso Pro por 365 dias" : "Acesso Pro por 31 dias",
+              quantity: 1, unit_price: valor, currency_id: "BRL",
+            }],
+            payer: { email: me.email, name: me.name },
+            // uid:dias:valor — é o que o webhook lê pra saber a quem dar quanto tempo, e se a
+            // compra saiu no preço de fundador (aí a vaga é queimada)
+            external_reference: `${me.id}:${dias}:${valor}`,
+            back_urls: { success: `${BASE_URL}/pro?pago=1`, pending: `${BASE_URL}/pro?pendente=1`, failure: `${BASE_URL}/pro` },
+            payment_methods: { excluded_payment_types: [{ id: "credit_card" }, { id: "debit_card" }, { id: "prepaid_card" }, { id: "ticket" }, { id: "atm" }], installments: 1 },
+            notification_url: `${BASE_URL}/api/billing/webhook`,
+            statement_descriptor: "FIXA",
+          }),
+        });
+        const pref = await r.json();
+        if (!r.ok || !pref.init_point) {
+          console.error("[billing] pix:", r.status, JSON.stringify(pref).slice(0, 300));
+          return json(res, 502, { error: "não deu pra gerar o Pix — tenta de novo" });
+        }
+        return json(res, 200, { ok: true, url: pref.init_point, valor, dias });
+      } catch (e) {
+        console.error("[billing] pix:", e.message);
+        return json(res, 502, { error: "não deu pra gerar o Pix — tenta de novo" });
       }
     }
     // métricas de produto (founder-only) — os 3 números do PARECER-CEO §8.3:

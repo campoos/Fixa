@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Check, Crown, Loader2 } from "lucide-react";
-import { ApiError, billingCheckout, getConfig, joinWaitlist, type Config, type Me } from "@/lib/api";
+import { ApiError, billingCheckout, billingPix, getConfig, joinWaitlist, type Config, type Me } from "@/lib/api";
 import { isAppMode } from "@/lib/app-mode";
 import { useApi } from "@/lib/useApi";
 import { FOCUS } from "@/App";
@@ -94,6 +94,45 @@ function SubscribeCta() {
   );
 }
 
+// Pix: a assinatura do Mercado Pago só aceita cartão ou saldo, e quem estuda pra concurso muitas
+// vezes não tem cartão. Aqui o Pix é compra avulsa de prazo — paga uma vez, fica Pro até a data.
+// Fica abaixo da assinatura porque a recorrência é o caminho padrão; o Pix é a saída pra quem
+// não pode usá-la.
+function PixCta({ mes, ano }: { mes: number; ano: number }) {
+  const [busy, setBusy] = useState<"mes" | "ano" | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const emReais = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
+  const go = async (plano: "mes" | "ano") => {
+    setBusy(plano); setErr(null);
+    try {
+      const r = await billingPix(plano);
+      window.location.href = r.url; // checkout do Mercado Pago, só com Pix habilitado
+    } catch (ex) {
+      setErr(ex instanceof ApiError ? ex.message : "não deu — tenta de novo");
+      setBusy(null);
+    }
+  };
+  // min-h em vez de altura fixa: em 320–360px o preço quebra em duas linhas e com h-10 o texto
+  // vazava pra fora da borda
+  const btn = "inline-flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border border-border bg-secondary/60 px-2 py-1.5 text-[13px] font-medium leading-none transition-colors hover:bg-secondary disabled:opacity-60";
+  return (
+    <div className="mt-3">
+      <p className="text-center text-[11px] text-muted-foreground">não tem cartão? pague por Pix</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button onClick={() => go("mes")} disabled={busy !== null} className={`${btn} ${FOCUS}`}>
+          {busy === "mes" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><span>1 mês</span><span className="font-mono text-[11px] tabular-nums text-muted-foreground">{emReais(mes)}</span></>}
+        </button>
+        <button onClick={() => go("ano")} disabled={busy !== null} className={`${btn} ${FOCUS}`}>
+          {busy === "ano" ? <Loader2 className="h-4 w-4 animate-spin" /> : <><span>1 ano</span><span className="font-mono text-[11px] tabular-nums text-muted-foreground">{emReais(ano)}</span></>}
+        </button>
+      </div>
+      {err
+        ? <p className="mt-1.5 text-center text-xs text-destructive">{err}</p>
+        : <p className="mt-1.5 text-center text-[11px] text-muted-foreground">pagamento único, não renova sozinho — o de 1 ano sai {emReais(ano / 12)}/mês</p>}
+    </div>
+  );
+}
+
 function WaitlistCta({ email }: { email: string }) {
   const [sent, setSent] = useState(() => localStorage.getItem(WAITLIST_KEY) === "1");
   const [busy, setBusy] = useState(false);
@@ -161,7 +200,11 @@ function ProCard({ me, billing, cfg }: { me: Me; billing: boolean; cfg?: Config 
       {fundador && <p className="mt-2 font-mono text-[12px] tabular-nums text-muted-foreground">depois das 100 primeiras assinaturas, {emReais(cheio)}/mês</p>}
       <p className="mt-2 min-h-[2.5rem] text-[13px] text-muted-foreground">sem teto de temas, trilha pronta em 1 clique — menos de R$ 0,85 por dia.</p>
       {isPro ? (
-        <StaticSlot tone="domain"><Check className="h-4 w-4" /> plano ativo na sua conta</StaticSlot>
+        <>
+          <StaticSlot tone="domain"><Check className="h-4 w-4" /> plano ativo na sua conta</StaticSlot>
+          {/* prazo só existe em compra por Pix — assinatura no cartão não tem data de fim */}
+          {cfg?.proUntil && <p className="mt-2 text-center font-mono text-[11px] tabular-nums text-muted-foreground">até {new Date(cfg.proUntil).toLocaleDateString("pt-BR")}</p>}
+        </>
       ) : (
         <>
           {fundador && (
@@ -172,7 +215,7 @@ function ProCard({ me, billing, cfg }: { me: Me; billing: boolean; cfg?: Config 
               </b>
             </p>
           )}
-          {billing ? <SubscribeCta /> : <WaitlistCta email={me.email} />}
+          {billing ? <><SubscribeCta /><PixCta mes={preco} ano={cfg?.yearPrice ?? cfg?.fullYearPrice ?? 149} /></> : <WaitlistCta email={me.email} />}
         </>
       )}
       <Features items={PRO_FEATURES} />
@@ -226,6 +269,7 @@ function ProAppScreen({ me, cfg }: { me: Me; cfg: Config }) {
           <Card className="gap-0 border-primary/50 p-6">
             <p className="text-sm font-semibold">Pro</p>
             <StaticSlot tone="domain"><Check className="h-4 w-4" /> plano ativo na sua conta</StaticSlot>
+            {cfg.proUntil && <p className="mt-2 text-center font-mono text-[11px] tabular-nums text-muted-foreground">até {new Date(cfg.proUntil).toLocaleDateString("pt-BR")}</p>}
             <Features items={PRO_FEATURES} />
           </Card>
         ) : (
