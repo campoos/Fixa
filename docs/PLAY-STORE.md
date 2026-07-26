@@ -105,7 +105,7 @@ Grátis pra usar, com revisões diárias ilimitadas.
 
 **Categoria:** Educação · **Tags:** estudo, memorização, revisão
 **Política de privacidade:** `https://fixaestudos.com.br/privacidade`
-**E-mail de contato:** a definir — a Play exibe publicamente, decida qual endereço usar.
+**E-mail de contato:** `contato@fixaestudos.com.br` (exibido publicamente pela Play e na política de privacidade — precisa de encaminhamento configurado no domínio pra cair numa caixa que você lê).
 
 ### Recursos gráficos exigidos
 
@@ -164,8 +164,8 @@ Falta — e cada um depende de uma decisão ou de uma conta que é sua:
 
 - [ ] **Conta de desenvolvedor** criada e paga (US$ 25) em play.google.com/console.
 - [ ] **Backup do keystore + senha** fora da VM (sem isso, o app não tem futuro — §1).
-- [ ] **E-mail de contato público** definido: some `__EMAIL_CONTATO__` de
-      `web/public/privacidade.html` e vai também na ficha da loja.
+- [ ] **Encaminhamento de `contato@fixaestudos.com.br`** ativo — o endereço já está na
+      política de privacidade e vai na ficha da loja; falta garantir que chega em você.
 - [ ] **`ANDROID_CERT_FINGERPRINTS` no Render** com as duas impressões digitais — só dá
       pra fazer depois do primeiro AAB subir, porque a segunda chave nasce lá (§1).
 
