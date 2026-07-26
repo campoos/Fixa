@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, Eye, GraduationCap, Lightbulb, Loader2, Pencil, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { ApiError, getConfig, getTrack, lessonSubmit, taskComment, tutorCorrect, type Epic, type Story, type Task, type Track as TrackData, type Tutor } from "@/lib/api";
 import { isAppMode } from "@/lib/app-mode";
+import { useBackLayer } from "@/lib/back";
 import { useApi } from "@/lib/useApi";
 import { usePersistentState } from "@/lib/usePersistentState";
 import { fmtNota, lessonStages, shortDate, timeAgo, QUIET_BTN } from "@/lib/lesson";
@@ -368,6 +369,12 @@ export function Licao({ trackId, taskId }: { trackId: string; taskId: string }) 
     setSheet(false); setTutorErr(null);
     requestAnimationFrame(() => tutorCardRef.current?.focus()); // devolve o foco ao card do Tutor (UI §8)
   };
+  // o voltar do Android consome as camadas antes de sair da Lição (DESIGN-APP-MODE §4).
+  // Sair da Lição em si não pergunta nada: o rascunho é local e a lição é retomável (UX §2.7).
+  useBackLayer(sheet, closeSheet);          // sheet do Tutor aberta → fecha a sheet, e nada mais
+  useBackLayer(editing, () => setEditing(false)); // modo edição → sai da edição mantendo o texto
+  useBackLayer(busy, () => {});             // envio em curso → ignora o voltar até a requisição terminar
+
   const saveDica = async () => {
     if (!tutor?.dica || dicaSaved || dicaBusy) return;
     setDicaBusy(true);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { Check, ChevronDown, ClipboardCopy, Loader2, Sparkles, Upload, Wand2 } from "lucide-react";
 import { ApiError, generateTrack, getConfig, getImportPrompt, importTrack, type Config } from "@/lib/api";
 import { FOCUS, navigate } from "@/App";
+import { useBackGuard } from "@/lib/back";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -174,6 +175,10 @@ export function NewTheme() {
     if (prompt) stepCopyRef.current?.scrollIntoView({ block: "nearest" });
   }, [prompt]);
 
+  // único ponto do app com trabalho não persistido: o voltar do Android pergunta antes
+  // de descartar o que foi digitado (DESIGN-APP-MODE §4)
+  useBackGuard(Boolean(theme.trim() || json.trim()), "Descartar o tema que você começou?");
+
   const gen = async () => {
     if (!theme.trim()) return;
     setGenBusy(true);
@@ -184,7 +189,7 @@ export function NewTheme() {
     setAiBusy(true); setAiError(null);
     try {
       const r = await generateTrack({ theme, level, mode, depth });
-      navigate(`/t/${encodeURIComponent(r.id)}`);
+      navigate(`/t/${encodeURIComponent(r.id)}`, { replace: true }); // voltar da trilha nova cai na Home, não no form vazio (§4)
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "falha na geração");
     } finally { setAiBusy(false); }
@@ -196,7 +201,7 @@ export function NewTheme() {
     setBusy(true); setErrors([]);
     try {
       const r = await importTrack(json);
-      navigate(`/t/${encodeURIComponent(r.id)}`);
+      navigate(`/t/${encodeURIComponent(r.id)}`, { replace: true }); // voltar da trilha nova cai na Home, não no form vazio (§4)
     } catch (e) {
       if (e instanceof ApiError && e.errors?.length) setErrors(e.errors);
       else setErrors([e instanceof Error ? e.message : "falha ao importar"]);

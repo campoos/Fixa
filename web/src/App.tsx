@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CircleHelp, Eye, EyeOff, Gem, Layers, Library, Loader2, LogOut, Moon, Plus, Sun } from "lucide-react";
 import { ApiError, forgotPass, getMe, getReview, login, logout, resetPass, signup, type Me } from "@/lib/api";
-import { isAppMode, raiz } from "@/lib/app-mode";
+import { isAppMode } from "@/lib/app-mode";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 import { useApi } from "@/lib/useApi";
 import { Home } from "@/screens/Home";
@@ -66,9 +66,20 @@ function parseRoute(): Route {
   if (p.startsWith("t/")) return { name: "track", id: decodeURIComponent(p.slice(2)) };
   return { name: "home" };
 }
-export function navigate(path: string) {
-  if (window.location.pathname !== path) window.history.pushState({}, "", path);
-  window.dispatchEvent(new PopStateEvent("popstate"));
+// navegação nossa avisa por evento próprio, não por um popstate sintético: assim as
+// camadas efêmeras (lib/back.ts) conseguem distinguir "o usuário apertou voltar" de
+// "a tela navegou sozinha" (DESIGN-APP-MODE §4)
+const ROTA = "fx-route";
+export function navigate(path: string, { replace = false }: { replace?: boolean } = {}) {
+  if (replace) window.history.replaceState({}, "", path);
+  else if (window.location.pathname !== path) window.history.pushState({}, "", path);
+  window.dispatchEvent(new Event(ROTA));
+}
+/** Assina mudança de rota: popstate é o voltar do Android/gesto, ROTA é navegação nossa. */
+function assinarRota(on: () => void) {
+  window.addEventListener("popstate", on);
+  window.addEventListener(ROTA, on);
+  return () => { window.removeEventListener("popstate", on); window.removeEventListener(ROTA, on); };
 }
 
 function ThemeButton() {
@@ -82,11 +93,7 @@ function ThemeButton() {
 
 function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [route, setRoute] = useState<Route>(parseRoute);
-  useEffect(() => {
-    const on = () => setRoute(parseRoute());
-    window.addEventListener("popstate", on);
-    return () => window.removeEventListener("popstate", on);
-  }, []);
+  useEffect(() => assinarRota(() => setRoute(parseRoute())), []);
   const { data: review, refetch: refetchReview } = useApi(getReview, [route.name]);
   const dueCount = review?.session?.length ?? review?.due.length ?? 0; // ação = dose (FILA-RETORNO §3)
   // badge atualiza na hora quando uma revisão é avaliada (evento disparado pela tela Revisar)
@@ -277,6 +284,7 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
     const m = new URLSearchParams(window.location.search).get("m");
     return m === "cadastro" ? "signup" : m === "esqueci" ? "forgot" : isAppMode ? "signup" : "login";
   });
+  const modoInicial = useRef(mode).current;
   const [sent, setSent] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -285,13 +293,33 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
   const [busy, setBusy] = useState(false);
   const canSubmit = mode === "login" ? email.trim() && pass : mode === "forgot" ? email.trim() : name.trim() && email.trim() && pass.length >= 6;
   // troca de modo limpa erro/envio/senha e mantém o e-mail (§B5)
-  const switchMode = (m: AuthMode) => { setMode(m); setErr(null); setSent(false); setPass(""); };
+  const aplicarModo = (m: AuthMode) => { setMode(m); setErr(null); setSent(false); setPass(""); };
+  // no app a troca de modo é empilhada no histórico: o voltar do Android desfaz a troca
+  // em vez de sair do app (DESIGN-APP-MODE §4). No modo de entrada, voltar sai mesmo.
+  // A profundidade viaja na própria entrada — assim ela se corrige sozinha quando o
+  // usuário desfaz trocas no braço, e o login sabe quantas entradas desempilhar.
+  const nivel = () => (window.history.state as { fxAuthNivel?: number } | null)?.fxAuthNivel ?? 0;
+  const switchMode = (m: AuthMode) => {
+    aplicarModo(m);
+    if (isAppMode) window.history.pushState({ fxAuth: m, fxAuthNivel: nivel() + 1 }, "");
+  };
+  useEffect(() => {
+    if (!isAppMode) return;
+    return assinarRota(() => aplicarModo((window.history.state as { fxAuth?: AuthMode } | null)?.fxAuth ?? modoInicial));
+  }, []);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
       if (mode === "forgot") { await forgotPass(email); setSent(true); }
-      else onLogin(mode === "login" ? await login(email, pass) : await signup(name, email, pass));
+      else {
+        const me = mode === "login" ? await login(email, pass) : await signup(name, email, pass);
+        // entrou: as entradas de troca de modo não podem ficar embaixo da Home, senão o
+        // voltar viraria um gesto morto (mesma URL, nada muda na tela)
+        const desempilhar = nivel();
+        if (desempilhar > 0) window.history.go(-desempilhar);
+        onLogin(me);
+      }
     } catch (ex) {
       setErr(ex instanceof ApiError ? ex.message : "algo deu errado — tenta de novo");
     } finally { setBusy(false); }
@@ -423,16 +451,12 @@ function ResetScreen({ onLogin }: { onLogin: (me: Me) => void }) {
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [booting, setBooting] = useState(true);
-  // deslogado ninguém escuta popstate (Shell não montou) — re-render pra "pedir um novo link" (§B4) sair de /redefinir
+  // deslogado ninguém escuta rota (Shell não montou) — re-render pra "pedir um novo link" (§B4) sair de /redefinir
   const [, setTick] = useState(0);
-  useEffect(() => {
-    const on = () => setTick((n) => n + 1);
-    window.addEventListener("popstate", on);
-    return () => window.removeEventListener("popstate", on);
-  }, []);
+  useEffect(() => assinarRota(() => setTick((n) => n + 1)), []);
   useEffect(() => { getMe().then(setMe).catch(() => setMe(null)).finally(() => setBooting(false)); }, []);
-  // no app, "/" é a landing pra quem não tem sessão — sair tem que cair na porta do app
-  const doLogout = async () => { await logout().catch(() => {}); setMe(null); navigate(raiz); };
+  // sair volta pra raiz: no app ela é a tela de auth (não existe landing), na web é a landing
+  const doLogout = async () => { await logout().catch(() => {}); setMe(null); navigate("/"); };
   return (
     <ThemeProvider>
       {/* no app o boot emenda no splash do Android: só o logo, sem "carregando…" piscando (§2) */}

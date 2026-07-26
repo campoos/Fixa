@@ -32,5 +32,21 @@ export const isAppMode = detectar();
 // precisa de prop nova pra saber que está dentro do app.
 if (typeof document !== "undefined" && isAppMode) document.documentElement.dataset.app = "1";
 
-/** Raiz segura: no app, "/" cairia na landing quando não há sessão. */
-export const raiz = isAppMode ? "/app" : "/";
+// Âncora do histórico (DESIGN-APP-MODE §4): a Home tem que ser sempre a primeira
+// entrada, porque é dela que o voltar sai do app — e de nenhuma outra tela.
+//
+//  - /app é a porta de entrada do manifest, não uma tela: vira "/" na mesma entrada,
+//    senão o primeiro toque em "Temas" empilharia "/" por cima e o voltar viraria um
+//    gesto morto (duas URLs, a mesma tela).
+//  - deep link direto numa Track, Lição ou revisão (notificação, link de e-mail) chega
+//    com uma entrada só: planta a Home embaixo, pra voltar nunca sair do app de dentro
+//    de uma tela interna.
+if (isAppMode && typeof window !== "undefined") {
+  const cauda = window.location.search + window.location.hash;
+  const p = window.location.pathname.replace(/\/+$/, "");
+  if (p === "/app") window.history.replaceState({}, "", "/" + cauda);
+  else if (p !== "") {
+    window.history.replaceState({}, "", "/");
+    window.history.pushState({}, "", p + cauda);
+  }
+}
