@@ -55,13 +55,9 @@ export function Logo({ size = 24 }: { size?: number }) {
 // Só no boot do app — enquanto o backend acorda a tela ficaria parada, e o ponto respirando
 // no fim mostra que não travou. Quem pediu menos movimento (prefers-reduced-motion) vê o
 // logo estático, via CSS.
-function LogoBoot({ size = 140 }: { size?: number }) {
+function LogoBoot({ size = 56 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      {/* anel vazio = exatamente o que o splash nativo mostra (os splash.png em
-          android/app/src/main/res, mesma geometria e mesmo 140dp). O desenho continua de
-          onde ele parou, em vez de a marca sumir e renascer do zero. */}
-      <circle cx="16" cy="16" r="11" stroke="var(--primary)" strokeOpacity="0.22" strokeWidth="4" />
       <path className="logo-traco" pathLength={1} d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round" />
       <circle className="logo-ponto" cx="23.78" cy="8.22" r="3.2" fill="#F4B740" />
     </svg>
