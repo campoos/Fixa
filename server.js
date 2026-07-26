@@ -371,6 +371,9 @@ const readBody = (req) => new Promise((res) => { let b = ""; req.on("data", (c) 
 
 // ---- estático (SPA + landing pública na raiz) ----
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json" };
+// extensões que são arquivo de verdade. O id de task tem ponto ("2.1.1"), então /t/x/l/2.1.1 tem
+// "extensão" .1 — sem essa lista o deep link da lição morria em 404 em vez de cair no SPA.
+const EXT_ARQUIVO = new Set([...Object.keys(MIME), ".txt", ".xml", ".map", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".woff", ".ttf", ".mp4", ".pdf", ".csv"]);
 // utm_source saneado pra chave de contador ([a-z0-9-], máx 24)
 const cleanSrc = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24);
 async function serveStatic(url, res, authed) {
@@ -406,7 +409,7 @@ async function serveStatic(url, res, authed) {
     return res.end(data);
   } catch {
     // arquivo com extensão inexistente = 404 de verdade (LAUNCH §6); rota de app cai no SPA
-    if (extname(p)) { res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("404"); }
+    if (EXT_ARQUIVO.has(extname(p).toLowerCase())) { res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("404"); }
     try { const html = await readFile(join(DIST, "index.html")); res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" }); return res.end(html); }
     catch { res.writeHead(404); return res.end("build ausente — rode: cd web && npm run build"); }
   }
