@@ -132,7 +132,12 @@ Grátis pra usar, com revisões diárias ilimitadas.
 |---|---|---|
 | Ícone | 512×512 PNG, 32 bits | `web/public/icons/icon-512.png` |
 | Gráfico de destaque | 1024×500 PNG | `docs/store/feature-graphic.png` |
-| Screenshots de celular | mín. 2, máx. 8 · 16:9 ou 9:16, lado maior ≤ 3840px | `docs/store/screenshots/` |
+| Screenshots de celular | mín. 2, máx. 8 · 16:9 ou 9:16, lado maior ≤ 3840px | `docs/store/frames/` — **é isso que sobe** |
+
+Os prints crus (`docs/store/screenshots/`) são matéria-prima: o que vai pra ficha é a versão
+emoldurada em `docs/store/frames/`, com headline em cima de cada tela. Suba **nesta ordem**:
+home → lição → revisar → trilha → plano (a Play respeita a ordem do console, não o nome do
+arquivo). Especificação, medições e o que não fazer: `docs/DESIGN-STORE-PRINTS.md`.
 
 ---
 
