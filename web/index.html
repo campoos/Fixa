@@ -15,6 +15,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <meta name="color-scheme" content="dark light" />
     <title>Fixa — aprenda de um jeito que fixa</title>
+    <!-- A casca do SPA só é servida em rota de app (/app, /revisar, /pro, /t/*) — a raiz deslogada
+         vai pra fixa.html (server.js, serveStatic). Nenhuma dessas telas deve entrar no Google:
+         são autenticadas ou vazias sem JS. follow mantém o Google seguindo os links de dentro.
+         Ver docs/SEO.md §5.1. -->
+    <meta name="robots" content="noindex, follow" />
     <script>
       // aplica o tema antes do primeiro pixel: sem isso pisca claro até o React montar.
       // Mesma regra do ThemeProvider (src/lib/theme.tsx) — escolha salva manda, senão o aparelho.

@@ -417,6 +417,10 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css
 const EXT_ARQUIVO = new Set([...Object.keys(MIME), ".txt", ".xml", ".map", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".woff", ".ttf", ".mp4", ".pdf", ".csv"]);
 // utm_source saneado pra chave de contador ([a-z0-9-], máx 24)
 const cleanSrc = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24);
+// Espelha web/src/App.tsx (parseRoute): só estes caminhos recebem a casca do SPA. Qualquer outro
+// vira 404 de verdade — senão toda URL inventada devolve 200 com a casca vazia e vira soft-404 no
+// Google (docs/SEO.md §5.5). Rota nova no App.tsx precisa entrar aqui também.
+const ROTAS_APP = /^\/(app|novo|revisar|ajuda|pro|redefinir|t\/.+)\/?$/;
 async function serveStatic(url, res, authed) {
   let p = normalize(url.pathname).replace(/^(\.\.[/\\])+/, "");
   // visitante deslogado na raiz vê a landing; logado cai no app
@@ -451,6 +455,8 @@ async function serveStatic(url, res, authed) {
   } catch {
     // arquivo com extensão inexistente = 404 de verdade (LAUNCH §6); rota de app cai no SPA
     if (EXT_ARQUIVO.has(extname(p).toLowerCase())) { res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("404"); }
+    // caminho que não é rota conhecida do app também é 404 (docs/SEO.md §5.5)
+    if (!ROTAS_APP.test(p)) { res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("404"); }
     try { const html = await readFile(join(DIST, "index.html")); res.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-cache" }); return res.end(html); }
     catch { res.writeHead(404); return res.end("build ausente — rode: cd web && npm run build"); }
   }
@@ -482,13 +488,45 @@ const server = createServer(async (req, res) => {
         target: { namespace: "android_app", package_name: process.env.ANDROID_PACKAGE_ID || "br.com.fixaestudos.app", sha256_cert_fingerprints: fps },
       }], null, 2));
     }
+    // a landing tem uma URL só: a raiz. /fixa.html é detalhe de implementação (docs/SEO.md §5.6)
+    if (path === "/fixa.html" && req.method === "GET") {
+      res.writeHead(301, { Location: `${BASE_URL}/` });
+      return res.end();
+    }
     if (path === "/robots.txt") {
       res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "public, max-age=3600" });
-      return res.end(`User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${BASE_URL}/sitemap.xml\n`);
+      // As rotas do app são autenticadas ou vazias sem JS — não têm o que fazer no índice.
+      // Elas já vão com noindex na casca (web/index.html), o Disallow aqui só poupa rastreamento.
+      return res.end(
+        `User-agent: *\n` +
+        `Allow: /\n` +
+        `Disallow: /api/\n` +
+        `Disallow: /app\n` +
+        `Disallow: /revisar\n` +
+        `Disallow: /novo\n` +
+        `Disallow: /pro\n` +
+        `Disallow: /ajuda\n` +
+        `Disallow: /redefinir\n` +
+        `Disallow: /t/\n` +
+        `Disallow: /fixa.html\n` +
+        `Sitemap: ${BASE_URL}/sitemap.xml\n`
+      );
     }
     if (path === "/sitemap.xml") {
       res.writeHead(200, { "Content-Type": "application/xml", "Cache-Control": "public, max-age=3600" });
-      return res.end(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${BASE_URL}/</loc></url></urlset>\n`);
+      // Só página pública com conteúdo próprio. Rota de app (/app, /revisar, /pro, /t/*) fica de
+      // fora de propósito: é tela logada, marcada noindex. Ver docs/SEO.md §5.4.
+      const paginas = [
+        { loc: "/", priority: "1.0" },
+        { loc: "/privacidade", priority: "0.3" },
+      ];
+      const urls = paginas
+        .map((p) => `  <url><loc>${BASE_URL}${p.loc}</loc><priority>${p.priority}</priority></url>`)
+        .join("\n");
+      return res.end(
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`
+      );
     }
     if (!path.startsWith("/api/")) return serveStatic(url, res, Boolean(sessionUser(req)));
 

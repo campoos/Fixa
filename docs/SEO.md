@@ -144,8 +144,8 @@ verificação da propriedade e a existência de links. Nós não temos acesso a 
 | Bing Webmaster Tools | **só o dono** | §4.4 |
 | Publicar os primeiros links (LinkedIn, TabNews, GitHub) | **só o dono** | §4.5 |
 | Ficha da Play Store | **só o dono** | §4.6 |
-| Dado estruturado JSON-LD | dev | §5.1 |
-| `noindex` na casca de SPA | dev | §5.2 |
+| `noindex` na casca de SPA | dev | §5.1 |
+| Dado estruturado JSON-LD | dev | §5.2 |
 | `robots.txt` e `sitemap.xml` corrigidos | dev | §5.3, §5.4 |
 | 404 de verdade | dev | §5.5 |
 | Link pra `/privacidade` no rodapé | dev | §5.6 |
@@ -280,6 +280,14 @@ sentidos e ajuda o Google a entender que site e app são a mesma entidade.
 
 Nenhuma destas mudanças faz o site aparecer sozinha. Elas garantem que, quando o Google entrar, ele
 gaste o rastreamento nas páginas certas e entenda o que o Fixa é. **Impacto na ordem em que estão.**
+
+> **Estado (28/07/2026):** §5.1 a §5.6 implementados e verificados com `curl` no servidor local.
+> §5.5 entrou junto com a correção dos CTAs (`/temas` → `/app`, ver o aviso lá embaixo).
+> §5.7 fica como está — a recomendação do próprio bloco é não fazer nenhuma das três opções agora.
+> Fora da spec, a pedido do dono: a marca passou a aparecer escrita como **"Fixa Estudos"** na
+> landing (nav, rodapé, `<title>`, `description`/OG e `alternateName` do JSON-LD), com "Fixa"
+> grifado no violeta da casa — a palavra não existia em nenhum lugar da página, e é por ela que a
+> busca de marca procura.
 
 ### 5.1 `noindex` na casca de SPA — uma linha, resolve S1, S2 e S3
 
@@ -461,12 +469,13 @@ E no `catch` (linha 452-455), trocar o fallback incondicional por:
   }
 ```
 
-> **Atenção antes de aplicar:** os CTAs da landing apontam 8× para `href="/temas"`, que **não é rota
-> do `parseRoute`** — hoje cai no `catch` e é salvo pelo fallback, virando a home do app. Com esta
-> mudança, `/temas` passaria a dar 404 e **os botões "Começar de graça", "Entrar" e "Criar conta"
-> quebrariam**. Corrija junto: ou troque os 8 `href="/temas"` por `href="/app"` em
-> `web/public/fixa.html`, ou acrescente `temas` ao `ROTAS_APP`. É um bug latente que este documento
-> encontrou de raspão — vale conferir de qualquer jeito.
+> **~~Atenção antes de aplicar~~ — resolvido em 28/07/2026:** os CTAs da landing apontavam para
+> `href="/temas"`, que **não é rota do `parseRoute`** — caía no `catch` e era salvo pelo fallback,
+> virando a home do app. Com o 404 de verdade isso quebraria os botões "Começar de graça", "Entrar"
+> e "Criar conta". Corrigido junto: os 7 CTAs (mais a regra de CSS que os esconde no mobile e o
+> seletor do beacon de funil, que casa por `href^=`) passaram a apontar para `/app`, que é rota real
+> e já é o `start_url` do app Android. `/temas` **não** entrou no `ROTAS_APP` de propósito: nunca foi
+> rota, e mantê-la viva só preservaria a URL fantasma que o §5.5 existe pra matar.
 
 ### 5.6 Fechar as pontas soltas (S6 e S7)
 

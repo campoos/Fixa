@@ -1,5 +1,53 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Recall ativo e revisão espaçada pra quem tem prova com data. Nasceu na certificação do Claude (Anthropic): do zero ao escopo da prova em 1,5 semana. Grátis."><title>Fixa — estude pra certificação de um jeito que fixa</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#12101b"><link rel="canonical" href="__BASE_URL__/"><meta property="og:type" content="website"><meta property="og:locale" content="pt_BR"><meta property="og:site_name" content="Fixa"><meta property="og:title" content="Fixa — estude pra certificação de um jeito que fixa"><meta property="og:description" content="Recall ativo e revisão espaçada pra quem tem prova com data. Nasceu na certificação do Claude (Anthropic): do zero ao escopo da prova em 1,5 semana. Grátis."><meta property="og:url" content="__BASE_URL__/"><meta property="og:image" content="__BASE_URL__/brand/og-image.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="__BASE_URL__/brand/og-image.png"></head><body>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Fixa Estudos: recall ativo e revisão espaçada pra quem tem prova com data. Nasceu na certificação do Claude (Anthropic): do zero ao escopo da prova em 1,5 semana. Grátis."><title>Fixa Estudos — estude pra certificação de um jeito que fixa</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#12101b"><link rel="canonical" href="__BASE_URL__/"><meta property="og:type" content="website"><meta property="og:locale" content="pt_BR"><meta property="og:site_name" content="Fixa"><meta property="og:title" content="Fixa Estudos — estude pra certificação de um jeito que fixa"><meta property="og:description" content="Fixa Estudos: recall ativo e revisão espaçada pra quem tem prova com data. Nasceu na certificação do Claude (Anthropic): do zero ao escopo da prova em 1,5 semana. Grátis."><meta property="og:url" content="__BASE_URL__/"><meta property="og:image" content="__BASE_URL__/brand/og-image.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Fixa — trilha de estudo com recall ativo e revisão espaçada"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="__BASE_URL__/brand/og-image.png">
+<!-- Dado estruturado (docs/SEO.md §5.2): diz ao Google que isto é um app de educação gratuito em
+     pt-BR e ajuda o site a virar entidade reconhecida — que é o que faz a busca de marca funcionar.
+     Sem aggregateRating/review (nota inventada = ação manual) e sem SearchAction (não há busca interna). -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "__BASE_URL__/#website",
+      "url": "__BASE_URL__/",
+      "name": "Fixa",
+      "alternateName": "Fixa Estudos",
+      "description": "Recall ativo e revisão espaçada pra quem tem prova com data.",
+      "inLanguage": "pt-BR"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "__BASE_URL__/#app",
+      "name": "Fixa",
+      "alternateName": "Fixa: Estude e Memorize",
+      "url": "__BASE_URL__/",
+      "applicationCategory": "EducationalApplication",
+      "applicationSubCategory": "Estudo e memorização",
+      "operatingSystem": "Web, Android",
+      "inLanguage": "pt-BR",
+      "description": "App de estudo por recall ativo e revisão espaçada para quem tem prova com data: certificação, concurso ou faculdade. Você monta a trilha do seu tema e o Fixa devolve o conteúdo no dia em que você ia esquecer.",
+      "featureList": [
+        "Trilha de estudo por tema, dividida em tarefas curtas",
+        "Recall ativo em dois estágios",
+        "Revisão espaçada em 1, 2, 3, 4, 7, 15 e 30 dias",
+        "Fila de revisão ajustada à data da prova",
+        "Correção por tutor de IA com nota e gaps",
+        "Lembrete diário por e-mail"
+      ],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "BRL",
+        "availability": "https://schema.org/InStock"
+      },
+      "isAccessibleForFree": true,
+      "isPartOf": { "@id": "__BASE_URL__/#website" }
+    }
+  ]
+}
+</script>
+</head><body>
 <style>
   :root {
     --bg: #0d0a1a; --bg-2: #141026; --card: #171231; --line: #2a2246;
@@ -43,6 +91,14 @@
     background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--line); }
   .nav-in { display: flex; align-items: center; gap: 16px; height: 62px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -0.03em; }
+  /* a marca por extenso, com "Fixa" grifado: é ela que a busca de marca procura e que não
+     aparecia em lugar nenhum da página (docs/SEO.md). O nome inteiro vai num span só, senão o
+     gap do flex abriria 10px entre "Fixa" e "Estudos". Tinta: violeta da casa (DESIGN-LOGO §3) —
+     --brand-2 no escuro e --brand no claro são os tons que passam AA em cada fundo. */
+  .brand .hl { color: var(--brand-2); }
+  @media (prefers-color-scheme: light) { .brand .hl { color: var(--brand); } }
+  :root[data-theme="light"] .brand .hl { color: var(--brand); }
+  :root[data-theme="dark"] .brand .hl { color: var(--brand-2); }
   .mark { width: 26px; height: 26px; flex: none; }
   .nav-links { margin-left: auto; display: flex; align-items: center; gap: 6px; }
   .nav-links a:not(.btn) { color: var(--muted); font-size: 14px; padding: 7px 12px; border-radius: 9px; }
@@ -200,6 +256,9 @@
   .foot-bottom { display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: space-between;
     align-items: baseline; border-top: 1px solid var(--line); margin-top: 48px; padding-top: 24px; }
   .foot-bottom > span:first-child { color: var(--muted); font-size: 13px; }
+  /* a política de privacidade é exigida pela Play e não recebia link nenhum (docs/SEO.md §5.6) */
+  .foot-bottom a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
+  .foot-bottom a:hover { color: var(--ink); text-decoration-color: currentColor; }
   .disc { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .04em; }
   @media (max-width: 560px) {
     footer { padding: 48px 0 32px; }
@@ -243,7 +302,7 @@
     .wrap { padding: 0 16px; }
     .nav-in { gap: 10px; }
     .nav-links { gap: 4px; }
-    .nav-links a[href="/temas"]:not(.btn) { display: none; }
+    .nav-links a[href="/app"]:not(.btn) { display: none; }
     .nav-links .btn { padding: 9px 13px; font-size: 13px; }
     .brand { font-size: 17px; }
     .pcard { padding: 24px 18px; }
@@ -260,18 +319,18 @@
         <path d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="var(--brand)" stroke-width="4" stroke-linecap="round"/>
         <circle cx="23.78" cy="8.22" r="3.2" fill="var(--recall)"/>
       </svg>
-      Fixa
+      <span class="marca-nome"><span class="hl">Fixa</span> Estudos</span>
     </div>
     <div class="nav-links">
       <a href="#metodo" class="hide-sm">Método</a>
       <a href="#recursos" class="hide-sm">Recursos</a>
       <a href="#planos" class="hide-sm">Planos</a>
       <a href="#duvidas">Dúvidas</a>
-      <a href="/temas">Entrar</a>
+      <a href="/app">Entrar</a>
       <button class="icon-btn" id="themeBtn" aria-label="alternar tema" title="tema">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
-      <a href="/temas" class="btn">Criar conta</a>
+      <a href="/app" class="btn">Criar conta</a>
     </div>
   </div>
 </nav>
@@ -283,7 +342,7 @@
     <h1>Estude pra certificação de um jeito que <span class="hl">fixa</span>.</h1>
     <p class="lead">Trilha guiada do zero à prova e revisão no intervalo exato em que você ia esquecer. Nasceu preparando uma certificação de IA — e serve pra qualquer tema.</p>
     <div class="hero-cta">
-      <a href="/temas" class="btn">Começar de graça</a>
+      <a href="/app" class="btn">Começar de graça</a>
       <a href="#metodo" class="btn ghost">Ver o método</a>
     </div>
     <p class="hero-note">// sem cartão · nasceu preparando a certificação do Claude, da Anthropic — história real abaixo</p>
@@ -399,7 +458,7 @@
         <div class="price"><b>R$ 0</b><span>pra sempre</span></div>
         <div class="price-alt">sem cartão · sem teste que expira</div>
         <p class="ptag">Tudo que faz fixar: revisões no tempo certo, todo dia.</p>
-        <a href="/temas" class="btn ghost">Começar grátis</a>
+        <a href="/app" class="btn ghost">Começar grátis</a>
         <ul class="pfeat">
           <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span><b>método completo</b> — revisões no tempo certo</span></li>
           <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg> <span>revisões diárias <b>ilimitadas, pra sempre</b></span></li>
@@ -486,7 +545,7 @@
       <span class="eyebrow">Grátis pra começar</span>
       <h2>Pare de reestudar. Comece a lembrar.</h2>
       <p>Crie sua conta grátis e comece agora. Quer o Pro? Deixa teu e-mail — os primeiros 100 da lista travam o preço de fundador: R$ 14,90/mês pra sempre.</p>
-      <p style="margin-bottom:26px"><a href="/temas" class="btn">Criar conta grátis</a></p>
+      <p style="margin-bottom:26px"><a href="/app" class="btn">Criar conta grátis</a></p>
       <form class="waitlist" id="wl">
         <input type="email" placeholder="seu@email.com" aria-label="seu e-mail" required>
         <button class="btn ghost" type="submit" style="border:1px solid var(--line)">Entrar na lista do Pro</button>
@@ -502,7 +561,7 @@
       <div>
         <div class="brand" style="font-weight:800">
           <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="width:22px;height:22px"><path d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="var(--brand)" stroke-width="4" stroke-linecap="round"/><circle cx="23.78" cy="8.22" r="3.2" fill="var(--recall)"/></svg>
-          Fixa
+          <span class="marca-nome"><span class="hl">Fixa</span> Estudos</span>
         </div>
         <p class="foot-tag">aprenda de um jeito que fixa</p>
       </div>
@@ -514,12 +573,12 @@
       </nav>
       <nav class="foot-col" aria-label="conta">
         <span class="foot-h">conta</span>
-        <a href="/temas">Entrar</a>
-        <a href="/temas">Criar conta grátis</a>
+        <a href="/app">Entrar</a>
+        <a href="/app">Criar conta grátis</a>
       </nav>
     </div>
     <div class="foot-bottom">
-      <span>© 2026 Fixa</span>
+      <span>© 2026 Fixa · <a href="/privacidade">Política de privacidade</a></span>
       <span class="disc">recall ativo + revisão espaçada</span>
     </div>
   </div>
@@ -700,7 +759,7 @@
     if (src) localStorage.setItem("fx-src", src.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24));
   } catch (e) {}
   document.addEventListener("click", function (e) {
-    var a = e.target && e.target.closest && e.target.closest('a[href^="/temas"]');
+    var a = e.target && e.target.closest && e.target.closest('a[href^="/app"]');
     if (!a || !navigator.sendBeacon) return;
     var src = "";
     try { src = localStorage.getItem("fx-src") || ""; } catch (e2) {}
