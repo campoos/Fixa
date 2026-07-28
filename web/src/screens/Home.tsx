@@ -5,6 +5,7 @@ import { TrackIcon } from "@/components/track-icon";
 import { deleteTrack, getStats, getTracks, getTrash, purgeTrash, restoreTrack } from "@/lib/api";
 import type { Progress, Stats, TrackSummary } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
+import { leuDoseFeita } from "@/lib/dia";
 import { FOCUS, Logo, navigate } from "@/App";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,7 +56,13 @@ function ReviewCard({ s }: { s: Stats }) {
   );
 }
 
-function ContinueCard({ next }: { next: TrackSummary | undefined }) {
+function ContinueCard({ next, goal, doneToday }: { next: TrackSummary | undefined; goal: number; doneToday: number }) {
+  // sub-linha: com meta do dia ela substitui o "X de Y tasks" (DESIGN-ENGAJAMENTO §4.2)
+  const sub = goal > 0
+    ? doneToday >= goal
+      ? <>meta de hoje feita</>
+      : <>meta de hoje · <span className="font-mono tabular-nums">{doneToday}/{goal}</span> tasks</>
+    : <>{next?.progress.done} de {next?.progress.total} tasks</>;
   return (
     <button
       onClick={() => navigate(next ? `/t/${encodeURIComponent(next.id)}` : "/novo")}
@@ -68,7 +75,7 @@ function ContinueCard({ next }: { next: TrackSummary | undefined }) {
         <span className="min-w-0 flex-1">
           <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">continuar</span>
           <span className="block truncate text-sm font-semibold">{next.title}</span>
-          <span className="block text-xs text-muted-foreground">{next.progress.done} de {next.progress.total} tasks</span>
+          <span className="block text-xs text-muted-foreground">{sub}</span>
         </span>
       ) : (
         <span className="min-w-0 flex-1">
@@ -81,12 +88,106 @@ function ContinueCard({ next }: { next: TrackSummary | undefined }) {
   );
 }
 
+/* ── zona HOJE — a faixa da prova (DESIGN-ENGAJAMENTO §3) ──
+   contexto da zona, não card: sem borda, sem fundo, sem sombra. O objeto é a barra. */
+
+function ExamStrip({ exam, outras }: { exam: TrackSummary; outras: number }) {
+  const d = exam.daysLeft ?? 0;
+  const total = exam.progress.total;
+  const pctDominadas = total ? Math.round((exam.mastery / total) * 100) : 0;
+  const pctConcluidas = total ? Math.round((exam.progress.done / total) * 100) : 0;
+  // E2 · E3 · E4 · E5 — âmbar é a semântica de tempo do app, nunca alarme
+  const tom = d < 0 ? "text-muted-foreground" : d <= 7 ? "text-recall" : "text-foreground";
+  const titulo = d < 0
+    ? <>a prova passou</>
+    : d === 0
+      ? <>a prova é hoje</>
+      : <>prova em <span className="font-mono tabular-nums">{d}</span> {d === 1 ? "dia" : "dias"}</>;
+  const dica = d === 0 ? "boa prova" : d >= 1 && d <= 7 ? "reta final" : null;
+  return (
+    <div className="mb-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className={`text-[15px] font-semibold tracking-[-0.01em] ${tom}`}>{titulo}</p>
+        {total > 0 && (
+          <p className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+            <span className="text-domain">{exam.mastery}</span>/{total} dominadas
+          </p>
+        )}
+      </div>
+      {total > 0 && (
+        // dois segmentos porque dominada ≠ concluída: o cheio é domínio, o claro é o que só foi visto
+        <div
+          className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
+          role="img"
+          aria-label={`${exam.mastery} de ${total} tasks dominadas, ${exam.progress.done} concluídas`}
+        >
+          <div className="h-full bg-domain" style={{ width: `${pctDominadas}%` }} />
+          <div className="h-full bg-domain/30" style={{ width: `${Math.max(0, pctConcluidas - pctDominadas)}%` }} />
+        </div>
+      )}
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+        <span className="min-w-0 truncate">{exam.title}{outras > 0 && ` · +${outras} com data`}</span>
+        {d < 0 ? (
+          <button
+            onClick={() => navigate(`/t/${encodeURIComponent(exam.id)}?prova=1`)}
+            className={`inline-flex min-h-[44px] shrink-0 items-center px-1 text-primary underline-offset-2 hover:underline ${FOCUS}`}
+          >
+            marcar a próxima
+          </button>
+        ) : dica ? (
+          <span className="shrink-0 text-recall">{dica}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+const ADIADO = "fx-prova-adiado";
+const provaAdiada = () => { try { return Date.now() < Number(localStorage.getItem(ADIADO) || 0); } catch { return false; } };
+
+// E1 — ninguém marcou data: o convite ocupa o lugar exato da faixa
+function ExamInvite({ alvo }: { alvo: TrackSummary }) {
+  const [oculto, setOculto] = useState(false);
+  if (oculto) return null;
+  const adiar = () => {
+    try { localStorage.setItem(ADIADO, String(Date.now() + 30 * 864e5)); } catch { /* sem storage */ }
+    setOculto(true); // não é dispensa permanente: volta em 30 dias, ou na hora se marcar uma data
+  };
+  return (
+    <div className="mb-3 flex min-h-[56px] items-center gap-3 rounded-lg border border-dashed border-border px-3">
+      <button
+        onClick={() => navigate(`/t/${encodeURIComponent(alvo.id)}?prova=1`)}
+        className={`flex min-h-[44px] flex-1 items-center gap-3 rounded-md text-left ${FOCUS}`}
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <CalendarClock className="h-[18px] w-[18px]" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[13px] font-medium">marque a data da prova</span>
+          <span className="block text-[11px] text-muted-foreground">a meta do dia e a fila passam a ter conta</span>
+        </span>
+      </button>
+      <button onClick={adiar} className={`inline-flex min-h-[44px] shrink-0 items-center rounded-md px-1 text-[11px] text-muted-foreground hover:text-foreground ${FOCUS}`}>
+        agora não
+      </button>
+    </div>
+  );
+}
+
 /* ── zona CONSISTÊNCIA — stat tiles + heatmap ── */
 
 function StatTiles({ s }: { s: Stats }) {
   const today = s.days[s.days.length - 1]?.count ?? 0;
+  // sequência zerada mostra "—", nunca "0": um zero grande é placar de fracasso (§5.3)
+  const semSeq = s.streak === 0;
   const tiles = [
-    { icon: <Flame className="h-4 w-4 text-recall" />, value: s.streak, label: s.streak === 1 ? "dia seguido" : "dias seguidos", hint: "dias seguidos com atividade" },
+    {
+      icon: <Flame className="h-4 w-4 text-recall" />,
+      value: semSeq ? "—" : s.streak,
+      dim: semSeq,
+      label: s.streak === 1 ? "dia seguido" : "dias seguidos",
+      hint: semSeq ? "sua sequência começa na primeira sessão de hoje" : "dias seguidos com atividade — um dia vazio não zera se os 7 antes dele tiveram estudo",
+    },
     { icon: <Activity className="h-4 w-4 text-primary" />, value: today, label: today === 1 ? "ação hoje" : "ações hoje", hint: "avaliações e conclusões de hoje" },
     { icon: <GraduationCap className="h-4 w-4 text-domain" />, value: s.mastered, label: s.mastered === 1 ? "dominada" : "dominadas", hint: "tasks que graduaram na revisão espaçada" },
     { icon: <Layers className="h-4 w-4 text-muted-foreground" />, value: s.tasksDone, label: `de ${s.tasksTotal} tasks`, hint: "tasks concluídas do total" },
@@ -97,13 +198,23 @@ function StatTiles({ s }: { s: Stats }) {
         <div key={t.label} title={t.hint} className="rounded-lg border border-border bg-card px-3.5 py-3">
           <div className="flex items-center gap-1.5">
             {t.icon}
-            <span className="font-mono text-xl font-semibold tabular-nums text-foreground">{t.value}</span>
+            <span className={`font-mono text-xl font-semibold tabular-nums ${t.dim ? "text-muted-foreground" : "text-foreground"}`}>{t.value}</span>
           </div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">{t.label}</div>
         </div>
       ))}
     </div>
   );
+}
+
+/* nota da folga (§5.2): aparece uma vez, no dia em que a folga cobriu ontem — e só depois do
+   fato. Nunca antes, nunca como aviso: ameaçar a sequência é proibido (LEMBRETES-V2 §4.3). */
+const AVISADA = "fx-folga-avisada";
+function NotaFolga({ dia }: { dia: string }) {
+  const [mostra] = useState(() => { try { return localStorage.getItem(AVISADA) !== dia; } catch { return false; } });
+  useEffect(() => { if (mostra) { try { localStorage.setItem(AVISADA, dia); } catch { /* sem storage */ } } }, [mostra, dia]);
+  if (!mostra) return null;
+  return <p className="mt-2 text-[11px] text-muted-foreground">ontem ficou vazio e a conta segurou — 7 dias cheios antes valem uma folga.</p>;
 }
 
 const HEAT = ["bg-heat-0", "bg-heat-1", "bg-heat-2", "bg-heat-3", "bg-heat-4"];
@@ -337,8 +448,12 @@ function EmptyState({ trashKey, onTrashChange }: { trashKey: number; onTrashChan
 function HomeSkeleton() {
   return (
     <div className="space-y-8">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-[76px] rounded-xl" />)}
+      <div>
+        {/* a faixa da prova, no lugar exato dela — sem pulo de layout quando os dados chegam */}
+        <Skeleton className="mb-3 h-[56px] rounded-lg" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-[76px] rounded-xl" />)}
+        </div>
       </div>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -373,7 +488,27 @@ export function Home() {
   const tracks = tracksQ.data ?? [];
   const s = statsQ.data;
   if (!tracks.length) return <EmptyState trashKey={rev} onTrashChange={bump} />;
-  const next = tracks.find((t) => t.progress.done < t.progress.total);
+
+  // a prova que manda na zona HOJE: a mais próxima; sem futura, a que passou há ≤14 dias
+  const comData = tracks.filter((t) => t.targetDate && t.daysLeft != null);
+  const futuras = comData.filter((t) => t.daysLeft! >= 0).sort((a, b) => a.daysLeft! - b.daysLeft!);
+  const passadas = comData.filter((t) => t.daysLeft! < 0 && t.daysLeft! >= -14).sort((a, b) => b.daysLeft! - a.daysLeft!);
+  const exam = futuras[0] ?? passadas[0] ?? null;
+  const outras = Math.max(0, futuras.length - 1);
+  // com prova futura pendente o Continuar aponta pra ela: senão a meta é de um tema e o botão leva a outro
+  const next = exam && exam.daysLeft! >= 0 && exam.progress.done < exam.progress.total
+    ? exam
+    : tracks.find((t) => t.progress.done < t.progress.total);
+  const goal = next && exam && next.id === exam.id ? next.dailyGoal ?? 0 : 0;
+  const doneToday = next?.doneToday ?? 0;
+  const alvoConvite = next ?? tracks[0];
+
+  // o dia fecha quando a fila de hoje acabou E a meta bateu — com pelo menos uma ação feita
+  const hoje = s?.days[s.days.length - 1];
+  const filaFeita = s ? (s.dueMode === "retorno" ? leuDoseFeita() === hoje?.day : s.dueToday === 0) : false;
+  const diaFechado = !!s && (hoje?.count ?? 0) > 0 && filaFeita && (!goal || doneToday >= goal);
+  const folgaOntem = !!s && (() => { const d = s.days, n = d.length - 1;
+    return (d[n]?.count ?? 0) > 0 && d[n - 1]?.count === 0 && Array.from({ length: 7 }, (_, i) => d[n - 2 - i]).every((x) => x && x.count > 0); })();
 
   return (
     <div>
@@ -382,18 +517,30 @@ export function Home() {
         <section>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className={EYEBROW}>hoje</h2>
-            <span className="font-mono text-[11px] lowercase text-muted-foreground/70">{fmtShort(new Date())}</span>
+            {diaFechado ? (
+              <span title="fila de hoje zerada e meta de tasks batida" className="inline-flex items-center gap-1 font-mono text-[11px] text-domain">
+                <Check className="h-3 w-3" /> dia fechado
+              </span>
+            ) : (
+              <span className="font-mono text-[11px] lowercase text-muted-foreground/70">{fmtShort(new Date())}</span>
+            )}
           </div>
+          {exam
+            ? <ExamStrip exam={exam} outras={outras} />
+            : alvoConvite && !provaAdiada() && <ExamInvite alvo={alvoConvite} />}
           <div className="grid gap-3 sm:grid-cols-2">
             {s && <ReviewCard s={s} />}
-            <ContinueCard next={next} />
+            <ContinueCard next={next} goal={goal} doneToday={doneToday} />
           </div>
         </section>
         {s && (
           <section>
             <h2 className={`mb-3 ${EYEBROW}`}>consistência</h2>
             <div className="space-y-3">
-              <StatTiles s={s} />
+              <div>
+                <StatTiles s={s} />
+                {folgaOntem && hoje && <NotaFolga dia={hoje.day} />}
+              </div>
               <Heatmap days={s.days} />
             </div>
           </section>

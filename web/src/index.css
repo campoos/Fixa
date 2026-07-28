@@ -270,6 +270,27 @@ body {
   }
 }
 
+/* fecho de dia (DESIGN-ENGAJAMENTO §7.3): a marca do boot, uma vez só e mais rápida — sem
+   respiro, porque o boot respira enquanto espera e o fecho não espera nada */
+.fecho-traco {
+  stroke-dasharray: 1;
+  animation: logo-desenha 700ms cubic-bezier(0.55, 0, 0.35, 1) forwards;
+}
+.fecho-ponto {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: logo-plim 620ms cubic-bezier(0.2, 0.8, 0.3, 1) 560ms forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fecho-traco,
+  .fecho-ponto {
+    animation: none;
+    opacity: 1;
+    stroke-dasharray: none;
+  }
+}
+
 /* skeleton com shimmer (varredura), bem mais visível que o pulse de opacidade no dark */
 .skel {
   position: relative;

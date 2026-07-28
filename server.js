@@ -273,10 +273,19 @@ function markActive(ud, uid) {
   ud.activity[d] = (ud.activity[d] || 0) + 1;
   saveU(uid, "activity").catch((e) => console.error("[activity]", e.message)); // fire-and-forget consciente
 }
+// sequência com folga (DESIGN-ENGAJAMENTO §5.1): um dia vazio não zera se os 7 dias imediatamente
+// anteriores a ele tiveram atividade. Dois vazios seguidos sempre quebram (o segundo reprova o
+// teste dos 7), e o número exibido continua contando só dias COM atividade — o valor é verdade.
 function computeStreak(ud) {
   let s = 0, d = spDay();
   if (!ud.activity[d]) d = addDays(d, -1); // hoje ainda não estudou? conta a partir de ontem
-  while (ud.activity[d]) { s++; d = addDays(d, -1); }
+  for (;;) {
+    if (ud.activity[d]) { s++; d = addDays(d, -1); continue; }
+    let cheio = true;
+    for (let i = 1; i <= 7; i++) if (!ud.activity[addDays(d, -i)]) { cheio = false; break; }
+    if (!cheio) break;
+    d = addDays(d, -1); // folga: o dia vazio não conta, mas a sequência segue
+  }
   return s;
 }
 function computeStats(ud) {
@@ -356,7 +365,12 @@ function buildTrack(ud, id) {
 }
 function trackSummary(ud, id) {
   const t = buildTrack(ud, id);
-  return { id, title: t.title, summary: t.summary, icon: t.icon, progress: t.progress, mastery: t.mastery, due: t.review.due.length, targetDate: t.targetDate, daysLeft: t.daysLeft, counts: trackCounts(ud.tracks[id]) };
+  // meta do dia na Home (DESIGN-ENGAJAMENTO §6): dailyGoal já vem do buildTrack; doneToday é
+  // derivado do ISO que s.done guarda — zero estado novo, zero migração
+  const s = tState(ud, id), hoje = spDay();
+  let doneToday = 0;
+  for (const k of Object.keys(s.done)) if (s.done[k] && spDay(new Date(s.done[k])) === hoje) doneToday++;
+  return { id, title: t.title, summary: t.summary, icon: t.icon, progress: t.progress, mastery: t.mastery, due: t.review.due.length, targetDate: t.targetDate, daysLeft: t.daysLeft, dailyGoal: t.dailyGoal, doneToday, counts: trackCounts(ud.tracks[id]) };
 }
 function globalReview(ud) {
   const today = spDay();

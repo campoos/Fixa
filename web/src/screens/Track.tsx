@@ -271,9 +271,18 @@ function EpicCard({ trackId, epic, meName, defaultOpen, openStoryId, openTaskId,
 }
 
 function TargetControl({ track, onChange }: { track: TrackData; onChange: () => void }) {
-  const [editing, setEditing] = useState(false);
+  // ?prova=1 vem do convite da Home (DESIGN-ENGAJAMENTO §3.d): abre o campo já na tela e em
+  // foco, uma vez só. Sem o parâmetro nada muda aqui.
+  const [veioDoConvite] = useState(() => new URLSearchParams(window.location.search).has("prova"));
+  const [editing, setEditing] = useState(veioDoConvite);
   const [busy, setBusy] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
+  const dataRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!veioDoConvite) return;
+    navigate(window.location.pathname, { replace: true }); // o parâmetro some da URL
+    requestAnimationFrame(() => { dataRef.current?.scrollIntoView({ block: "center" }); dataRef.current?.focus(); });
+  }, [veioDoConvite]);
   const save = async (date: string | null) => { setBusy(true); try { await setTrackTarget(track.id, date); onChange(); setEditing(false); } finally { setBusy(false); } };
   if (track.targetDate && !editing) {
     const dl = track.daysLeft ?? 0;
@@ -290,7 +299,7 @@ function TargetControl({ track, onChange }: { track: TrackData; onChange: () => 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
       <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
-      <input type="date" min={today} defaultValue={track.targetDate ?? ""} disabled={busy}
+      <input ref={dataRef} type="date" min={today} defaultValue={track.targetDate ?? ""} disabled={busy}
         onChange={(e) => e.target.value && save(e.target.value)}
         className="rounded-md border border-border bg-background px-2 py-1 text-xs" />
       <span className="text-muted-foreground">data da prova — as revisões se ajustam a ela</span>

@@ -98,7 +98,13 @@ function assinarRota(on: () => void) {
 function ThemeButton() {
   const { theme, toggle } = useTheme();
   return (
-    <button onClick={toggle} title="tema" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}>
+    <button
+      onClick={toggle}
+      // rótulo diz o DESTINO, não o estado — "tema escuro" com o app escuro não se entende
+      title={theme === "dark" ? "tema claro" : "tema escuro"}
+      aria-label={theme === "dark" ? "mudar para o tema claro" : "mudar para o tema escuro"}
+      className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}
+    >
       {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
   );

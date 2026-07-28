@@ -3,6 +3,7 @@ import { ChevronRight, Download, Eye, EyeOff, LogOut, PenLine, RotateCcw } from 
 import type { Me } from "@/lib/api";
 import { QUIET_BTN } from "@/lib/lesson";
 import { FOCUS } from "@/App";
+import { useTheme, type Modo } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 
@@ -123,6 +124,14 @@ const FAQ_GROUPS: { label: string; items: Faq[] }[] = [
         ),
       },
       {
+        q: "Dá pra usar no tema claro?",
+        a: (
+          <>
+            Dá. Em <B>Ajuda › aparência</B> você escolhe entre automático, claro e escuro — automático segue o modo do celular. O sol/lua no canto superior direito faz a mesma troca em um toque.
+          </>
+        ),
+      },
+      {
         q: "Esqueci minha senha — e agora?",
         a: (
           <>
@@ -145,6 +154,45 @@ function FaqItem({ q, a }: Faq) {
       </summary>
       <div className="px-3.5 pb-3.5 text-sm leading-relaxed text-muted-foreground">{a}</div>
     </details>
+  );
+}
+
+/* ── aparência — a casa com palavra do sol/lua do header (DESIGN-ENGAJAMENTO §8.2) ── */
+
+const MODOS: { v: Modo; label: string }[] = [
+  { v: "auto", label: "automático" },
+  { v: "light", label: "claro" },
+  { v: "dark", label: "escuro" },
+];
+
+function Aparencia() {
+  const { modo, setModo } = useTheme();
+  return (
+    <section className="mt-10">
+      <h2 className={EYEBROW}>aparência</h2>
+      <Card className="mt-3 gap-0 p-4">
+        <p className="text-sm">tema</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">o sol/lua no topo faz a mesma troca</p>
+        <div role="radiogroup" aria-label="tema do app" className="mt-3 flex overflow-hidden rounded-lg border border-border">
+          {MODOS.map((m) => (
+            <button
+              key={m.v}
+              role="radio"
+              aria-checked={modo === m.v}
+              onClick={() => setModo(m.v)}
+              className={cn(
+                "h-11 flex-1 border-r border-border text-[13px] transition-colors last:border-r-0",
+                modo === m.v ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                FOCUS,
+              )}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground/70">automático segue o modo do seu celular.</p>
+      </Card>
+    </section>
   );
 }
 
@@ -211,6 +259,8 @@ export function Ajuda({ me, onLogout }: { me: Me; onLogout: () => void }) {
           ))}
         </div>
       </section>
+
+      <Aparencia />
 
       {/* a casa da conta (DESCOBRIBILIDADE §2): as ações com PALAVRA — o ícone do header vira atalho */}
       <section className="mt-10">

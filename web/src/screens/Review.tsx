@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { BookOpen, Check, Eye, EyeOff, FlaskConical, Loader2, RotateCcw, Shuffle, X } from "lucide-react";
-import { getReview, taskReview, type Due } from "@/lib/api";
+import { getReview, getStats, getTracks, taskReview, type Due } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
+import { marcarDoseFeita } from "@/lib/dia";
 import { usePersistentState } from "@/lib/usePersistentState";
 import { cn } from "@/lib/utils";
 import { FOCUS, navigate } from "@/App";
@@ -91,16 +92,72 @@ function EmptyQueue({ ladder }: { ladder: number[] }) {
   );
 }
 
+// a marca se desenhando: a única comemoração que o app já sabe fazer, e que significa
+// exatamente o que aconteceu — o retorno cravou o ponto (DESIGN-ENGAJAMENTO §7.3)
+function MarcaFecho() {
+  return (
+    <svg width={34} height={34} viewBox="0 0 32 32" fill="none" aria-hidden="true" className="mx-auto">
+      <path className="fecho-traco" pathLength={1} d="M26.83 14.09A11 11 0 1 1 17.91 5.17" stroke="var(--primary)" strokeWidth="4" strokeLinecap="round" />
+      <circle className="fecho-ponto" cx="23.78" cy="8.22" r="3.2" fill="#F4B740" />
+    </svg>
+  );
+}
+
+type CtxFecho = { streak: number; goal: number; doneToday: number; examDaysLeft: number | null; examId: string | null };
+
 function SessionDone({ hits, misses, rest, dose, titleRef, onSeeQueue }: { hits: number; misses: number; rest: number; dose: number; titleRef: RefObject<HTMLParagraphElement | null>; onSeeQueue: () => void }) {
   useEffect(() => { localStorage.setItem("fx-hint-ladder", "1"); }, []); // 1ª sessão concluída — o hint da escada já ensinou
+  // prova de que a parte de hoje foi feita: no modo retorno a fila nunca chega a zero (§4.4)
+  useEffect(() => { if (hits + misses > 0) marcarDoseFeita(); }, [hits, misses]);
+  // contexto do dia, sem bloquear: o card já renderiza no estado neutro e troca quando chegar.
+  // Se qualquer chamada falhar, fica no neutro — o pior caso do fecho novo é o fecho de hoje.
+  const [ctx, setCtx] = useState<CtxFecho | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    Promise.all([getStats(), getTracks()])
+      .then(([s, tracks]) => {
+        if (!vivo) return;
+        const futuras = tracks
+          .filter((t) => t.targetDate && t.daysLeft != null && t.daysLeft >= 0)
+          .sort((a, b) => a.daysLeft! - b.daysLeft!);
+        const exam = futuras[0] ?? null;
+        setCtx({ streak: s.streak, goal: exam?.dailyGoal ?? 0, doneToday: exam?.doneToday ?? 0, examDaysLeft: exam?.daysLeft ?? null, examId: exam?.id ?? null });
+      })
+      .catch(() => { /* fica no estado neutro */ });
+    return () => { vivo = false; };
+  }, []);
+
+  const metaFalta = !!ctx && ctx.goal > 0 && ctx.doneToday < ctx.goal;
+  const reta = !!ctx && ctx.examDaysLeft != null && ctx.examDaysLeft >= 0 && ctx.examDaysLeft <= 7;
+  const estado = rest > 0 ? "F1" : !ctx ? "F0" : metaFalta ? "F2" : reta ? "F4" : "F3";
+  const d = ctx?.examDaysLeft ?? 0;
+  const titulo = estado === "F1" ? "Dose de hoje feita"
+    : estado === "F2" ? "Fila de hoje limpa"
+    : estado === "F4" ? "Reta final: fila de hoje feita"
+    : estado === "F3" ? "Dia fechado"
+    : "Sessão concluída";
+  const metodo = misses > 0 ? "Erros voltam amanhã — é assim que fixa." : "Tudo subiu de caixa — os intervalos aumentam.";
+  const sub = estado === "F1"
+    ? <><span className="font-mono tabular-nums">{rest}</span> seguem na fila — mais uma dose agora, se quiser; senão, amanhã tem mais.</>
+    : estado === "F2"
+      ? <>meta de hoje: <span className="font-mono tabular-nums">{ctx!.doneToday}/{ctx!.goal}</span> tasks — dá pra fechar agora.</>
+      : estado === "F4"
+        ? d === 0
+          ? <>a prova é hoje — boa prova.</>
+          : <>falta{d === 1 ? "" : "m"} <span className="font-mono tabular-nums">{d}</span> {d === 1 ? "dia" : "dias"} — o que você refrescou hoje chega vivo na prova.</>
+        : estado === "F3" && ctx!.streak >= 3
+          ? <>meta de hoje feita · <span className="font-mono tabular-nums">{ctx!.streak}</span> dias seguidos</>
+          : metodo;
   const tiles = [
     { icon: <Check className="h-4 w-4 text-domain" />, value: hits, label: hits === 1 ? "acerto" : "acertos" },
     { icon: <RotateCcw className="h-4 w-4 text-recall" />, value: misses, label: misses === 1 ? "erro" : "erros" },
   ];
   return (
     <Card className="mt-5 gap-0 rounded-xl p-8 text-center">
-      <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-domain/12 text-domain"><Check className="h-5 w-5" /></div>
-      <p ref={titleRef} tabIndex={-1} className="mt-4 font-semibold outline-none">Sessão concluída</p>
+      {estado === "F3" || estado === "F4"
+        ? <MarcaFecho />
+        : <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-domain/12 text-domain"><Check className="h-5 w-5" /></div>}
+      <p ref={titleRef} tabIndex={-1} className="mt-4 font-semibold outline-none">{titulo}</p>
       <div className="mx-auto mt-4 grid w-full max-w-[280px] grid-cols-2 gap-2.5">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-lg border border-border px-4 py-2.5 text-left">
@@ -112,17 +169,23 @@ function SessionDone({ hits, misses, rest, dose, titleRef, onSeeQueue }: { hits:
           </div>
         ))}
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">
-        {rest > 0
-          ? <>Dose de hoje feita. <span className="font-mono tabular-nums">{rest}</span> seguem na fila — mais uma dose agora, se quiser; senão, amanhã tem mais.</>
-          : misses > 0 ? "Erros voltam amanhã — é assim que fixa." : "Tudo subiu de caixa — os intervalos aumentam."}
-      </p>
+      <p className="mt-3 text-sm text-muted-foreground">{sub}</p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
-        {rest > 0 && (
+        {estado === "F1" && (
           <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Mais uma dose ({Math.min(dose, rest)})</button>
         )}
+        {/* o único sólido do fecho: em F2 o app tem uma próxima ação certa e barata pra oferecer.
+            Em F3 não há — oferecer virava esteira, que é o que esta tela recusa. */}
+        {estado === "F2" && ctx?.examId && (
+          <button
+            onClick={() => navigate(`/t/${encodeURIComponent(ctx.examId!)}`)}
+            className={cn("inline-flex h-9 items-center rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90", FOCUS)}
+          >
+            Estudar 1 task
+          </button>
+        )}
         <button onClick={() => navigate("/")} className={cn(QUIET_BTN, FOCUS)}>Voltar aos temas</button>
-        {rest === 0 && <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Ver fila</button>}
+        {rest === 0 && estado !== "F2" && <button onClick={onSeeQueue} className={cn(QUIET_BTN, FOCUS)}>Ver fila</button>}
       </div>
     </Card>
   );

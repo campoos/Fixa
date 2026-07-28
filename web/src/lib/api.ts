@@ -28,7 +28,7 @@ const api = {
 export interface Me { name: string; email: string; plan: "free" | "pro" }
 export interface Counts { epics: number; stories: number; tasks: number; practice: number; theory: number }
 export interface Progress { done: number; total: number }
-export interface TrackSummary { id: string; title: string; summary: string; icon: string | null; progress: Progress; mastery: number; due: number; targetDate: string | null; daysLeft: number | null; counts: Counts }
+export interface TrackSummary { id: string; title: string; summary: string; icon: string | null; progress: Progress; mastery: number; due: number; targetDate: string | null; daysLeft: number | null; dailyGoal: number | null; doneToday: number; counts: Counts }
 export interface Comment { text: string; at: string; author: string }
 export interface Review { box: number; next: string | null; graduated: boolean; due: boolean; ladder: number }
 export interface Sample { q: string; a: string }
