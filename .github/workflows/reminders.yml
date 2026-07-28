@@ -1,12 +1,22 @@
-name: lembretes diários
+name: lembretes
 on:
   schedule:
-    - cron: "23 11 * * *"   # ~08h23 em São Paulo
-  workflow_dispatch: {}      # permite disparar manual pra testar
+    - cron: "23 11 * * *"   # ~08h23 em São Paulo — push do dia + o e-mail de evento
+    - cron: "37 23 * * *"   # ~20h37 em São Paulo — só push, e só pra fila intocada (DESIGN-PUSH §4)
+  workflow_dispatch:        # permite disparar manual pra testar
+    inputs:
+      slot:
+        description: "manha ou noite"
+        default: manha
 jobs:
   remind:
     runs-on: ubuntu-latest
     steps:
       - name: chama o cron de lembretes (e acorda o Render)
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_SLOT: ${{ github.event.inputs.slot }}
         run: |
-          curl -fsS --max-time 120 "https://fixa-hbn1.onrender.com/api/cron/reminders?key=${{ secrets.CRON_SECRET }}"
+          SLOT="${INPUT_SLOT:-manha}"
+          if [ "$SCHEDULE" = "37 23 * * *" ]; then SLOT=noite; fi
+          curl -fsS --max-time 120 "https://fixa-hbn1.onrender.com/api/cron/reminders?key=${{ secrets.CRON_SECRET }}&slot=$SLOT"

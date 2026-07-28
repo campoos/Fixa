@@ -11,7 +11,7 @@
   "navigationDividerColor": "#F8F7FB",
   "navigationDividerColorDark": "#12101B",
   "backgroundColor": "#12101B",
-  "enableNotifications": false,
+  "enableNotifications": true,
   "startUrl": "/app",
   "iconUrl": "https://fixaestudos.com.br/icons/icon-512.png",
   "maskableIconUrl": "https://fixaestudos.com.br/icons/maskable-512.png",

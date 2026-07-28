@@ -62,6 +62,22 @@ const SPECIAL = {
     t: () => `Sua trilha está guardada.`,
     b: (v) => `Duas linhas só pra dizer que nada se perdeu: ${rev(v.n)} guardadas e o método esperando. Quando fizer sentido, a primeira dose é pequena.`,
   },
+  // ---- eventos pontuais do e-mail (v3) ----
+  retorno: {
+    s: () => `Sua fila está esperando — Fixa`,
+    t: (v) => `${rev(v.n)} guardadas, sem juros.`,
+    b: () => `Três dias sem sessão — nada se perdeu. Quando voltar, a Fixa separa as memórias mais frágeis primeiro e o resto vai em doses. Um e-mail só: o dia a dia mora na notificação.`,
+  },
+  prova: {
+    s: (v) => (v.d === 1 ? `Amanhã é a prova — Fixa` : `Falta uma semana pra sua prova — Fixa`),
+    t: (v) => (v.d === 1 ? `Amanhã. ${rev(v.n)} na fila.` : `Uma semana. ${rev(v.n)} na fila.`),
+    b: (v) => (v.d === 1 ? `Hoje não é dia de matéria nova: é dia de refrescar o que já está quase pronto. A fila inteira, da mais frágil pra frente — é o que chega vivo amanhã.` : `A semana que mais rende começa agora. A partir daqui a Fixa solta a fila completa por dia, sem dose, pra nada esfriar antes da prova.`),
+  },
+  semanal: {
+    s: (v) => `Sua semana no Fixa: ${rev(v.n)} — Fixa`,
+    t: (v) => `${rev(v.n)} esperando.`,
+    b: () => `Resumo de segunda, uma vez por semana. Se preferir o lembrete diário no aparelho, é só ligar a notificação em Ajuda — aí este e-mail some.`,
+  },
 };
 
 // monta o e-mail do dia (§5): cadence decide a família; no diário, o modo da fila decide o pool
@@ -78,6 +94,80 @@ export function buildReminder({ cadence, mode, n, dose, rest, daysLeft, streak, 
   // streak vivo se celebra; zerado nunca é mencionado (FILA-RETORNO §4)
   if (streak >= 3) bodyP += ` Seu ritmo: <strong>${streak} dias seguidos</strong> — a sessão de hoje mantém a conta.`;
   return { subject: pick.s(v), title: pick.t(v), bodyP };
+}
+
+// ---------------------------------------------------------------------------
+// v3 — dois canais (DESIGN-PUSH.md): push carrega o dia a dia, e-mail vira evento.
+// As leis do §4 valem igual nos dois: zero culpa, zero mascote, streak só quando vivo,
+// nada de FOMO. O que muda é a régua de frequência, não o tom.
+// ---------------------------------------------------------------------------
+
+// Cadência do push. Mais insistente que a do e-mail de propósito: o toque é barato de
+// ignorar e mora no aparelho. Some do mesmo jeito quando vira ruído (>13 dias parado).
+export function pushCadence(daysInactive) {
+  if (daysInactive <= 13) return "daily";
+  if ([21, 28].includes(daysInactive)) return "weekly";
+  return "silent";
+}
+
+const dow = (ymd) => new Date(ymd + "T00:00:00Z").getUTCDay(); // 0=dom, 1=seg
+
+/**
+ * Qual evento justifica um e-mail hoje — ou null pra ficar quieto.
+ * Nada disso é contador persistido: tudo sai de (dias parado, dias pra prova, dia da semana),
+ * então cada evento dispara sozinho uma vez e se reseta quando a pessoa estuda.
+ */
+export function emailEvent({ daysInactive, daysLeft = null, hasPush = false, ymd = spDay() }) {
+  const c = reminderCadence(daysInactive);
+  if (c === "silent") return null;
+  if (c !== "daily") return c; // pause-notice / weekly / monthly: o reengajamento continua sendo e-mail
+  if (daysLeft === 7 || daysLeft === 1) return "prova"; // reta final: dois avisos, nas datas
+  if (daysInactive === 3) return "retorno"; // a fila cresceu — um aviso, não sete
+  if (!hasPush && dow(ymd) === 1) return "semanal"; // quem recusou push não fica no vácuo
+  return null;
+}
+
+// ---- pools do push (§1 v3): título curto, corpo de uma linha ----
+const NORMAL_PUSH = [
+  { t: (v) => `${rev(v.n)} no ponto certo`, b: () => `Poucos minutos e a conta do dia fecha.` },
+  { t: (v) => `Hoje: ${rev(v.n)}`, b: () => `Revisar agora é o que faz o intervalo crescer.` },
+  { t: (v) => `${v.n} na fila — quase soltando`, b: () => `É agora que relembrar fixa de vez.` },
+  { t: (v) => `A dose de hoje: ${rev(v.n)}`, b: () => `Abrir, responder de cabeça, conferir.` },
+];
+const RETORNO_PUSH = [
+  { t: (v) => `Sua dose de hoje: ${v.dose}`, b: (v) => `As mais frágeis primeiro. As outras ${v.rest} esperam.` },
+  { t: (v) => `Recomeço leve: ${v.dose} revisões`, b: () => `Voltar é o que importa — o resto vai em doses.` },
+  { t: (v) => `${v.dose} agora, ${v.rest} depois`, b: () => `A fila não é parede: é fila.` },
+];
+const PROVA_PUSH = [
+  { t: (v) => (v.d === 0 ? `A prova é hoje — ${v.n} na fila` : `Prova em ${v.d} ${v.d === 1 ? "dia" : "dias"} — ${v.n} na fila`), b: () => `Hoje vale encarar a fila inteira, da mais frágil pra frente.` },
+  { t: (v) => `Reta final: ${rev(v.n)}`, b: () => `O que refrescar agora chega vivo no dia da prova.` },
+];
+// segundo toque do dia (§4 v3): só quando a fila continua intocada. Constata, não cobra.
+const NOITE_PUSH = [
+  { t: () => `A fila de hoje ainda está aberta`, b: (v) => `${rev(v.n)} — dá pra fechar em poucos minutos.` },
+  { t: () => `Ainda dá tempo hoje`, b: (v) => `${rev(v.n)} esperando, do jeito que você deixou.` },
+];
+
+/**
+ * Monta a notificação. `slot` "manha" é o toque do dia; "noite" só existe pra fila intocada.
+ * Devolve null quando não há o que dizer — o chamador não inventa fallback.
+ */
+export function buildPush({ cadence = "daily", mode, n, dose, rest, daysLeft, streak = 0, userId, ymd, slot = "manha" }) {
+  const v = { n, dose, rest, d: daysLeft };
+  if (!n) return null;
+  if (cadence === "silent") return null;
+  if (slot === "noite") {
+    if (cadence !== "daily") return null; // à noite só o dia a dia; reengajamento nunca cutuca duas vezes
+    const p = pickVariant(NOITE_PUSH, userId, ymd);
+    return { title: p.t(v), body: p.b(v), tag: "fixa-noite", url: "/revisar" };
+  }
+  if (cadence === "weekly") return { title: `Sua fila continua guardada`, body: `${rev(n)} sem pressa. Uma dose pequena já reativa o ritmo.`, tag: "fixa-dia", url: "/revisar" };
+  const pool = mode === "retorno" ? RETORNO_PUSH : mode === "prova" ? PROVA_PUSH : NORMAL_PUSH;
+  const p = pickVariant(pool, userId, ymd);
+  let body = p.b(v);
+  if (streak >= 3) body += ` ${streak} dias seguidos.`; // streak vivo se celebra; zerado nem aparece
+  return { title: p.t(v), body, tag: "fixa-dia", url: "/revisar" };
 }
 
 // dias sem atividade hoje (fallback: data de criação da conta)

@@ -1,5 +1,11 @@
 # DESIGN-LEMBRETES-V2 — variedade, cadência honesta e o que aprender (e não) com o Duolingo
 
+> ⚠️ **Emendado em 28/07 por [DESIGN-PUSH](DESIGN-PUSH.md):** o lembrete do dia a dia saiu do
+> e-mail e virou notificação; o e-mail agora só sai em evento pontual (§3 de lá). O que segue
+> valendo daqui: as leis de tom (§4), o pool e a rotação determinística (§1), a cadência
+> derivada sem estado novo (§2) e o horário da manhã (§3). O que mudou: a cadência `daily` do
+> e-mail não é mais usada pelo cron, e existe um segundo slot (noite), só pra push.
+
 > **Origem:** pedido do dono (14/07): "variar datas, várias mensagens, algo pique Duolingo —
 > baita inspiração". **Lei da casa que limita a inspiração:** FILA-RETORNO §4 — acolher, não
 > culpar; zero culpa pelo streak; "atrasadas" nunca como manchete.

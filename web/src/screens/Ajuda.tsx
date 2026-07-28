@@ -1,6 +1,8 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight, Download, Eye, EyeOff, LogOut, PenLine, RotateCcw } from "lucide-react";
-import type { Me } from "@/lib/api";
+import { getConfig, setReminders, type Me } from "@/lib/api";
+import { useApi } from "@/lib/useApi";
+import { desligarPush, estadoPush, ligarPush, type EstadoPush } from "@/lib/push";
 import { QUIET_BTN } from "@/lib/lesson";
 import { FOCUS } from "@/App";
 import { useTheme, type Modo } from "@/lib/theme";
@@ -196,6 +198,82 @@ function Aparencia() {
   );
 }
 
+/* ── lembretes — a casa de quem recusou o convite da primeira abertura (DESIGN-PUSH.md §5) ── */
+
+const LINHA = "flex items-center justify-between gap-3";
+
+function Lembretes() {
+  const { data: cfg, refetch } = useApi(getConfig, []);
+  const [estado, setEstado] = useState<EstadoPush | null>(null);
+  const [indo, setIndo] = useState(false);
+  useEffect(() => { estadoPush().then(setEstado); }, []);
+  if (!cfg?.pushKey) return null; // servidor sem VAPID: não prometer o que não existe
+
+  const on = cfg.remindersOn;
+  const alterna = async () => {
+    setIndo(true);
+    try {
+      setEstado(estado === "on" ? await desligarPush() : await ligarPush(cfg.pushKey));
+      refetch(true);
+    } finally { setIndo(false); }
+  };
+  const desligarTudo = async (ligado: boolean) => {
+    setIndo(true);
+    try {
+      await setReminders(ligado);
+      if (!ligado && estado === "on") setEstado(await desligarPush());
+      refetch(true);
+    } finally { setIndo(false); }
+  };
+  const rotulo = estado === "on" ? "desligar" : "ativar";
+  return (
+    <section className="mt-10">
+      <h2 className={EYEBROW}>lembretes</h2>
+      <Card className="mt-3 gap-0 p-4">
+        <div className={LINHA}>
+          <div className="min-w-0">
+            <p className="text-sm">notificação no aparelho</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              {estado === "sem-suporte"
+                ? "este navegador não recebe notificação — funciona no app da Play e no Chrome do Android"
+                : estado === "negado"
+                  ? "bloqueada nas permissões deste site — libere no cadeado da barra de endereço"
+                  : "um toque por dia, na hora em que revisar rende mais"}
+            </p>
+          </div>
+          {on && estado !== "sem-suporte" && estado !== "negado" && (
+            <button onClick={alterna} disabled={indo} className={cn("inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-[13px] font-medium disabled:opacity-60", estado === "on" ? "bg-secondary text-foreground" : "bg-primary/10 text-primary", FOCUS)}>
+              {indo ? "…" : rotulo}
+            </button>
+          )}
+        </div>
+        <div className="mt-3 border-t border-border pt-3">
+          <p className="text-sm">e-mail</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            deixou de ser diário: chega quando a fila cresce depois de uns dias parado, na reta final da prova e no aviso de pausa. Sem notificação ligada, vira um resumo toda segunda.
+          </p>
+        </div>
+        <div className={cn("mt-3 border-t border-border pt-3", LINHA)}>
+          <div className="min-w-0">
+            <p className="text-sm">receber lembretes</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">desligado aqui, nenhum dos dois canais fala. Sua fila continua guardada.</p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={on}
+            aria-label="receber lembretes"
+            onClick={() => desligarTudo(!on)}
+            disabled={indo}
+            className={cn("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-60", on ? "bg-primary" : "bg-muted", FOCUS)}
+          >
+            <span className={cn("inline-block h-5 w-5 rounded-full bg-background shadow transition-transform", on ? "translate-x-[22px]" : "translate-x-0.5")} />
+          </button>
+        </div>
+      </Card>
+    </section>
+  );
+}
+
 export function Ajuda({ me, onLogout }: { me: Me; onLogout: () => void }) {
   return (
     <div className="space-y-8">
@@ -259,6 +337,8 @@ export function Ajuda({ me, onLogout }: { me: Me; onLogout: () => void }) {
           ))}
         </div>
       </section>
+
+      <Lembretes />
 
       <Aparencia />
 

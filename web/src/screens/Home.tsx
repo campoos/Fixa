@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { Activity, CalendarClock, Check, ChevronDown, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { Activity, Bell, BellOff, CalendarClock, Check, ChevronDown, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { TrackIcon } from "@/components/track-icon";
-import { deleteTrack, getStats, getTracks, getTrash, purgeTrash, restoreTrack } from "@/lib/api";
+import { deleteTrack, getConfig, getStats, getTracks, getTrash, purgeTrash, restoreTrack } from "@/lib/api";
 import type { Progress, Stats, TrackSummary } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { leuDoseFeita } from "@/lib/dia";
+import { ligarPush, sincronizarPush, suportaPush } from "@/lib/push";
+import type { EstadoPush } from "@/lib/push";
 import { FOCUS, Logo, navigate } from "@/App";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -166,6 +168,55 @@ function ExamInvite({ alvo }: { alvo: TrackSummary }) {
           <span className="block text-[13px] font-medium">marque a data da prova</span>
           <span className="block text-[11px] text-muted-foreground">a meta do dia e a fila passam a ter conta</span>
         </span>
+      </button>
+      <button onClick={adiar} className={`inline-flex min-h-[44px] shrink-0 items-center rounded-md px-1 text-[11px] text-muted-foreground hover:text-foreground ${FOCUS}`}>
+        agora não
+      </button>
+    </div>
+  );
+}
+
+/* pré-pedido da notificação (DESIGN-PUSH.md §5): a caixa do navegador só abre depois de um
+   "sim" aqui. Recusar neste convite não queima a permissão — e quem disser "agora não"
+   reencontra o interruptor em Ajuda › lembretes, que é a casa definitiva do assunto. */
+const PUSH_ADIADO = "fx-push-adiado";
+const pushAdiado = () => { try { return Date.now() < Number(localStorage.getItem(PUSH_ADIADO) || 0); } catch { return false; } };
+
+// visível só quando a caixa do navegador ainda não foi respondida: tudo aqui é síncrono de
+// propósito, pra Home saber de cara que a linha existe e não empilhar dois convites tracejados
+const podeConvidarPush = (chave: string, subs: number, remindersOn: boolean) =>
+  Boolean(chave) && remindersOn && subs === 0 && suportaPush() && Notification.permission === "default" && !pushAdiado();
+
+function PushInvite({ chave, onMudou }: { chave: string; onMudou: () => void }) {
+  const [estado, setEstado] = useState<EstadoPush>("off");
+  const [oculto, setOculto] = useState(false);
+  const [indo, setIndo] = useState(false);
+  if (oculto || estado === "on" || estado === "sem-suporte") return null;
+  const adiar = () => {
+    try { localStorage.setItem(PUSH_ADIADO, String(Date.now() + 14 * 864e5)); } catch { /* sem storage */ }
+    setOculto(true); // volta em 14 dias; até lá o assunto mora só em Ajuda
+  };
+  const ligar = async () => {
+    setIndo(true);
+    try { setEstado(await ligarPush(chave)); onMudou(); } finally { setIndo(false); }
+  };
+  if (estado === "negado")
+    return (
+      <div className="mb-3 flex min-h-[56px] items-center gap-3 rounded-lg border border-dashed border-border px-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"><BellOff className="h-[18px] w-[18px]" /></span>
+        <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">a notificação está bloqueada nas permissões deste site — dá pra liberar no cadeado da barra de endereço</span>
+        <button onClick={() => setOculto(true)} className={`inline-flex min-h-[44px] shrink-0 items-center rounded-md px-1 text-[11px] text-muted-foreground hover:text-foreground ${FOCUS}`}>ok</button>
+      </div>
+    );
+  return (
+    <div className="mb-3 flex min-h-[56px] items-center gap-3 rounded-lg border border-dashed border-border px-3">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-recall/12 text-recall"><Bell className="h-[18px] w-[18px]" /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-medium">receber o lembrete da fila</span>
+        <span className="block text-[11px] text-muted-foreground">um toque por dia, na hora em que revisar rende mais</span>
+      </span>
+      <button onClick={ligar} disabled={indo} className={`inline-flex h-8 shrink-0 items-center rounded-lg bg-primary/10 px-3 text-[13px] font-medium text-primary disabled:opacity-60 ${FOCUS}`}>
+        {indo ? "…" : "ativar"}
       </button>
       <button onClick={adiar} className={`inline-flex min-h-[44px] shrink-0 items-center rounded-md px-1 text-[11px] text-muted-foreground hover:text-foreground ${FOCUS}`}>
         agora não
@@ -473,7 +524,12 @@ function HomeSkeleton() {
 export function Home() {
   const tracksQ = useApi(getTracks, []);
   const statsQ = useApi(getStats, []);
+  const cfgQ = useApi(getConfig, []);
   const [rev, setRev] = useState(0);
+  // aparelho com permissão mas sem inscrição no servidor (reinstalou, trocou de celular, o
+  // navegador expirou): reavisa em silêncio — nada aparece na tela, ninguém é perguntado de novo
+  const cfg = cfgQ.data;
+  useEffect(() => { if (cfg?.pushKey) sincronizarPush(cfg.pushKey, cfg.pushSubs); }, [cfg?.pushKey, cfg?.pushSubs]);
   const bump = () => { tracksQ.refetch(true); statsQ.refetch(true); setRev((v) => v + 1); };
   const del = async (e: MouseEvent<HTMLButtonElement>, t: TrackSummary) => {
     e.stopPropagation();
@@ -502,6 +558,7 @@ export function Home() {
   const goal = next && exam && next.id === exam.id ? next.dailyGoal ?? 0 : 0;
   const doneToday = next?.doneToday ?? 0;
   const alvoConvite = next ?? tracks[0];
+  const convitePush = !!cfg && podeConvidarPush(cfg.pushKey, cfg.pushSubs, cfg.remindersOn);
 
   // o dia fecha quando a fila de hoje acabou E a meta bateu — com pelo menos uma ação feita
   const hoje = s?.days[s.days.length - 1];
@@ -525,9 +582,12 @@ export function Home() {
               <span className="font-mono text-[11px] lowercase text-muted-foreground/70">{fmtShort(new Date())}</span>
             )}
           </div>
+          {/* um convite tracejado por vez: o da notificação passa na frente porque só existe
+              na primeira abertura — o da prova volta sozinho na visita seguinte */}
+          {convitePush && cfg && <PushInvite chave={cfg.pushKey} onMudou={() => cfgQ.refetch(true)} />}
           {exam
             ? <ExamStrip exam={exam} outras={outras} />
-            : alvoConvite && !provaAdiada() && <ExamInvite alvo={alvoConvite} />}
+            : !convitePush && !cfgQ.loading && alvoConvite && !provaAdiada() && <ExamInvite alvo={alvoConvite} />}
           <div className="grid gap-3 sm:grid-cols-2">
             {s && <ReviewCard s={s} />}
             <ContinueCard next={next} goal={goal} doneToday={doneToday} />

@@ -63,6 +63,13 @@ se a verificação de domínio funcionou.
 com `appVersionCode` maior — o Bubblewrap incrementa sozinho a cada build. Mudança no
 site não exige nada disso.
 
+**Notificação (28/07):** `enableNotifications` virou `true` e o projeto foi regerado com
+`bubblewrap update` — isso trouxe a permissão `POST_NOTIFICATIONS`, a
+`NotificationPermissionRequestActivity` e os ícones de status (substituídos por uma
+silhueta branca: o gerado pelo Bubblewrap é colorido e opaco, e o Android transforma isso
+num quadrado branco na barra). Como é mudança de invólucro, **o AAB precisa ser
+reconstruído antes de subir** — o pacote que está no disco é anterior a isso.
+
 ---
 
 ## 3. Conta e faixas de teste
@@ -154,6 +161,11 @@ Respostas coerentes com o que o app faz hoje (a política em `/privacidade` é a
 - **Usuário pode pedir exclusão:** sim, por e-mail.
 - **Publicidade / rastreamento entre apps:** não. Não há SDK de anúncios.
 - **Localização, contatos, arquivos, câmera, microfone:** não são acessados.
+- **Notificações:** o app pede `POST_NOTIFICATIONS` para o lembrete de revisão
+  (DESIGN-PUSH.md). Não é coleta de dado — a inscrição do aparelho fica no próprio
+  cadastro e some quando a pessoa desliga em Ajuda › lembretes. Nenhum dado de
+  notificação vai pra terceiro; o serviço de push do navegador só recebe um toque vazio,
+  sem conteúdo.
 
 ---
 
@@ -198,6 +210,10 @@ Falta — e cada um depende de uma decisão ou de uma conta que é sua:
       política de privacidade e vai na ficha da loja; falta garantir que chega em você.
 - [ ] **`ANDROID_CERT_FINGERPRINTS` no Render** com as duas impressões digitais — só dá
       pra fazer depois do primeiro AAB subir, porque a segunda chave nasce lá (§1).
+- [ ] **Chaves VAPID no Render** (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`)
+      — já geradas e guardadas no `.secrets.env`. Sem elas a notificação simplesmente não
+      existe; com elas, trocar o par depois derruba todas as inscrições.
+- [ ] **Reconstruir o AAB** depois do `enableNotifications: true` (§2).
 
 ---
 

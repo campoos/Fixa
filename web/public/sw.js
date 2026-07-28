@@ -28,6 +28,42 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// ---- push (DESIGN-PUSH.md) ----
+// O servidor manda o toque sem payload; o conteúdo vem daqui, na hora de mostrar. Custa uma
+// requisição e paga com verdade: se a fila foi fechada entre o disparo e a entrega, a
+// notificação diz isso em vez de repetir um número velho.
+const FALLBACK = { title: "Hora da revisão", body: "Abra o Fixa pra ver a fila de hoje.", url: "/revisar", tag: "fixa-dia" };
+
+self.addEventListener("push", (e) => {
+  e.waitUntil(
+    fetch("/api/push/payload", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : FALLBACK))
+      .catch(() => FALLBACK)
+      .then((m) =>
+        self.registration.showNotification(m.title || FALLBACK.title, {
+          body: m.body || "",
+          tag: m.tag || "fixa-dia", // mesma tag substitui: nunca empilha lembrete velho
+          icon: "/icons/icon-192.png",
+          badge: "/icons/badge-96.png",
+          lang: "pt-BR",
+          data: { url: m.url || "/revisar" },
+        })
+      )
+  );
+});
+
+// tocar na notificação: reaproveita a janela que já está aberta em vez de abrir outra
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const alvo = new URL(e.notification.data?.url || "/revisar", self.location.origin).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => {
+      for (const c of cs) if (c.url.startsWith(self.location.origin) && "focus" in c) return c.navigate(alvo).then((x) => (x || c).focus());
+      return self.clients.openWindow(alvo);
+    })
+  );
+});
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;

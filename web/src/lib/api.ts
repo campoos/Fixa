@@ -102,8 +102,12 @@ export const appendTrack = (id: string, jsonStr: string) => {
 export interface GenUsage { used: number; limit: number; dayUsed?: number; dayLimit?: number }
 // tutor: uso das correções do Tutor — free: lifetime (degustação); pro: no mês
 export interface TutorUsage { used: number; limit: number }
-export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage; price: number; fullPrice: number; yearPrice: number; fullYearPrice: number; founderLeft: number; proUntil: string | null }
+export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage; price: number; fullPrice: number; yearPrice: number; fullYearPrice: number; founderLeft: number; proUntil: string | null; pushKey: string; pushSubs: number; remindersOn: boolean }
 export const getConfig = () => api.get<Config>("/api/config");
+// lembretes (DESIGN-PUSH.md): a inscrição do aparelho e o interruptor geral dos dois canais
+export const pushSubscribe = (endpoint: string) => api.post<{ ok: true; subs: number }>("/api/push/subscribe", { endpoint });
+export const pushUnsubscribe = (endpoint?: string) => api.post<{ ok: true; subs: number }>("/api/push/unsubscribe", endpoint ? { endpoint } : {});
+export const setReminders = (on: boolean) => api.post<{ ok: true; on: boolean; subs: number }>("/api/reminders/prefs", { on });
 // lista do Pro (pré-billing) — guarda o e-mail pra avisar quando abrir
 export const joinWaitlist = (email: string) => api.post<{ ok: true }>("/api/waitlist", { email });
 export const generateTrack = (p: PromptParams) =>

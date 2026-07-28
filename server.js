@@ -7,8 +7,9 @@ import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
 import { buildTutorPrompt } from "./prompt-tutor.js";
 import { REVIEW_LADDER, REVIEW_DOSE, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry, planSession } from "./review-engine.js";
-import { buildReminder, reminderCadence, daysInactive } from "./reminders.js";
+import { buildReminder, buildPush, pushCadence, emailEvent, daysInactive } from "./reminders.js";
 import { emailEnabled, sendEmail, emailShell, emailButton } from "./email.js";
+import { pushEnabled, pushPublicKey, sendPush } from "./push.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -58,6 +59,8 @@ const PIX_DAYS_MONTH = 31;
 const PIX_DAYS_YEAR = 365;
 const BILLING_ENABLED = Boolean(MP_ACCESS_TOKEN);
 const CRON_SECRET = process.env.CRON_SECRET || "";
+// sobrancelha do e-mail por evento (DESIGN-PUSH.md §3): diz de cara por que ele chegou
+const EYEBROW = { prova: "reta final", retorno: "sua fila", semanal: "resumo da semana", "pause-notice": "sobre os lembretes", weekly: "sua trilha", monthly: "sua trilha" };
 // limites de geração por IA (PRICING.md): free = 1 degustação lifetime; pro = fair use 30/mês, máx 10/dia
 const GEN_FREE_LIFETIME = Number(process.env.GEN_FREE_LIFETIME || 1);
 const GEN_PRO_MONTH = Number(process.env.GEN_PRO_MONTH || 30);
@@ -184,6 +187,27 @@ async function createUser(email, name, pass, plan = "free") {
 async function checkPass(u, pass) {
   const h = await hashPass(pass, u.salt);
   try { return timingSafeEqual(Buffer.from(h), Buffer.from(u.hash)); } catch { return false; }
+}
+
+// ---- inscrições de push (DESIGN-PUSH.md) ----
+// Moram no próprio usuário (u.push), como o resto do cadastro. Uma pessoa pode ter várias:
+// celular, app da Play, navegador do PC. Não existe flag "pushOff": lista vazia = sem push,
+// e remindersOff continua soberano sobre os dois canais.
+const MAX_SUBS = 8; // aparelho novo empurra o mais velho; ninguém tem oito telefones
+const pushSubs = (u) => (Array.isArray(u.push) ? u.push : []);
+async function addSub(u, endpoint, ua = "") {
+  const subs = pushSubs(u).filter((s) => s.endpoint !== endpoint);
+  subs.push({ endpoint, ua: String(ua).slice(0, 120), addedAt: new Date().toISOString() });
+  u.push = subs.slice(-MAX_SUBS);
+  await saveUsers();
+}
+async function dropSubs(u, endpoints) {
+  const fora = new Set(endpoints);
+  const subs = pushSubs(u).filter((s) => !fora.has(s.endpoint));
+  if (subs.length === pushSubs(u).length) return false;
+  u.push = subs;
+  await saveUsers();
+  return true;
 }
 
 // ---- dados por usuário (tracks/state/trash/activity) ----
@@ -675,35 +699,60 @@ ${emailButton(link, "Criar nova senha")}
       }
       return json(res, 200, { ok: true }); // MP exige 200 sempre
     }
-    // cron de lembretes (GitHub Action diária): ?key=CRON_SECRET
+    // cron de lembretes (GitHub Action): ?key=CRON_SECRET&slot=manha|noite
+    // v3 (DESIGN-PUSH.md): o push carrega o dia a dia e o e-mail só sai em evento pontual.
+    // O slot da noite existe só pro push, e só pra quem ainda não abriu a fila hoje.
     if (path === "/api/cron/reminders") {
       if (!CRON_SECRET || url.searchParams.get("key") !== CRON_SECRET) return json(res, 401, { error: "não autorizado" });
-      if (!emailEnabled()) return json(res, 200, { ok: true, sent: 0, reason: "e-mail não configurado" });
-      let sent = 0, skipped = 0;
+      const slot = url.searchParams.get("slot") === "noite" ? "noite" : "manha";
+      const ymd = spDay();
+      let sent = 0, pushed = 0, dead = 0, skipped = 0;
       for (const u of Object.values(users)) {
-        if (u.remindersOff) { skipped++; continue; }
+        if (u.remindersOff) { skipped++; continue; } // soberano sobre os dois canais
         const ud = await udata(u.id);
         const gr = globalReview(ud);
         const due = gr.due.length;
         if (!due) continue;
-        const offLink = `${BASE_URL}/api/reminders/off?u=${u.id}&sig=${signUid(u.id)}`;
-        // Lembretes v2 (DESIGN-LEMBRETES-V2): cadência derivada da atividade (smart pause honesto)
-        // + pool com rotação determinística por (usuário, dia); streak só quando vivo
         const inactive = daysInactive(ud, u.createdAt);
-        const cadence = reminderCadence(inactive);
-        if (cadence === "silent") { skipped++; continue; }
+        const subs = pushSubs(u);
+
+        // ---- push: o lembrete do dia ----
+        if (pushEnabled() && subs.length) {
+          const jaEstudou = (ud.activity?.[ymd] || 0) > 0;
+          if (!(slot === "noite" && jaEstudou)) {
+            const m = buildPush({
+              cadence: pushCadence(inactive), mode: gr.mode, n: due, dose: gr.session.length,
+              rest: gr.rest, daysLeft: gr.daysLeft, streak: computeStreak(ud), userId: u.id, ymd, slot,
+            });
+            if (m) {
+              const mortos = [];
+              for (const s of subs) {
+                const r = await sendPush(s, { topic: m.tag, urgency: slot === "noite" ? "low" : "normal" });
+                if (r.ok) pushed++;
+                else if (r.gone) mortos.push(s.endpoint); // inscrição morta: some sozinha
+              }
+              if (mortos.length) { dead += mortos.length; await dropSubs(u, mortos); }
+            }
+          }
+        }
+
+        // ---- e-mail: evento pontual, só de manhã ----
+        if (slot !== "manha" || !emailEnabled()) continue;
+        const ev = emailEvent({ daysInactive: inactive, daysLeft: gr.daysLeft, hasPush: pushEnabled() && subs.length > 0, ymd });
+        if (!ev) { skipped++; continue; }
         const m = buildReminder({
-          cadence, mode: gr.mode, n: due, dose: gr.session.length, rest: gr.rest,
-          daysLeft: gr.daysLeft, streak: computeStreak(ud), userId: u.id, ymd: spDay(),
+          cadence: ev, mode: gr.mode, n: due, dose: gr.session.length, rest: gr.rest,
+          daysLeft: gr.daysLeft, streak: computeStreak(ud), userId: u.id, ymd,
         });
         if (!m) { skipped++; continue; }
         const { subject, title, bodyP } = m;
+        const offLink = `${BASE_URL}/api/reminders/off?u=${u.id}&sig=${signUid(u.id)}`;
         const r = await sendEmail({
           to: u.email,
           subject,
           html: emailShell({
             preheader: "Revisar no tempo certo é o que faz fixar. Leva poucos minutos.",
-            eyebrow: "revisão do dia",
+            eyebrow: EYEBROW[ev] || "sua fila",
             title,
             bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.65;color:#5c5480;">${bodyP}</p>
 ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
@@ -715,7 +764,27 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
         });
         if (r.ok) sent++;
       }
-      return json(res, 200, { ok: true, sent, skipped });
+      return json(res, 200, { ok: true, slot, sent, pushed, dead, skipped });
+    }
+    // conteúdo da notificação. O push sai sem payload e o service worker busca aqui na hora de
+    // mostrar — então o que aparece na bandeja é o estado de agora, não o de quando o cron rodou.
+    // Fica antes do portão de sessão porque precisa responder algo honesto mesmo deslogado:
+    // notificação recebida e não exibida faz o navegador mostrar um aviso genérico no lugar.
+    if (path === "/api/push/payload") {
+      const u = checkExpiry(sessionUser(req));
+      if (!u) return json(res, 200, { title: "Hora da revisão", body: "Abra o Fixa pra ver a fila de hoje.", url: "/revisar", tag: "fixa-dia" });
+      const ud = await udata(u.id);
+      const gr = globalReview(ud);
+      const slot = url.searchParams.get("slot") === "noite" ? "noite" : "manha";
+      const m = gr.due.length
+        ? buildPush({
+            cadence: pushCadence(daysInactive(ud, u.createdAt)), mode: gr.mode, n: gr.due.length,
+            dose: gr.session.length, rest: gr.rest, daysLeft: gr.daysLeft, streak: computeStreak(ud),
+            userId: u.id, ymd: spDay(), slot,
+          })
+        : null;
+      // fila fechada entre o disparo e a entrega: dizer a verdade, sem cobrar nada
+      return json(res, 200, m || { title: "Fila do dia fechada", body: "Nada pendente agora — a próxima revisão já está agendada.", url: "/app", tag: "fixa-dia" });
     }
     // opt-out de lembretes: GET mostra confirmação (scanners de e-mail prefetcham GET — QA #5);
     // só o POST assinado desliga de verdade
@@ -725,12 +794,13 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
       if (!u) return json(res, 400, { error: "link inválido" });
       if (req.method === "POST") {
         u.remindersOff = true;
+        u.push = []; // o link do rodapé cala os dois canais, não só o e-mail
         await saveUsers();
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         return res.end(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f5f3fa;color:#1c1533"><div style="text-align:center"><p style="font-weight:600">Lembretes desligados.</p><p style="font-size:14px;color:#5c5480">Você pode continuar revisando em <a href="${BASE_URL}/revisar" style="color:#6c47f0">${BASE_URL.replace("https://", "")}/revisar</a></p></div>`);
       }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      return res.end(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f5f3fa;color:#1c1533"><form method="POST" action="/api/reminders/off?u=${encodeURIComponent(uid)}&sig=${encodeURIComponent(sig)}" style="text-align:center"><p style="font-weight:600">Parar de receber lembretes?</p><p style="font-size:14px;color:#5c5480">Sua fila continua guardada — só o e-mail diário para.</p><button type="submit" style="margin-top:8px;padding:10px 18px;border:0;border-radius:11px;background:#6c47f0;color:#fff;font-weight:600;cursor:pointer">Parar lembretes</button></form>`);
+      return res.end(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f5f3fa;color:#1c1533"><form method="POST" action="/api/reminders/off?u=${encodeURIComponent(uid)}&sig=${encodeURIComponent(sig)}" style="text-align:center"><p style="font-weight:600">Parar de receber lembretes?</p><p style="font-size:14px;color:#5c5480">Sua fila continua guardada — param a notificação e o e-mail.</p><button type="submit" style="margin-top:8px;padding:10px 18px;border:0;border-radius:11px;background:#6c47f0;color:#fff;font-weight:600;cursor:pointer">Parar lembretes</button></form>`);
     }
 
     // daqui pra baixo exige sessão
@@ -742,9 +812,35 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     if (path === "/api/me") return json(res, 200, { name: me.name, email: me.email, plan: me.plan });
     // price/founderLeft: a tela do Pro mostra o preço que o checkout vai cobrar de verdade,
     // e a promessa dos 100 primeiros some sozinha quando as vagas acabam
-    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me), price: priceFor(me), fullPrice: MP_PRICE, yearPrice: yearPriceFor(me), fullYearPrice: MP_PRICE_YEAR, founderLeft: Math.max(0, FOUNDER_SEATS - foundersUsed()), proUntil: me.proUntil || null });
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me), price: priceFor(me), fullPrice: MP_PRICE, yearPrice: yearPriceFor(me), fullYearPrice: MP_PRICE_YEAR, founderLeft: Math.max(0, FOUNDER_SEATS - foundersUsed()), proUntil: me.proUntil || null, pushKey: pushPublicKey(), pushSubs: pushSubs(me).length, remindersOn: !me.remindersOff });
     // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
     // free: 1 degustação lifetime · pro: fair use 30/mês + máx 10/dia (PRICING.md)
+    // ---- push: inscrição do aparelho e chave do interruptor de lembretes ----
+    if (path === "/api/push/subscribe" && req.method === "POST") {
+      if (!pushEnabled()) return json(res, 503, { error: "push não configurado" });
+      const b = await readBody(req);
+      const ep = String(b.endpoint || "");
+      if (!/^https:\/\//.test(ep) || ep.length > 1024) return json(res, 400, { error: "inscrição inválida" });
+      me.remindersOff = false; // ligar a notificação é dizer "quero lembrete" — vale pros dois canais
+      await addSub(me, ep, req.headers["user-agent"] || "");
+      return json(res, 200, { ok: true, subs: pushSubs(me).length });
+    }
+    if (path === "/api/push/unsubscribe" && req.method === "POST") {
+      const b = await readBody(req);
+      const ep = String(b.endpoint || "");
+      await dropSubs(me, ep ? [ep] : pushSubs(me).map((s) => s.endpoint));
+      return json(res, 200, { ok: true, subs: pushSubs(me).length });
+    }
+    // interruptor geral (Ajuda › lembretes): desligado aqui, nenhum canal fala. O link assinado
+    // do rodapé do e-mail continua valendo — este é o caminho de volta, que antes não existia.
+    if (path === "/api/reminders/prefs" && req.method === "POST") {
+      const b = await readBody(req);
+      me.remindersOff = b.on === false;
+      if (me.remindersOff) me.push = []; // desligou tudo: as inscrições vão junto
+      await saveUsers();
+      return json(res, 200, { ok: true, on: !me.remindersOff, subs: pushSubs(me).length });
+    }
+
     if (path === "/api/generate" && req.method === "POST") {
       if (!GEN_ENABLED) return json(res, 400, { error: "geração direta não configurada (GEMINI_API_KEY)" });
       const usage = genUsage(me);
