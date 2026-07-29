@@ -2,13 +2,17 @@
 
 > Spec de design pronta pra implementação. Escopo: **apenas `web/src/screens/Ajuda.tsx`**. Nenhuma mudança em tokens (`index.css`), API, rotas ou shell.
 > Contexto: a Ajuda foi escrita quando o app era single-user, sem planos, sem geração direta, sem data da prova, sem lixeira e com revelação em um estágio só. Esta spec traz o **design pro padrão novo** (eyebrows mono, tokens `domain`/`recall`/`primary`, `FOCUS`) e — entregável principal — a **auditoria de conteúdo**: o que entra, o que sai e o que muda, com texto final.
-> Referências: DESIGN-HOME §2 (tokens — a lei visual), METODO-CIENCIA-E-PRODUTO.md (a ciência), PRICING.md (números dos planos — lei), `review-engine.js` (`REVIEW_LADDER = [1,2,3,4,7,15,21,30]` — 8 caixas), DESIGN-SHELL-MOBILE (a tela convive com a bottom tab bar; aba Ajuda ativa).
+> Referências: DESIGN-HOME §2 (tokens — a lei visual), METODO-CIENCIA-E-PRODUTO.md (a ciência), PRICING.md (números dos planos — lei), `review-engine.js` (`REVIEW_LADDER = [1,2,3,4,7,15,21,30]` — 8 caixas), DESIGN-SHELL-MOBILE (a tela convive com a bottom tab bar).
 
 ---
 
 ## 1. Direção
 
-A Ajuda é a única tela do app que é **leitura**, não ferramenta — mas fala o mesmo dialeto: eyebrows mono, cards quietos, zero marketing. Três camadas em ordem de valor: **o método** (como estudar — 4 cards visuais), **a ciência** (um card de credibilidade, com nomes e anos — trust é feature, METODO §5 P1) e **as perguntas** (só as que a UI não responde sozinha). Curta o bastante pra ler inteira numa espera de elevador.
+**Emenda 29/07 (tarde) — o papel muda: `/ajuda` deixa de ser só leitura e vira também a casa da conta.** `DESIGN-SHELL-MOBILE §1.3` colapsou os três icon-buttons do header (Ajuda, tema, sair) num ícone só de "conta" (`CircleUserRound`), que navega pra esta mesma tela. Ela passa a responder por **duas perguntas**, não uma: "como eu estudo aqui" (o conteúdo original, intocado) e "onde eu mexo na minha conta" (tema, e-mail, export, sair — agora o único caminho pra essas quatro ações). Nada de popover: a decisão consciente foi navegação pra tela, não menu (`DESIGN-SHELL-MOBILE §7` continua proibindo dropdown/popover).
+
+Consequência de layout (§3): como o ponto de entrada agora é um ícone de "conta", não mais um `CircleHelp` de "ajuda", **as zonas de conta/config sobem pro topo** — quem toca o ícone esperando tema ou sair não deveria rolar a tela inteira de FAQ pra achar. O conteúdo de leitura (método/ciência/perguntas) continua existindo por inteiro, só desce uma posição.
+
+A tela fala o mesmo dialeto do resto do app: eyebrows mono, cards quietos, zero marketing. Camadas em ordem de valor pra quem entra pelo ícone de conta: **sua conta** (e-mail, export, sair), **aparência** (tema), depois **o método** (como estudar — 4 cards visuais), **a ciência** (um card de credibilidade, com nomes e anos — trust é feature, METODO §5 P1) e **as perguntas** (só as que a UI não responde sozinha). Curta o bastante pra ler inteira numa espera de elevador — o topo responde a maioria das visitas em 1 toque.
 
 ---
 
@@ -45,14 +49,20 @@ Dois nomes no corpo (Roediger & Karpicke; Cepeda) + o ranking (Dunlosky, 2013) n
 
 ## 3. Layout / zonas
 
-Container da tela: `space-y-8` (mesma métrica de zonas da Home). A tela convive com a bottom tab bar em `<md` (aba Ajuda ativa, `CircleHelp`) — o `main` do Shell já compensa o padding; **nada a fazer aqui**.
+Container da tela: `space-y-8` (mesma métrica de zonas da Home). A tela convive com a bottom tab bar em `<md` — não há mais aba própria (nunca teve desde `DESIGN-SHELL-MOBILE §1.2`); chega-se aqui pelo ícone de conta do header (`§1.3`). O `main` do Shell já compensa o padding; **nada a fazer aqui**.
+
+**Ordem (29/07, tarde — invertida: conta/config primeiro, leitura depois).** Motivo: o ponto de entrada virou um ícone de "conta", não de "ajuda" — quem toca ele mais vezes quer trocar tema ou sair, não reler o método pela enésima vez.
 
 ```
 1. HEADER      → h1 + sub (sem eyebrow — é o título da página)
-2. O MÉTODO    → eyebrow · grid 4 cards · linha-eco da régua
-3. A CIÊNCIA   → eyebrow · card quieto
-4. PERGUNTAS   → eyebrow · 3 grupos (overline) de <details>
+2. SUA CONTA   → eyebrow · e-mail · export · sair                (29/07: subiu, era a última zona)
+3. APARÊNCIA   → eyebrow · tema (auto/claro/escuro)               (29/07: subiu, era penúltima)
+4. O MÉTODO    → eyebrow · grid 4 cards · linha-eco da régua
+5. A CIÊNCIA   → eyebrow · card quieto
+6. PERGUNTAS   → eyebrow · 3 grupos (overline) de <details>
 ```
+
+`Lembretes` (push) não muda de lugar — continua entre "perguntas" e "aparência" no fluxo atual do componente; ao subir conta+aparência pro topo, `Lembretes` fica entre "perguntas" (que desceu) e "aparência" (que subiu), então também sobe: nova ordem de componentes é `SuaConta → Aparencia → Lembretes → (método/ciência/perguntas)` ou, se o dev preferir manter `Lembretes` colado em config, `SuaConta → Aparencia → (método/ciência/perguntas) → Lembretes` também resolve — **não é uma decisão de produto, é liberdade de implementação**; o único requisito de spec é conta+aparência abrirem a tela.
 
 Constantes compartilhadas (mesmas strings de Home/Review/Track):
 
@@ -189,5 +199,6 @@ Tom: minúsculas em metadados, sem exclamação, sem emoji, números em mono `ta
 - [ ] FAQ tem **10 perguntas em 3 grupos** com overlines; "programar" e "certificação" não existem mais; nenhuma resposta contradiz PRICING.md (2 temas, 1 degustação, 30/mês, 10/dia).
 - [ ] `<details>` estilizado: sem marker nativo, chevron gira em `group-open`, `summary` com anel `FOCUS` no teclado.
 - [ ] FAQ 10 (senha) não promete recuperação nem cita canal de suporte inexistente.
-- [ ] 390px: nada estoura, cards empilham, último acordeão rola pra cima da tab bar (padding do Shell, sem padding próprio na tela); aba Ajuda ativa na bar.
+- [ ] 390px: nada estoura, cards empilham, último acordeão rola pra cima da tab bar (padding do Shell, sem padding próprio na tela).
 - [ ] Zero emoji, zero exclamação, zero cor hardcoded (`grep -nE "emerald|amber|blue-4|red-4" Ajuda.tsx` vazio).
+- [ ] **(29/07, tarde)** `sua conta` e `aparência` são as duas primeiras zonas depois do header (antes de `o método`); chegar em `/ajuda` pelo ícone de conta do header mostra sair/tema num toque, sem rolar até o fim.

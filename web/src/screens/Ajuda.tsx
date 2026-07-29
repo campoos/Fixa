@@ -129,7 +129,7 @@ const FAQ_GROUPS: { label: string; items: Faq[] }[] = [
         q: "Dá pra usar no tema claro?",
         a: (
           <>
-            Dá. Em <B>Ajuda › aparência</B> você escolhe entre automático, claro e escuro — automático segue o modo do celular. O sol/lua no canto superior direito faz a mesma troca em um toque.
+            Dá. Em <B>Ajuda › aparência</B>, logo no topo desta tela, você escolhe entre automático, claro e escuro — automático segue o modo do celular.
           </>
         ),
       },
@@ -159,7 +159,7 @@ function FaqItem({ q, a }: Faq) {
   );
 }
 
-/* ── aparência — a casa com palavra do sol/lua do header (DESIGN-ENGAJAMENTO §8.2) ── */
+/* ── aparência — a única casa do tema desde que o header perdeu o sol/lua (SHELL-MOBILE §1.3) ── */
 
 const MODOS: { v: Modo; label: string }[] = [
   { v: "auto", label: "automático" },
@@ -170,11 +170,10 @@ const MODOS: { v: Modo; label: string }[] = [
 function Aparencia() {
   const { modo, setModo } = useTheme();
   return (
-    <section className="mt-10">
+    <section>
       <h2 className={EYEBROW}>aparência</h2>
       <Card className="mt-3 gap-0 p-4">
         <p className="text-sm">tema</p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">o sol/lua no topo faz a mesma troca</p>
         <div role="radiogroup" aria-label="tema do app" className="mt-3 flex overflow-hidden rounded-lg border border-border">
           {MODOS.map((m) => (
             <button
@@ -227,7 +226,7 @@ function Lembretes() {
   };
   const rotulo = estado === "on" ? "desligar" : "ativar";
   return (
-    <section className="mt-10">
+    <section>
       <h2 className={EYEBROW}>lembretes</h2>
       <Card className="mt-3 gap-0 p-4">
         <div className={LINHA}>
@@ -281,6 +280,24 @@ export function Ajuda({ me, onLogout }: { me: Me; onLogout: () => void }) {
         <h1 className="text-lg font-semibold">Como estudar na Fixa</h1>
         <p className="mt-1 text-sm text-muted-foreground">Não é releitura — é esforço de lembrar. Cada task roda este loop.</p>
       </div>
+
+      {/* conta e config abrem a tela (DESIGN-AJUDA §3, 29/07): o ponto de entrada é o ícone
+          de conta do header — quem chega aqui quer tema ou sair num toque, não rolar a FAQ */}
+      <section>
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">sua conta</h2>
+        <Card className="mt-3 gap-0 p-4">
+          <p className="text-sm">logado como <span className="font-medium">{me.email}</span></p>
+          <div className="mt-3 flex flex-wrap items-center gap-2.5">
+            <a href="/api/export" download className={cn(QUIET_BTN, FOCUS)}><Download className="h-4 w-4" /> exportar meus dados</a>
+            <button onClick={onLogout} className={cn(QUIET_BTN, FOCUS)}><LogOut className="h-4 w-4" /> sair da conta</button>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground/70">o export baixa um JSON com todos os seus temas, respostas e progresso — seus dados são seus, sempre.</p>
+        </Card>
+      </section>
+
+      <Aparencia />
+
+      <Lembretes />
 
       <section>
         <h2 className={`mb-3 ${EYEBROW}`}>o método</h2>
@@ -338,22 +355,6 @@ export function Ajuda({ me, onLogout }: { me: Me; onLogout: () => void }) {
         </div>
       </section>
 
-      <Lembretes />
-
-      <Aparencia />
-
-      {/* a casa da conta (DESCOBRIBILIDADE §2): as ações com PALAVRA — o ícone do header vira atalho */}
-      <section className="mt-10">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">sua conta</h2>
-        <Card className="mt-3 gap-0 p-4">
-          <p className="text-sm">logado como <span className="font-medium">{me.email}</span></p>
-          <div className="mt-3 flex flex-wrap items-center gap-2.5">
-            <a href="/api/export" download className={cn(QUIET_BTN, FOCUS)}><Download className="h-4 w-4" /> exportar meus dados</a>
-            <button onClick={onLogout} className={cn(QUIET_BTN, FOCUS)}><LogOut className="h-4 w-4" /> sair da conta</button>
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground/70">o export baixa um JSON com todos os seus temas, respostas e progresso — seus dados são seus, sempre.</p>
-        </Card>
-      </section>
     </div>
   );
 }

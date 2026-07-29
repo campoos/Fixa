@@ -29,6 +29,24 @@ Por quê:
 
 Consequência na nav de pills do **desktop** (`≥md`, `DESIGN-HOME §3`): `Ajuda` some de lá também — não é só um ajuste de mobile, é o item saindo de "navegação primária" em qualquer largura e virando "acesso secundário" nos dois. A pill vira ícone no cluster direito do header, igual ao mobile.
 
+> **Superseded em 29/07 (tarde) — ver §1.3.** O icon-button `Ajuda` (`CircleHelp`) criado por esta emenda **sai de novo, no mesmo dia**: ele e os outros dois ícones do cluster (tema, sair) viram um ícone de perfil só. O raciocínio acima (por que `Ajuda` não é navegação diária, por que um lugar só em vez de dois) continua valendo — é a base do que vem a seguir. Fica registrado por inteiro, não apagado.
+
+### 1.3 Emenda 29/07 (tarde) — Ajuda, tema e sair viram 1 ícone de perfil
+
+**Decisão: os três icon-buttons do cluster direito (Ajuda, `ThemeButton`, sair) saem do header e viram um único ícone de perfil — `CircleUserRound` (lucide), `h-9 w-9`, sem borda, `title="conta"` `aria-label="abrir conta"` — que navega pra `/ajuda`. Mesma rota, mesmo componente, nenhuma tela nova.** Cluster direito passa a ter só 2 itens nos dois breakpoints: CTA "Novo tema" e o ícone de perfil.
+
+Pedido do dono (29/07): "lá dentro ter configs e tal" — tema, ajuda, sair e conta acessíveis a partir de um ícone só, não de três lado a lado com o CTA.
+
+**Decisão 1 — o ícone abre tela, não menu.** A `§7` item 2 desta spec já proibia o primeiro popover/dropdown do app; abrir uma exceção pra um menu de 4 itens exigiria criar esse componente do zero só pra repetir o que uma tela já resolve. **A proibição continua valendo** — o ícone não abre popover, navega. `/ajuda` já é, hoje, a tela que reúne conta (e-mail/export/sair) e, por `DESIGN-ENGAJAMENTO §8.2`, também aparência/tema — virar a casa única das três ações pede só trocar o ponto de entrada e reordenar o que já existe lá dentro (ver `DESIGN-AJUDA.md`, emenda 29/07), não uma rota nova.
+
+**Decisão 2 — pra onde cada ação vai.** `tema` → `Ajuda › aparência` (já existe). `ajuda/FAQ` → continua sendo o corpo da própria tela (método/ciência/perguntas). `sair` e `e-mail`/`export` → `Ajuda › sua conta` (já existe). Nada fica inacessível — só o ponto de entrada vira um ícone; o toggle rápido de tema no header deixa de existir (era exatamente o que o dono pediu pra recolher).
+
+**Decisão 3 — ícone e estados.** `CircleUserRound` é a convenção universal de "minha conta" — mesma lógica que já valeu pro `CircleHelp` no §1.2 (não precisa de rótulo ao lado). Mesmo tratamento visual dos outros icon-buttons do shell: `h-9 w-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground`, sem borda. **Sem estado ativo/`aria-current`**: não é uma aba de navegação primária, é acesso secundário — mesmo comportamento que o antigo icon-button de Ajuda tinha.
+
+**Decisão 4 — mobile e desktop.** A tab bar mobile **não ganha 4ª aba** (mesma lógica do §1.2: o ícone já é visível em toda rota, no header sticky — uma aba duplicaria entrada). O desktop **não ganha pill nova**: as pills continuam só `Temas · Revisar · Pro`; conta é sempre ícone, nos dois breakpoints — era essa já a regra do §1.2, só o ícone que era `CircleHelp` vira `CircleUserRound` e absorve tema+sair.
+
+**O que isso substitui**: o icon-button `Ajuda` que o §1.2 criou sai de novo; `ThemeButton` e o botão de sair saem do header pela primeira vez (nunca tinham saído antes desta emenda).
+
 ### 1.1 Convivência com o dock do Revisar (decisão)
 
 Na rota `/revisar` (em `<md`) **a tab bar não renderiza** e o dock sticky do player continua dono do `bottom-0` + safe-area, como hoje.
@@ -44,13 +62,13 @@ Na rota `/revisar` (em `<md`) **a tab bar não renderiza** e o dock sticky do pl
 Mesmo elemento `header` atual (sticky, `h-14`, vidro `bg-background/92 backdrop-blur-md` + `pt-[env(safe-area-inset-top)]`, `z-30`). O `pt-[env(safe-area-inset-top)]` resolve 0 sem `viewport-fit=cover` — fica como seguro, e sem `max()` nunca vira folga fantasma. Muda só o conteúdo em `<md`:
 
 ```
-[ Logo + Fixa ]          [ (+) Novo tema ] [ ajuda ] [ tema ] [ sair ]
+[ Logo + Fixa ]                    [ (+) Novo tema ] [ conta ]
 ```
 
 - **Marca**: botão logo + wordmark → **remover `hidden sm:` do wordmark** (`<span className="text-[17px] font-extrabold tracking-[-0.02em]">Fixa</span>` sempre visível). Com a nav fora do header, cabe com folga até em 320px.
-- **Nav de pills**: `nav` vira `hidden md:flex items-center gap-1`. Dentro dela, o `NavBtn` do Pro **perde o override** `display="hidden sm:inline-flex"` (a prop `display` do `NavBtn` pode ser removida — a nav inteira já só existe em ≥`md`). **(29/07)** a pill `Ajuda` **sai** desta nav também (não só do mobile) — vira icon-button no cluster direito, ver §1.2 e item abaixo.
-- **Cluster direito** (**29/07: ganha um item, `Ajuda`** — estrutura descrita em `DESIGN-HOME §3`): CTA Novo tema (ícone-só `h-9 w-9` em `<sm`, texto+ícone em ≥`sm`, `bg-primary` — segue o único sólido violeta do shell), `Ajuda` **novo** (`CircleHelp h-9 w-9`, `title/aria-label="Ajuda"`, → `/ajuda`), `ThemeButton` `h-9 w-9`, sair `h-9 w-9`. Gap `gap-2`. Ordem: Novo tema → Ajuda → tema → sair (ação primeiro, depois os três de "acesso secundário").
-- Orçamento em 360px: marca ≈ 90px + cluster ≈ 168px (4×36 + 3×gap-2) → sobra ≈ 70px de respiro (era ≈100px com 3 ícones; ainda folgado). Em ≥`sm` o CTA com texto (~120px) também cabe, cluster ≈ 252px.
+- **Nav de pills**: `nav` vira `hidden md:flex items-center gap-1`. Dentro dela, o `NavBtn` do Pro **perde o override** `display="hidden sm:inline-flex"` (a prop `display` do `NavBtn` pode ser removida — a nav inteira já só existe em ≥`md`). A pill `Ajuda` **não existe** nesta nav (saiu em 29/07 de manhã, §1.2) e conta/tema/sair também nunca entram como pill — são sempre ícone, ver item abaixo.
+- **Cluster direito (29/07, tarde — §1.3): 2 itens só, nos dois breakpoints** (estrutura descrita em `DESIGN-HOME §3`): CTA Novo tema (ícone-só `h-9 w-9` em `<sm`, texto+ícone em ≥`sm`, `bg-primary` — único sólido violeta do shell) e o ícone de **conta** (`CircleUserRound h-9 w-9`, `title="conta"` `aria-label="abrir conta"`, → `/ajuda`, sem borda, sem estado ativo). Gap `gap-2`. `Ajuda` (`CircleHelp`), `ThemeButton` e o botão de sair **saem do header** — absorvidos pelo ícone de conta (§1.3).
+- Orçamento em 360px: marca ≈ 90px + cluster ≈ 78px (2×36 + 1×gap-2) → sobra ≈ 160px de respiro (era ≈70px com 4 ícones — bem mais folgado agora). Em ≥`sm` o CTA com texto (~120px) também cabe, cluster ≈ 162px.
 
 Nada muda em ≥`md`: pills, badge no pill Revisar, CTA completo, tudo como hoje.
 
@@ -152,8 +170,7 @@ A bar é `fixed`, então o conteúdo precisa de respiro embaixo em `<md` (exceto
 | `aria-label` da bar | `navegação principal` |
 | `aria-label` da aba Revisar com fila | `Revisar, {n} pendente(s)` |
 | CTA header (inalterado) | `Novo tema` (≥`sm`) · `title="Novo tema"` no ícone-só |
-| Botão de Ajuda no header (novo, 29/07) | `title="Ajuda"` `aria-label="Ajuda"` |
-| Botões do header (inalterados) | `title="tema"` · `title="sair"` |
+| Ícone de conta no header (29/07, tarde — §1.3, substitui os ícones de Ajuda/tema/sair) | `title="conta"` `aria-label="abrir conta"` |
 
 Tom herdado: sem exclamação, sem emoji; números em mono `tabular-nums`.
 
@@ -173,10 +190,10 @@ Tom herdado: sem exclamação, sem emoji; números em mono `tabular-nums`.
 ## 7. Não-objetivos (segurar o dev)
 
 1. **Não tocar em `Review.tsx`** nem em nenhuma tela — escopo é o `Shell` do `App.tsx`.
-2. **Sem router lib, sem componente de dropdown/popover** — a direção (B) foi descartada justamente pra não criar esse componente.
+2. **Sem router lib, sem componente de dropdown/popover** — a direção (B) foi descartada justamente pra não criar esse componente, e a emenda de 29/07 (tarde, §1.3) reafirma a proibição: o ícone de conta navega, não abre menu.
 3. **Sem auto-hide da bar no scroll** (padrão frágil, briga com o sticky header e com leitores de tela).
-4. **Sem 4ª aba de volta**: o slot que `Ajuda` deixou não recebe substituto — 3 é a contagem honesta de destinos de uso diário (§1.2). Criar tema continua fora da bar, no CTA do header.
-5. **Sem mudar desktop ≥`md` além do combinado em 29/07**: badge, CTA continuam intactos; a única mudança é `Ajuda` saindo das pills e entrando no cluster direito como ícone (mesma mudança dos dois breakpoints, ver §1.2) — não reabrir mais nada da nav desktop além disso.
+4. **Sem 4ª aba de volta**: nem `Ajuda` nem `conta` recebem aba — 3 é a contagem honesta de destinos de uso diário (§1.2, reafirmado em §1.3). Criar tema continua fora da bar, no CTA do header.
+5. **Sem mudar desktop ≥`md` além do combinado em 29/07**: badge, CTA continuam intactos; a nav de pills fica só `Temas · Revisar · Pro`; `Ajuda`/tema/sair nunca viram pill — são sempre o ícone de conta no cluster direito (§1.3), igual ao mobile.
 6. **Sem tokens novos, sem sólido âmbar** (badge segue tint), sem mexer no `z-index` do header/dock.
 7. **Sem estado "sessão ativa" vazando do `Review` pro `Shell`** — a regra é por rota, ponto.
 
@@ -184,11 +201,11 @@ Tom herdado: sem exclamação, sem emoji; números em mono `tabular-nums`.
 
 ## 8. Checklist de aceite
 
-- [ ] **360×800 (e 320px)**: header mostra Logo + wordmark "Fixa" + CTA + **Ajuda** + tema + sair sem overflow nem truncar; nenhuma pill de nav visível; bar com **3 abas** visível (29/07, era 4).
+- [ ] **360×800 (e 320px)**: header mostra Logo + wordmark "Fixa" + CTA + **ícone de conta** sem overflow nem truncar; nenhuma pill de nav visível; bar com **3 abas** visível.
 - [ ] **Bar some em `/revisar`**: na sessão de revisão o dock Revelar/Errei/Acertei fica colado no fundo com safe-area, sem bar atrás nem por cima; ao navegar de volta (logo ou `Voltar aos temas`) a bar reaparece.
 - [ ] **Badge**: com 7 pendentes, aba Revisar mostra `7` em âmbar tint mono no canto do ícone; ao avaliar um card e voltar, o número caiu (evento `fx-review-changed`); com 0, sem badge; com 120, `99+`; leitor de tela anuncia "Revisar, 7 pendentes".
-- [ ] **Ativa certa em toda rota**: `/` e `/t/:id` → Temas; `/revisar` → (sem bar); `/pro` → Pro (agora alcançável no mobile); `/novo` → nenhuma aba ativa, bar visível. **(29/07) `/ajuda` não tem mais aba** — chega pelo ícone do header, visível (e clicável) em qualquer rota, inclusive dentro da própria Ajuda.
+- [ ] **Ativa certa em toda rota**: `/` e `/t/:id` → Temas; `/revisar` → (sem bar); `/pro` → Pro (agora alcançável no mobile); `/novo` → nenhuma aba ativa, bar visível. `/ajuda` não tem aba — chega pelo ícone de conta do header, visível (e clicável) em qualquer rota, inclusive dentro da própria Ajuda.
 - [ ] **Sem conteúdo engolido**: no fim da Home (e de `/pro`, a mais longa) o último elemento rola pra cima da bar (`pb` do `main` correto); e conferir no aparelho que **não há faixa clara** abaixo do rodapé, no claro e no escuro.
-- [ ] **(29/07) Ajuda alcançável nos dois breakpoints**: ícone `CircleHelp` no cluster direito do header em `<md` **e** `≥md`; `title`/`aria-label` "Ajuda"; navega pra `/ajuda`; conta (e-mail/export/sair) continua acessível de dentro da tela Ajuda, sem regressão.
-- [ ] **Desktop (≥768px)**: header com pills **Temas · Revisar** (sem `Ajuda`), badge, CTA completo, zero bar, `main` com `pb-6`, cluster direito com o ícone novo de Ajuda.
+- [ ] **(29/07, tarde — §1.3) Conta alcançável nos dois breakpoints, sem popover**: ícone `CircleUserRound` no cluster direito do header em `<md` **e** `≥md`; `title="conta"` `aria-label="abrir conta"`; navega pra `/ajuda`; tema, ajuda/FAQ, e-mail, export e sair continuam acessíveis de dentro da tela, sem regressão; nenhum `ThemeButton`/ícone de Ajuda/botão de sair sobra no header.
+- [ ] **Desktop (≥768px)**: header com pills **Temas · Revisar · Pro**, badge, CTA completo, zero bar, `main` com `pb-6`, cluster direito com CTA + ícone de conta, só isso.
 - [ ] **A11y/identidade**: abas com anel `FOCUS` no teclado, `aria-current` na ativa, ativa em violeta tinta (sem fundo), nenhum emoji/exclamação, números mono `tabular-nums`.

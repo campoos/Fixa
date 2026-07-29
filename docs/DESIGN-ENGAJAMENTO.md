@@ -350,7 +350,9 @@ Duração total 1180ms, uma vez, sem loop. Com `prefers-reduced-motion: reduce` 
 
 O botão existe desde sempre no header (`App.tsx`, `h-9 w-9`, `title="tema"`), sem `aria-label` e sem palavra. Três correções, da mais barata pra mais estrutural.
 
-### 8.1 `aria-label` no botão do header (1 linha)
+> **Superseded em 29/07 (tarde) — `DESIGN-SHELL-MOBILE §1.3`.** O `ThemeButton` do header **deixou de existir**: o dono pediu explicitamente pra tema/ajuda/sair virarem "um ícone de perfil, e lá dentro ter configs e tal". O toggle rápido no header (§8.1 abaixo) não se aplica mais — não há mais botão de tema no header pra ganhar `aria-label`. O que continua valendo por inteiro: **§8.2** (a seção `Ajuda › aparência`, que agora é a **única** casa do tema, não mais backup de um atalho) e **§8.3** (o estado "automático" no `ThemeProvider`). §8.1 e a frase "o sol/lua no topo faz a mesma troca" (§8.2, §8.4) ficam históricas — registradas, não apagadas — mas não descrevem mais o app.
+
+### 8.1 `aria-label` no botão do header (1 linha) — histórico, botão não existe mais desde 29/07 (tarde)
 
 ```tsx
 <button onClick={toggle}
@@ -360,16 +362,16 @@ O botão existe desde sempre no header (`App.tsx`, `h-9 w-9`, `title="tema"`), s
 
 Hoje um leitor de tela lê "botão" e nada mais. O rótulo diz o **destino**, não o estado — quem lê "tema escuro" com o app escuro não sabe se é o que está ou o que vai ficar.
 
-### 8.2 Ajuda › aparência (a casa com palavra)
+### 8.2 Ajuda › aparência (a casa — 29/07 tarde: deixa de ser "com palavra", vira a única)
 
-Seção nova em `Ajuda.tsx`, **imediatamente antes** de `sua conta` (configuração agrupada no rodapé, conta por último porque termina em "sair"):
+Seção em `Ajuda.tsx`. **Posição mudou em 29/07 (tarde, `DESIGN-AJUDA §3`):** era imediatamente antes de `sua conta`, no rodapé da tela; agora `sua conta` e `aparência` juntas abrem a tela (logo após o header), porque o ponto de entrada virou o ícone de conta do header, não mais um `CircleHelp` de leitura eventual.
 
 ```tsx
 <section className="mt-10">
   <h2 className={EYEBROW}>aparência</h2>
   <Card className="mt-3 gap-0 p-4">
     <p className="text-sm">tema</p>
-    <p className="mt-0.5 text-[11px] text-muted-foreground">o sol/lua no topo faz a mesma troca</p>
+    {/* 29/07 (tarde): linha abaixo removida — não há mais sol/lua no header, ver §8 topo */}
     <div role="radiogroup" aria-label="tema do app" className="mt-3 flex overflow-hidden rounded-lg border border-border">
       {MODOS.map((m) => (
         <button key={m.v} role="radio" aria-checked={modo === m.v} onClick={() => setModo(m.v)}
@@ -403,12 +405,12 @@ O listener de `prefers-color-scheme` que já existe (`theme.tsx:27`) continua ex
 
 ### 8.4 FAQ
 
-Item novo no grupo **conta e plano** de `Ajuda.tsx`:
+Item no grupo **conta e plano** de `Ajuda.tsx`. Texto revisado em 29/07 (tarde) — não existe mais sol/lua no header:
 
 > **Dá pra usar no tema claro?**
-> Dá. Em **Ajuda › aparência** você escolhe entre automático, claro e escuro — automático segue o modo do celular. O sol/lua no canto superior direito faz a mesma troca em um toque.
+> Dá. Em **Ajuda › aparência**, logo no topo desta tela, você escolhe entre automático, claro e escuro — automático segue o modo do celular.
 
-Com isso o ícone do header passa a ser exceção **(b)** da regra transversal da `DESIGN-DESCOBRIBILIDADE §D` ("atalho de algo que tem casa com palavra"), igual ao logout. Sem a seção de Ajuda ele não se enquadrava em nenhuma exceção.
+**Superseded (29/07, tarde):** a versão original desta FAQ ("o sol/lua no canto superior direito faz a mesma troca em um toque") e a leitura de que o ícone do header era exceção **(b)** da `DESIGN-DESCOBRIBILIDADE §D` ("atalho de algo que tem casa com palavra") não valem mais — não existe mais atalho de tema no header pra ser exceção de nada. O ícone de conta (`CircleUserRound`, `DESIGN-SHELL-MOBILE §1.3`) não é atalho de tema especificamente; é a porta de entrada de conta+config como um todo, e tema é uma das coisas lá dentro, tratada igual às outras (sem exceção própria).
 
 ### 8.5 O que não fazer aqui
 
@@ -438,8 +440,9 @@ Nenhum coachmark, tooltip de primeira vez, badge "novo" ou tour apontando pro bo
 | Fecho F3 | `Dia fechado` / `meta de hoje feita · {n} dias seguidos` |
 | Fecho F4 | `Reta final: fila de hoje feita` / `faltam {n} dias — o que você refrescou hoje chega vivo na prova.` |
 | Fecho F0 | `Sessão concluída` *(atual)* |
-| Ajuda › aparência | `aparência` / `tema` / `o sol/lua no topo faz a mesma troca` / `automático` `claro` `escuro` / `automático segue o modo do seu celular.` |
-| Header, `aria-label` | `mudar para o tema claro` · `mudar para o tema escuro` |
+| Ajuda › aparência | `aparência` / `tema` / `automático` `claro` `escuro` / `automático segue o modo do seu celular.` — **29/07 (tarde): linha "o sol/lua no topo faz a mesma troca" saiu, não existe mais sol/lua no header** |
+| Header, `aria-label` (histórico, botão não existe mais desde 29/07 tarde) | `mudar para o tema claro` · `mudar para o tema escuro` |
+| Ícone de conta no header (29/07, tarde — `DESIGN-SHELL-MOBILE §1.3`) | `title="conta"` `aria-label="abrir conta"` |
 
 Tom: minúsculas em rótulos e metadados, sem exclamação, sem emoji, sem "você consegue". **Palavras banidas em qualquer estado novo:** `atrasado`, `atrasadas`, `você perdeu`, `não perca`, `você vai perder`, `parabéns`, `uau`, `sentimos sua falta`, `volte`, `ainda dá tempo`.
 
@@ -518,7 +521,7 @@ A **notificação no celular** (pedido de permissão, horário, frequência e co
 - [ ] Fecho de sessão: os cinco estados (F0–F4) aparecem nas cinco condições; com `getStats` **e** `getTracks` falhando, o card mostra o texto de hoje e nada quebra.
 - [ ] A marca do fecho anima **uma vez** (sem loop) e fica estática com `prefers-reduced-motion: reduce`.
 - [ ] Ajuda › aparência: três opções de 44px, `role="radiogroup"` + `aria-checked` corretos; escolher `automático` faz o app voltar a seguir o aparelho (**trocar o modo do sistema muda o app com ele**).
-- [ ] O botão do header tem `aria-label` que diz o destino, e ele muda quando o tema muda.
+- [ ] **(29/07, tarde)** Não existe mais botão de tema solto no header — só o ícone de conta (`DESIGN-SHELL-MOBILE §1.3`); trocar de tema só é possível de dentro de `Ajuda › aparência`.
 - [ ] Nenhuma cor nova: `grep -nE "#[0-9a-f]{3,6}|amber-|orange-|emerald-|red-"` nos arquivos tocados = 0, exceto o `#F4B740` já existente do ponto da marca.
 - [ ] Nenhum estado novo mostra preço, "assinar", link externo ou menção a pagamento.
 - [ ] Foco visível (`FOCUS`) em: convite da faixa, `agora não`, `marcar a próxima`, os três botões de aparência e `Estudar 1 task`.

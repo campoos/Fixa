@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { CircleHelp, Eye, EyeOff, Gem, Layers, Library, Loader2, LogOut, Moon, Plus, Sun } from "lucide-react";
+import { CircleUserRound, Eye, EyeOff, Gem, Layers, Library, Loader2, Plus } from "lucide-react";
 import { ApiError, forgotPass, getMe, getReview, login, logout, resetPass, signup, type Me } from "@/lib/api";
 import { isAppMode } from "@/lib/app-mode";
-import { ThemeProvider, useTheme } from "@/lib/theme";
+import { ThemeProvider } from "@/lib/theme";
 import { useApi } from "@/lib/useApi";
 import { Home } from "@/screens/Home";
 import { NewTheme } from "@/screens/NewTheme";
@@ -95,21 +95,6 @@ function assinarRota(on: () => void) {
   return () => { window.removeEventListener("popstate", on); window.removeEventListener(ROTA, on); };
 }
 
-function ThemeButton() {
-  const { theme, toggle } = useTheme();
-  return (
-    <button
-      onClick={toggle}
-      // rótulo diz o DESTINO, não o estado — "tema escuro" com o app escuro não se entende
-      title={theme === "dark" ? "tema claro" : "tema escuro"}
-      aria-label={theme === "dark" ? "mudar para o tema claro" : "mudar para o tema escuro"}
-      className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}
-    >
-      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </button>
-  );
-}
-
 function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const [route, setRoute] = useState<Route>(parseRoute);
   useEffect(() => assinarRota(() => setRoute(parseRoute())), []);
@@ -176,11 +161,9 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
               <Plus className="h-4 w-4" /> Novo tema
             </button>
             <button onClick={() => navigate("/novo")} className={`grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 sm:hidden ${FOCUS}`} title="Novo tema"><Plus className="h-4 w-4" /></button>
-            {/* Ajuda saiu da navegação primária (tab bar + pills) e mora aqui nos dois breakpoints
-                (DESIGN-SHELL-MOBILE §1.2): tela de referência, não de uso diário */}
-            <button onClick={() => navigate("/ajuda")} title="Ajuda" aria-label="Ajuda" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}><CircleHelp className="h-4 w-4" /></button>
-            <ThemeButton />
-            <button onClick={onLogout} title="sair" aria-label="sair da conta" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}><LogOut className="h-4 w-4" /></button>
+            {/* um ícone só de conta (DESIGN-SHELL-MOBILE §1.3): ajuda, tema e sair moram todos
+                em /ajuda — navega pra tela, sem popover (proibição do §7 segue de pé) */}
+            <button onClick={() => navigate("/ajuda")} title="conta" aria-label="abrir conta" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}><CircleUserRound className="h-4 w-4" /></button>
           </div>
         </div>
       </header>
