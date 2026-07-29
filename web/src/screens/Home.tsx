@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { Activity, Bell, BellOff, CalendarClock, Check, ChevronDown, Flame, GraduationCap, Layers, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { Activity, Bell, BellOff, CalendarClock, CalendarDays, Check, ChevronDown, Flame, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { TrackIcon } from "@/components/track-icon";
 import { deleteTrack, getConfig, getStats, getTracks, getTrash, purgeTrash, restoreTrack } from "@/lib/api";
 import type { Progress, Stats, TrackSummary } from "@/lib/api";
@@ -240,11 +240,11 @@ function StatTiles({ s }: { s: Stats }) {
       hint: semSeq ? "sua sequência começa na primeira sessão de hoje" : "dias seguidos com atividade — um dia vazio não zera se os 7 antes dele tiveram estudo",
     },
     { icon: <Activity className="h-4 w-4 text-primary" />, value: today, label: today === 1 ? "ação hoje" : "ações hoje", hint: "avaliações e conclusões de hoje" },
-    { icon: <GraduationCap className="h-4 w-4 text-domain" />, value: s.mastered, label: s.mastered === 1 ? "dominada" : "dominadas", hint: "tasks que graduaram na revisão espaçada" },
-    { icon: <Layers className="h-4 w-4 text-muted-foreground" />, value: s.tasksDone, label: `de ${s.tasksTotal} tasks`, hint: "tasks concluídas do total" },
+    // só sequência + ações hoje (§4.c): dominadas e "de N tasks" são progresso acumulado,
+    // que a faixa da prova e o card de tema já respondem com contexto — aqui é zona de hábito
   ];
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5">
       {tiles.map((t) => (
         <div key={t.label} title={t.hint} className="rounded-lg border border-border bg-card px-3.5 py-3">
           <div className="flex items-center gap-1.5">
@@ -276,6 +276,9 @@ const DAY_LABELS: [string, number][] = [["seg", 3], ["qua", 5], ["sex", 7]];
 /* heatmap GitHub-style: 52 semanas, colunas fluidas (minmax(10px, 1fr)) que enchem o card;
    rola horizontal só quando o mínimo (~704px) não cabe, ancorado nas semanas recentes */
 function Heatmap({ days }: { days: Stats["days"] }) {
+  // fechado por padrão, toda visita (§4.d): prova com data motiva mais que streak — a grade
+  // é de quem gosta de olhar pra trás, não o motivo de abrir o app. Sem localStorage.
+  const [aberto, setAberto] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   // tooltip customizado: um único chip flutuante (fixed) que segue a célula sob o cursor
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
@@ -294,7 +297,7 @@ function Heatmap({ days }: { days: Stats["days"] }) {
     const ro = new ResizeObserver(aoFim);
     ro.observe(el);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [days]);
+  }, [days, aberto]); // o scroller só monta com a grade aberta — reancorar ao expandir
   if (!days.length) return null;
 
   const startDow = dateFromYmd(days[0].day).getDay(); // 0 = dom (o server alinha no domingo)
@@ -313,7 +316,20 @@ function Heatmap({ days }: { days: Stats["days"] }) {
   }
 
   return (
-    <Card className="gap-0 p-4">
+    <div>
+      {/* mesma revelação da Lixeira (§4.f): a linha carrega o número que importa, a grade
+          só abre pra quem quiser olhar — corte seco, sem animar altura */}
+      <button
+        onClick={() => setAberto(!aberto)}
+        aria-expanded={aberto}
+        className={`flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-3 text-xs text-muted-foreground transition-colors hover:text-foreground ${FOCUS}`}
+      >
+        <CalendarDays className="h-3.5 w-3.5" />
+        <span className="flex-1 text-left">Consistência · <span className="font-mono tabular-nums">{total}</span> {total === 1 ? "ação" : "ações"} no último ano</span>
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${aberto ? "" : "-rotate-90"}`} />
+      </button>
+      {aberto && (
+    <Card className="mt-2 gap-0 p-4">
       {/* a última trilha do grid (4px) é a folga do contorno de "hoje": padding não entra no
           scroll horizontal quando as colunas transbordam a caixa do grid */}
       <div ref={scrollerRef} onScroll={() => setTip(null)} onMouseLeave={() => setTip(null)} className="scroll-custom overflow-x-auto pb-3">
@@ -379,6 +395,8 @@ function Heatmap({ days }: { days: Stats["days"] }) {
         </div>
       </div>
     </Card>
+      )}
+    </div>
   );
 }
 
@@ -396,6 +414,7 @@ function ExamBadge({ daysLeft }: { daysLeft: number }) {
 }
 
 function ThemeCard({ t, onDelete }: { t: TrackSummary; onDelete: (e: MouseEvent<HTMLButtonElement>, t: TrackSummary) => void }) {
+  const pctDom = t.progress.total ? Math.round((t.mastery / t.progress.total) * 100) : 0;
   const open = () => navigate(`/t/${encodeURIComponent(t.id)}`);
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return; // Enter no botão de excluir não abre o tema
@@ -418,20 +437,19 @@ function ThemeCard({ t, onDelete }: { t: TrackSummary; onDelete: (e: MouseEvent<
                 <RotateCcw className="h-3 w-3" /><span className="font-mono tabular-nums">{t.due}</span>
               </span>
             )}
-            {t.mastery > 0 && (
-              <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-domain" title="dominadas">
-                <GraduationCap className="h-3 w-3" /><span className="font-mono tabular-nums">{t.mastery}</span>
-              </span>
-            )}
             <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{t.progress.done}/{t.progress.total}</span>
           </div>
           {t.summary && <p className="mt-1 truncate text-xs text-muted-foreground">{t.summary}</p>}
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-domain transition-all" style={{ width: `${pct(t.progress)}%` }} />
+          {/* dois segmentos como na faixa da prova (§4.e): o cheio é domínio (a badge que saiu),
+              o claro é o que só foi concluído — dominada ≠ concluída sem número a mais na linha */}
+          <div
+            className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
+            role="img"
+            aria-label={`${t.mastery} de ${t.progress.total} tasks dominadas, ${t.progress.done} concluídas`}
+          >
+            <div className="h-full bg-domain" style={{ width: `${pctDom}%` }} />
+            <div className="h-full bg-domain/30" style={{ width: `${Math.max(0, pct(t.progress) - pctDom)}%` }} />
           </div>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            {t.counts.epics} epics · {t.counts.stories} stories · {t.counts.tasks} tasks ({t.counts.practice} práticas)
-          </p>
         </div>
         <button
           onClick={(e) => onDelete(e, t)}
@@ -507,10 +525,11 @@ function HomeSkeleton() {
         </div>
       </div>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[64px] rounded-lg" />)}
+        <div className="grid grid-cols-2 gap-2.5">
+          {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-[64px] rounded-lg" />)}
         </div>
-        <Skeleton className="h-[180px] rounded-xl" />
+        {/* o heatmap nasce fechado: o skeleton é da linha colapsada, não da grade */}
+        <Skeleton className="h-[52px] rounded-lg" />
       </div>
       <div className="space-y-2.5">
         {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[120px] rounded-xl" />)}

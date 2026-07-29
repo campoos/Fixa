@@ -169,7 +169,6 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
                 </span>
               )}
             </NavBtn>
-            <NavBtn to="/ajuda" active={route.name === "ajuda"}>Ajuda</NavBtn>
             <NavBtn to="/pro" active={route.name === "pro"}>Pro</NavBtn>
           </nav>
           <div className="ml-auto flex items-center gap-2">
@@ -177,6 +176,9 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
               <Plus className="h-4 w-4" /> Novo tema
             </button>
             <button onClick={() => navigate("/novo")} className={`grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 sm:hidden ${FOCUS}`} title="Novo tema"><Plus className="h-4 w-4" /></button>
+            {/* Ajuda saiu da navegação primária (tab bar + pills) e mora aqui nos dois breakpoints
+                (DESIGN-SHELL-MOBILE §1.2): tela de referência, não de uso diário */}
+            <button onClick={() => navigate("/ajuda")} title="Ajuda" aria-label="Ajuda" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}><CircleHelp className="h-4 w-4" /></button>
             <ThemeButton />
             <button onClick={onLogout} title="sair" aria-label="sair da conta" className={`grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${FOCUS}`}><LogOut className="h-4 w-4" /></button>
           </div>
@@ -198,10 +200,10 @@ function Shell({ me, onLogout }: { me: Me; onLogout: () => void }) {
           folga só embaixo — foi exatamente o que deixou o rodapé torto. */}
       {route.name !== "revisar" && route.name !== "licao" && (
         <nav aria-label="navegação principal" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/92 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_-4px_oklch(0.235_0.03_290/0.18)] backdrop-blur-md md:hidden">
-          <div className="mx-auto grid h-[72px] max-w-4xl grid-cols-4">
+          {/* 3 abas — Ajuda virou ícone do header (DESIGN-SHELL-MOBILE §1.2): a bar fica só com destino de uso diário */}
+          <div className="mx-auto grid h-[72px] max-w-4xl grid-cols-3">
             <TabBtn to="/" active={route.name === "home" || route.name === "track"} icon={<Library className="h-[22px] w-[22px]" />} label="Temas" />
             <TabBtn to="/revisar" active={false} icon={<Layers className="h-[22px] w-[22px]" />} label="Revisar" badge={dueCount} />
-            <TabBtn to="/ajuda" active={route.name === "ajuda"} icon={<CircleHelp className="h-[22px] w-[22px]" />} label="Ajuda" />
             <TabBtn to="/pro" active={route.name === "pro"} icon={<Gem className="h-[22px] w-[22px]" />} label={isAppMode ? "Plano" : "Pro"} />
           </div>
         </nav>

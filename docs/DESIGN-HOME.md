@@ -120,15 +120,16 @@ A landing é a marca em volume alto (dark índigo saturado, canvas animado, hero
 
 ## 3. Shell / Header (`App.tsx`)
 
-Estrutura atual mantida (sticky, blur, mesma ordem de elementos); refinamentos abaixo.
+Estrutura atual mantida (sticky, blur, mesma ordem de elementos); refinamentos abaixo. **`<md` (mobile) segue `DESIGN-SHELL-MOBILE.md`** — header reduzido + bottom tab bar; o que está aqui é a base ≥`md` (desktop) mais o que vale nos dois breakpoints (marca, cluster direito).
 
 - **Container**: `sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md`. Inner: `mx-auto flex h-14 max-w-4xl items-center gap-2 px-4` (**56px** de altura, constante).
 - **Marca**: botão → `/`. Logo loop existente **24px** + wordmark `text-[17px] font-extrabold tracking-[-0.02em]`. Em `<sm`, esconder o wordmark (`hidden sm:inline`) e manter só o loop — é o que libera espaço pros 3 itens de nav no mobile.
-- **Nav** (Temas · Revisar · Ajuda): pills `h-8 px-3 rounded-lg text-sm`. Ativa: `bg-secondary font-medium text-foreground` + `aria-current="page"`. Inativa: `text-muted-foreground hover:bg-accent hover:text-foreground`. "Temas" ativa também na rota `t/:id` (comportamento atual).
+- **Nav** (Temas · Revisar): pills `h-8 px-3 rounded-lg text-sm`. Ativa: `bg-secondary font-medium text-foreground` + `aria-current="page"`. Inativa: `text-muted-foreground hover:bg-accent hover:text-foreground`. "Temas" ativa também na rota `t/:id` (comportamento atual). **(29/07) `Ajuda` sai da nav de pills** — motivo e destino em `DESIGN-SHELL-MOBILE §1.2`.
 - **Badge do Revisar**: `ml-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-recall/15 px-1 font-mono text-[11px] tabular-nums text-recall`. Oculto quando 0; exibir `99+` acima de 99. Mantém o listener `fx-review-changed` existente.
-- **Cluster direito**: 
+- **Cluster direito** (mesma composição em `<md` e `≥md`, ver `DESIGN-SHELL-MOBILE §2`):
   - "Novo tema": **único elemento sólido do shell** — `h-9 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary/90`, ícone `Plus h-4 w-4`. Em `<sm` vira icon-button `h-9 w-9 rounded-lg` (já existe).
-  - Tema e Sair: **sem borda** (mudança — hoje têm `border`): `h-9 w-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground`, ícones `h-4 w-4`. Menos cromo, só o CTA pesa.
+  - **Ajuda — novo (29/07)**: icon-button `h-9 w-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground`, `CircleHelp h-4 w-4`, `title="Ajuda"` `aria-label="Ajuda"`, navega pra `/ajuda`. Entra entre "Novo tema" e o toggle de tema. Detalhe e justificativa em `DESIGN-SHELL-MOBILE §1.2`.
+  - Ajuda, Tema e Sair: **sem borda** (mudança — hoje Tema/Sair têm `border`): `h-9 w-9 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground`, ícones `h-4 w-4`. Menos cromo, só o CTA pesa.
 - **Foco**: todo interativo do app: `focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background outline-none`.
 - **Main**: `mx-auto max-w-4xl px-4 py-6` (py sobe de 5→6). Não alargar o shell (não-objetivo).
 
@@ -140,7 +141,7 @@ Estrutura atual mantida (sticky, blur, mesma ordem de elementos); refinamentos a
 
 ```
 1. HOJE          → linha eyebrow + data · cards de ação (Revisar | Continuar)
-2. CONSISTÊNCIA  → 4 stat tiles · heatmap GitHub-style
+2. CONSISTÊNCIA  → 2 stat tiles · heatmap GitHub-style, colapsado por padrão (29/07)
 3. SEUS TEMAS    → lista de temas
 4. (sem label)   → Lixeira, mt-10
 ```
@@ -163,7 +164,7 @@ Grid `grid gap-3 sm:grid-cols-2` (empilha no mobile, Revisar primeiro). Anatomia
 
 ### 4.c Zona CONSISTÊNCIA — stat tiles
 
-Grid `grid grid-cols-2 gap-2.5 sm:grid-cols-4`, acima do heatmap (mesma zona, `space-y-3`).
+**(29/07 — enxugado de 4 pra 2 tiles, ver §4.i.)** Grid `grid grid-cols-2 gap-2.5` (sem variante `sm:grid-cols-4` — com só 2 métricas, 2 colunas já preenche bem em qualquer largura; cada tile fica com metade da largura do card do heatmap logo abaixo, o que os alinha visualmente sem precisar de `max-w` extra).
 
 Tile: `rounded-lg border border-border bg-card px-3.5 py-3` (~64px). Linha 1: ícone `h-4 w-4` colorido + valor `text-xl font-mono font-semibold tabular-nums text-foreground`. Linha 2: label `mt-0.5 text-[11px] text-muted-foreground`.
 
@@ -171,14 +172,29 @@ Tile: `rounded-lg border border-border bg-card px-3.5 py-3` (~64px). Linha 1: í
 |---|---|---|---|---|---|
 | 1 | Sequência | `s.streak` | `Flame` | `text-recall` | "dia seguido"/"dias seguidos" |
 | 2 | Ações hoje | `s.days` (último item) | `Activity` | `text-primary` | "ação hoje"/"ações hoje" |
-| 3 | Dominadas | `s.mastered` | `GraduationCap` | `text-domain` | "dominadas" ("dominada" se 1) |
-| 4 | Concluídas | `s.tasksDone` | `Layers` | `text-muted-foreground` | "de {tasksTotal} tasks" |
+
+**Removidos (29/07): `dominadas` (`s.mastered`) e `de {n} tasks` (`s.tasksDone`).** Motivo: são leitura de progresso *global e acumulado* — o mesmo lugar que a faixa da prova (`DESIGN-ENGAJAMENTO §3`) e o card de tema (§4.e, agora com barra de dois segmentos) já cobrem, cada um com contexto (desta prova / deste tema). Nesta zona, que é sobre **hábito** (sequência + ritmo do dia), esses dois números eram redundância pura, sem contexto adicional. Ficam **sequência** (o hábito em si) e **ações hoje** (o pulso do dia) — as duas métricas que só esta zona responde.
 
 Nenhum tile é clicável (a ação de revisar já mora na zona HOJE — o tile "revisar hoje" atual **sai** da strip). Sem sparklines, sem variação percentual.
 
-### 4.d Heatmap GitHub-style (o coração da spec)
+### 4.d Heatmap GitHub-style
 
-**Requisito nº 1: o grid preenche 100% da largura interna do card em desktop.** Colunas fluidas `1fr`; scroll horizontal só quando o mínimo não couber.
+**(29/07 — deixa de ser "o coração da spec" e vira colapsável, fechado por padrão. Ver §4.i.)** O produto é prova com data, não streak do GitHub: um bloco de 52 semanas ocupando ~180px de altura logo abaixo dos tiles competia com a zona HOJE pela atenção de quem abre o app todo dia. A escolha entre "altura menor" e "colapsável" foi por colapsável — encolher a grade perderia a legibilidade dos 5 níveis (a própria razão de ser do heatmap) sem de fato tirar peso visual da tela; esconder atrás de um toque tira o peso de verdade e ainda reaproveita um idioma que o app já tem (a Lixeira, §4.f, já é uma revelação `<details>`-like com chevron).
+
+**Estado fechado (default, toda visita — não persiste em localStorage):** uma linha só, no lugar do card do heatmap, mesmo tratamento visual da Lixeira fechada:
+
+```tsx
+<button onClick={() => setAberto(true)} aria-expanded={aberto}
+        className={`flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-3 text-xs text-muted-foreground transition-colors hover:text-foreground ${FOCUS}`}>
+  <CalendarDays className="h-3.5 w-3.5" />
+  <span className="flex-1 text-left">Consistência · <span className="font-mono tabular-nums">{total}</span> ações no último ano</span>
+  <ChevronDown className="h-3.5 w-3.5 -rotate-90 transition-transform" />
+</button>
+```
+
+Continua contando o total (o número que já importa), só não abre a grade. Tocar expande o `Card` do heatmap (estrutura abaixo, intocada); o chevron gira pra `rotate-0` aberto — mesma convenção da Lixeira. Sem animação de altura (corte seco, como todo collapse do app, `DESIGN-AJUDA §3.4`/`§6.4`).
+
+**Requisito nº 1 do card expandido: o grid preenche 100% da largura interna do card em desktop.** Colunas fluidas `1fr`; scroll horizontal só quando o mínimo não couber.
 
 **Janela de dados: 52 semanas** (colunas), da semana atual pra trás. Coluna 52 = semana corrente (parcial); dias futuros são renderizados com `visibility: hidden` (mantêm a malha). Linhas = dom(1)…sáb(7).
 
@@ -259,15 +275,17 @@ Header da zona: eyebrow `SEUS TEMAS` + contador `· N` (mono, mesmo estilo) à e
 
 Lista: `space-y-2.5`. Card do tema: `Card p-4 rounded-xl cursor-pointer transition-colors hover:border-primary/40` (navega pro tema; role de botão, foco visível §3).
 
+**(29/07 — enxugado: badges caem de 4 pra no máx. 2, linha de counts sai, barra ganha dois segmentos. Ver §4.i.)**
+
 Anatomia (uma coluna de conteúdo + ação de excluir à direita, `flex items-start gap-3`):
-1. **Linha do título**: título `text-[15px] font-semibold truncate flex-1 min-w-0` · badges à direita (ordem fixa): 
-   - **prova**: pill `h-[20px] rounded-full px-2 text-[11px] font-medium inline-flex items-center gap-1` com `CalendarClock h-3 w-3`. Cor por urgência: `daysLeft > 7` → `bg-primary/10 text-primary` "prova em {X}d"; `1–7` → `bg-recall/12 text-recall` "prova em {X}d"; `0` → `bg-recall/12 text-recall` "prova hoje"; `< 0` → `bg-muted text-muted-foreground` "prova passou". (Sobe da posição atual — badge de prova pertence à linha do título.)
-   - **revisar**: pill `bg-recall/12 text-recall` com `RotateCcw h-3 w-3` + `{due}` (mono tabular) + `title="pra revisar hoje"`. Só se `due > 0`.
-   - **dominadas**: sem pill — `inline-flex items-center gap-1 text-[11px] font-medium text-domain` com `GraduationCap h-3 w-3` + `{mastery}`. Só se `> 0`.
-   - **contador**: `font-mono text-xs tabular-nums text-muted-foreground` "{done}/{total}".
+1. **Linha do título**: título `text-[15px] font-semibold truncate flex-1 min-w-0` · badges à direita (**máx. 2, ordem fixa**):
+   - **prova** (só se `t.targetDate`): pill `h-[20px] rounded-full px-2 text-[11px] font-medium inline-flex items-center gap-1` com `CalendarClock h-3 w-3`. Cor por urgência: `daysLeft > 7` → `bg-primary/10 text-primary` "prova em {X}d"; `1–7` → `bg-recall/12 text-recall` "prova em {X}d"; `0` → `bg-recall/12 text-recall` "prova hoje"; `< 0` → `bg-muted text-muted-foreground` "prova passou".
+   - **revisar** (só se `due > 0`): pill `bg-recall/12 text-recall` com `RotateCcw h-3 w-3` + `{due}` (mono tabular) + `title="pra revisar hoje"`.
+   - **contador**: `font-mono text-xs tabular-nums text-muted-foreground` "{done}/{total}" — não conta como badge (é o contador de sempre, fica sempre visível, à direita dos badges).
+   - **Removida (29/07): a badge de `dominadas`.** Motivo: `mastery` deixa de ser texto solto e passa a ser o segmento cheio da barra de progresso (item 3, abaixo) — a mesma leitura visual que a faixa da prova já usa (`DESIGN-ENGAJAMENTO §3.b`: dominada ≠ concluída é a distinção central do produto, e um segundo segmento na barra explica isso sem precisar de um número a mais na linha do título). Sobra espaço pra prova+revisar não quebrarem linha em telas estreitas.
 2. **Resumo** (se houver): `mt-1 text-xs text-muted-foreground truncate` (1 linha).
-3. **Barra de progresso**: `mt-2 h-1.5 rounded-full bg-muted overflow-hidden` com fill `bg-domain rounded-full transition-all` a `{pct}%`.
-4. **Counts**: `mt-1.5 text-[11px] text-muted-foreground` — "{e} epics · {s} stories · {t} tasks ({p} práticas)".
+3. **Barra de progresso — dois segmentos** (era um só): `mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-muted`, mesma anatomia da `ExamStrip` (`DESIGN-ENGAJAMENTO §3.b`) — `<div className="h-full bg-domain" style={{ width: pctDominadas }} />` seguido de `<div className="h-full bg-domain/30" style={{ width: max(0, pctConcluidas - pctDominadas) }} />`, com `pctDominadas = mastery/total*100` e `pctConcluidas = done/total*100`. O cheio é domínio real (o que a badge removida dizia em número); o claro é o que só foi concluído/visto. `role="img"` com `aria-label` "{mastery} de {total} tasks dominadas, {done} concluídas" (mesmo padrão da faixa).
+4. **Linha de counts — removida (29/07).** "{e} epics · {s} stories · {t} tasks ({p} práticas)" saía do card sem virar ação nenhuma; quem quer esse detalhe entra no tema (`/t/:id`), que já mostra a árvore inteira. O card de tema na Home é decisão de "o que eu abro", não inventário.
 
 **Excluir**: icon-button à direita, **sempre visível mas apagado** (sem jogo de hover-only — touch existe): `h-8 w-8 rounded-md grid place-items-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10`, `Trash2 h-4 w-4`, `title="mover pra lixeira"`, `stopPropagation`. Confirm mantém o texto atual.
 
@@ -291,8 +309,21 @@ Substitui a página inteira (sem HOJE/CONSISTÊNCIA — zeros não motivam). Con
 
 ### 4.h Loading e erro
 
-- Skeletons na ordem/altura do layout final: ação `2× h-[76px]` (grid 2 cols), tiles `4× h-[64px]`, heatmap `1× h-[180px]`, temas `3× h-[120px]`. Usa `Skeleton`/`.skel` existentes.
+- Skeletons na ordem/altura do layout final: ação `2× h-[76px]` (grid 2 cols), tiles `2× h-[64px]` (29/07, era 4×), heatmap fechado `1× h-[52px]` (29/07, era `1× h-[180px]` — o estado default agora é a linha colapsada, não a grade), temas `3× h-[120px]`. Usa `Skeleton`/`.skel` existentes.
 - Erro: `Card p-4 text-sm text-destructive` — "erro: {mensagem}" (atual, mantém).
+
+### 4.i Emendas 29/07 — enxugamento pós-auditoria de UX
+
+O dono auditou a Home e pediu pra tirar peso sem tirar informação que sustenta uma decisão (o "de onde eu abro" e "quanto falta pra prova"). Registro central das quatro mudanças (cada linha já foi aplicada nos parágrafos correspondentes acima — isto aqui é o porquê, num lugar só):
+
+| Onde | Era | Passa a ser | Por quê (1 linha) |
+|---|---|---|---|
+| `§4.e` ThemeCard | linha "{e} epics · {s} stories · {t} tasks ({p} práticas)" | removida | Inventário sem ação: quem quer o detalhe abre o tema, que já mostra a árvore inteira. |
+| `§4.e` ThemeCard | até 4 badges (prova, revisar, dominadas, contador) | até 2 badges (prova, revisar) + contador fixo | `mastery` vira segmento da barra (não é mais texto solto) — a mesma dupla leitura da faixa da prova, não duplicada em número. |
+| `§4.c` stat tiles | 4 tiles (sequência, ações hoje, dominadas, de N tasks) | 2 tiles (sequência, ações hoje) | `dominadas`/`de N tasks` são progresso global acumulado — já respondido pela faixa da prova e pelo card de tema; a zona CONSISTÊNCIA é sobre hábito, não inventário. |
+| `§4.d` heatmap | sempre aberto, ~180px, "o coração da spec" | colapsado por padrão, uma linha com o total; expande com um toque | Prova com data motiva mais que streak GitHub — o heatmap é ferramenta de quem gosta de olhar pra trás, não o motivo de abrir o app todo dia. Colapsar (não encolher) preserva os 5 níveis legíveis pra quem abre, e some da rolagem pra quem não liga. |
+
+O que **não muda**: nenhum dado novo, nenhum endpoint novo — tudo já vem de `TrackSummary`/`Stats` como estão em `DESIGN-ENGAJAMENTO §6`. A única peça de estado novo é `aberto` (heatmap), local ao componente, sem persistência.
 
 ---
 
@@ -305,13 +336,14 @@ Substitui a página inteira (sem HOJE/CONSISTÊNCIA — zeros não motivam). Con
 | Revisar (vazio) | título **Fila limpa** · sub `Nada pendente. Amanhã tem mais.` |
 | Continuar | overline `continuar` · título `{título do tema}` · sub `{x} de {y} tasks` · chip **Abrir** |
 | Tudo concluído | título **Tudo concluído** · sub `Crie outro tema ou adicione conteúdo.` · chip **Novo tema** |
-| Tiles | `dias seguidos` / `ações hoje` / `dominadas` / `de {n} tasks` (singular: `dia seguido`, `ação hoje`, `dominada`) |
+| Tiles | `dias seguidos` / `ações hoje` (singular: `dia seguido`, `ação hoje`) — **29/07: `dominadas` e `de {n} tasks` saíram, ver §4.i** |
 | Zona 2 eyebrow | `CONSISTÊNCIA` |
-| Heatmap rodapé | `{n} ações no último ano` · legenda `menos` … `mais` |
+| Heatmap fechado (29/07) | `Consistência · {n} ações no último ano` |
+| Heatmap rodapé (aberto) | `{n} ações no último ano` · legenda `menos` … `mais` |
 | Heatmap tooltip | `{n} ações · qua, 08 jul` · `1 ação · …` · `sem atividade · …` |
 | Zona 3 eyebrow | `SEUS TEMAS · {n}` · link `+ novo tema` |
-| Badges do tema | `prova em {x}d` / `prova hoje` / `prova passou` · pill revisar: `{n}` (title `pra revisar hoje`) · dominadas: `{n}` (title `dominadas`) |
-| Counts do tema | `{e} epics · {s} stories · {t} tasks ({p} práticas)` |
+| Badges do tema | `prova em {x}d` / `prova hoje` / `prova passou` · pill revisar: `{n}` (title `pra revisar hoje`) — **29/07: badge `dominadas` saiu, virou segmento da barra (ver §4.e)** |
+| Counts do tema | **removida (29/07)** — era `{e} epics · {s} stories · {t} tasks ({p} práticas)`, ver §4.i |
 | Confirm excluir | `Mover "{título}" pra lixeira? Dá pra restaurar depois.` |
 | Lixeira | `Lixeira ({n})` · item `{t} tasks · excluído {dd mmm}` · titles `restaurar` / `apagar de vez` · confirm `Apagar de vez? Não dá pra desfazer.` |
 | Empty | `Nenhum tema ainda` · `Descreva um assunto e a Fixa monta a trilha — com revisão espaçada pra você não esquecer.` · CTA `Criar primeiro tema` · `revisa em 1d · 2d · 4d · 7d · 15d · 30d` |
@@ -345,3 +377,5 @@ Tom: minúsculas em subs e metadados, sem exclamação, sem emoji, sem "você co
 - [ ] Nenhum botão sólido âmbar; único sólido da página além do CTA de header/empty é o chip visual dos action cards (tintado, não sólido).
 - [ ] Textos âmbar/esmeralda de 11px passam AA no light (tokens novos, não `amber-500`).
 - [ ] Foco visível (ring) em: pills do nav, cards de ação, cards de tema, excluir, lixeira.
+- [ ] **(29/07)** Zona CONSISTÊNCIA mostra só 2 tiles (sequência, ações hoje) em `grid-cols-2`; heatmap **fechado por padrão**, uma linha com o total; tocar expande a grade completa, sem pulo de layout brusco (corte seco, sem animar altura).
+- [ ] **(29/07)** Card de tema: no máx. 2 badges (prova + revisar, cada uma condicional) mais o contador `{done}/{total}`; sem badge `dominadas` e sem linha de counts (epics/stories/tasks); barra de progresso com dois segmentos (domínio cheio + concluído claro), igual à faixa da prova.
