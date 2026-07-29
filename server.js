@@ -139,6 +139,15 @@ const kv = {
     this._writeQ = this._writeQ.then(run, run); // roda mesmo se a escrita anterior falhou
     return this._writeQ;
   },
+  async del(key) {
+    if (UPSTASH_URL) { await this._cmd(["DEL", key]); return; }
+    const run = async () => {
+      let all = {}; try { all = JSON.parse(await readFile(KV_FILE, "utf8")); } catch { /* nada a apagar */ }
+      delete all[key]; await writeFile(KV_FILE, JSON.stringify(all, null, 2));
+    };
+    this._writeQ = this._writeQ.then(run, run);
+    return this._writeQ;
+  },
 };
 
 // ---- usuários (multiusuário; senha com scrypt nativo) ----
@@ -465,6 +474,8 @@ async function serveStatic(url, res, authed) {
   if (p === "/" && !authed) p = "/fixa.html";
   // política de privacidade: página própria, exigida pela Google Play (URL pública)
   if (p === "/privacidade") p = "/privacidade.html";
+  // exclusão de conta: URL pública exigida pela Play na seção de segurança de dados
+  if (p === "/excluir-conta") p = "/excluir-conta.html";
   let file = join(DIST, p === "/" ? "index.html" : p);
   if (!file.startsWith(DIST)) file = join(DIST, "index.html");
   try {
@@ -477,7 +488,7 @@ async function serveStatic(url, res, authed) {
       : p.startsWith("/assets/") || p.startsWith("/brand/") || p.startsWith("/icons/") || p === "/apple-touch-icon.png"
       ? "public, max-age=31536000, immutable"
       : ext === ".html" || p === "/" ? "no-cache" : "public, max-age=3600";
-    if (file.endsWith("privacidade.html")) {
+    if (file.endsWith("privacidade.html") || file.endsWith("excluir-conta.html")) {
       data = data.toString("utf8").replaceAll("__BASE_URL__", BASE_URL);
     }
     if (file.endsWith("fixa.html")) {
@@ -557,6 +568,7 @@ const server = createServer(async (req, res) => {
       const paginas = [
         { loc: "/", priority: "1.0" },
         { loc: "/privacidade", priority: "0.3" },
+        { loc: "/excluir-conta", priority: "0.3" },
       ];
       const urls = paginas
         .map((p) => `  <url><loc>${BASE_URL}${p.loc}</loc><priority>${p.priority}</priority></url>`)
@@ -810,6 +822,20 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     const isPro = me.plan === "pro";
 
     if (path === "/api/me") return json(res, 200, { name: me.name, email: me.email, plan: me.plan });
+    // exclusão de conta (exigência da Play pra app com cadastro; página pública em /excluir-conta).
+    // Pede a senha de novo: sessão aberta num aparelho emprestado não pode apagar uma conta inteira.
+    if (path === "/api/account/delete" && req.method === "POST") {
+      const b = await readBody(req);
+      if (!(await checkPass(me, String(b.pass || "")))) return json(res, 403, { error: "senha incorreta" });
+      if (me.email === FOUNDER_EMAIL) return json(res, 400, { error: "a conta fundadora não se apaga por aqui" });
+      await Promise.all(["tracks", "state", "trash", "activity"].map((part) => kv.del(`u:${me.id}:${part}`)));
+      dataCache.delete(me.id);
+      delete users[me.email];
+      await saveUsers();
+      console.log(`[conta] ${me.email} excluída a pedido do titular`);
+      res.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "ts_sess=; HttpOnly; Path=/; Max-Age=0" });
+      return res.end("{}");
+    }
     // price/founderLeft: a tela do Pro mostra o preço que o checkout vai cobrar de verdade,
     // e a promessa dos 100 primeiros some sozinha quando as vagas acabam
     if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me), price: priceFor(me), fullPrice: MP_PRICE, yearPrice: yearPriceFor(me), fullYearPrice: MP_PRICE_YEAR, founderLeft: Math.max(0, FOUNDER_SEATS - foundersUsed()), proUntil: me.proUntil || null, pushKey: pushPublicKey(), pushSubs: pushSubs(me).length, remindersOn: !me.remindersOff });

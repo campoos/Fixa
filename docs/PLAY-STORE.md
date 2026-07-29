@@ -131,6 +131,7 @@ Grátis pra usar, com revisões diárias ilimitadas.
 
 **Categoria:** Educação · **Tags:** estudo, memorização, revisão
 **Política de privacidade:** `https://fixaestudos.com.br/privacidade`
+**URL de exclusão de conta** (seção "Segurança dos dados" — obrigatória pra app com cadastro): `https://fixaestudos.com.br/excluir-conta` — o app tem o fluxo em Ajuda › sua conta › excluir minha conta (confirma com senha; endpoint `POST /api/account/delete`).
 **E-mail de contato:** `contato@fixaestudos.com.br` (exibido publicamente pela Play e na política de privacidade — precisa de encaminhamento configurado no domínio pra cair numa caixa que você lê).
 
 ### Recursos gráficos exigidos

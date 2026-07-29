@@ -73,6 +73,7 @@ export const signup = (name: string, email: string, pass: string) => {
   return api.post<Me>("/api/signup", { name, email, pass, ...(src ? { src } : {}) });
 };
 export const logout = () => api.post("/api/logout");
+export const deleteAccount = (pass: string) => api.post("/api/account/delete", { pass });
 export const forgotPass = (email: string) => api.post<{ ok: true }>("/api/forgot", { email });
 export const resetPass = (token: string, pass: string) => api.post<Me>("/api/reset", { token, pass });
 export const billingCheckout = () => api.post<{ ok: true; url: string }>("/api/billing/checkout");

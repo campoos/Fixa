@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight, Download, Eye, EyeOff, LogOut, PenLine, RotateCcw } from "lucide-react";
-import { getConfig, setReminders, type Me } from "@/lib/api";
+import { ApiError, deleteAccount, getConfig, setReminders, type Me } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { desligarPush, estadoPush, ligarPush, type EstadoPush } from "@/lib/push";
 import { QUIET_BTN } from "@/lib/lesson";
@@ -273,6 +273,60 @@ function Lembretes() {
   );
 }
 
+/* exclusão de conta (exigência da Play; página pública em /excluir-conta explica o processo).
+   Revelação em dois passos + senha de novo: apagar tudo não pode estar a um toque de distância. */
+function ExcluirConta() {
+  const [aberto, setAberto] = useState(false);
+  const [pass, setPass] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [indo, setIndo] = useState(false);
+  const excluir = async () => {
+    if (!pass || indo) return;
+    setIndo(true); setErr(null);
+    try {
+      await deleteAccount(pass);
+      window.location.href = "/"; // conta não existe mais: recomeça do zero, sem estado velho
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "algo deu errado — tenta de novo");
+      setIndo(false);
+    }
+  };
+  if (!aberto) {
+    return (
+      <button onClick={() => setAberto(true)} className={cn("mt-3 text-[11px] text-muted-foreground/70 underline-offset-2 hover:text-destructive hover:underline", FOCUS)}>
+        excluir minha conta
+      </button>
+    );
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+      <p className="text-[13px] font-medium text-destructive">excluir a conta apaga tudo — temas, respostas e progresso. Não tem volta.</p>
+      <p className="text-[11px] text-muted-foreground">se quiser guardar seu histórico, exporte seus dados antes. Confirme com sua senha:</p>
+      {err && <p role="alert" className="text-[11px] text-destructive">{err}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="password"
+          value={pass}
+          onChange={(e) => setPass(e.target.value)}
+          placeholder="sua senha"
+          autoComplete="current-password"
+          className="h-9 w-44 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-destructive focus:ring-2 focus:ring-destructive/25"
+        />
+        <button
+          onClick={excluir}
+          disabled={indo || !pass}
+          className={cn("inline-flex h-9 items-center rounded-md border border-destructive/40 px-3 text-[13px] font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50", FOCUS)}
+        >
+          {indo ? "excluindo…" : "excluir de vez"}
+        </button>
+        <button onClick={() => { setAberto(false); setPass(""); setErr(null); }} disabled={indo} className={cn("inline-flex h-9 items-center rounded-md px-2 text-[13px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50", FOCUS)}>
+          cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Ajuda({ me, onLogout }: { me: Me; onLogout: () => void }) {
   return (
     <div className="space-y-8">
@@ -292,6 +346,7 @@ export function Ajuda({ me, onLogout }: { me: Me; onLogout: () => void }) {
             <button onClick={onLogout} className={cn(QUIET_BTN, FOCUS)}><LogOut className="h-4 w-4" /> sair da conta</button>
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground/70">o export baixa um JSON com todos os seus temas, respostas e progresso — seus dados são seus, sempre.</p>
+          <ExcluirConta />
         </Card>
       </section>
 
