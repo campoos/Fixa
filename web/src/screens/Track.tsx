@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode, type Ref } from "react";
 import { ArrowLeft, ArrowRight, CalendarClock, Check, ChevronDown, ChevronRight, FlaskConical, GraduationCap, Loader2, MessageSquarePlus, Pencil, PlusCircle, Trash2, X } from "lucide-react";
 import {
   appendTrack, editTask, getTrack, removeTask, renameTrack, setTrackIcon, setTrackTarget, taskComment, taskCommentDelete, taskDone,
@@ -18,6 +18,8 @@ const EYEBROW = "font-mono text-[11px] uppercase tracking-[0.14em] text-muted-fo
 
 const pct = (p: Progress) => (p.total ? Math.round((p.done / p.total) * 100) : 0);
 const fmt = (s: string) => new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+// mesma linha local de Licao.tsx — o repo não tem lib compartilhada pra isso, repetir é o padrão
+const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function Bar({ p, className }: { p: Progress; className?: string }) {
   return <div className={cn("h-1.5 overflow-hidden rounded-full bg-muted", className)}><div className="h-full rounded-full bg-domain transition-all" style={{ width: `${pct(p)}%` }} /></div>;
@@ -42,8 +44,17 @@ function Comments({ list, meName, onAdd, onDelete }: { list: Comment[]; meName: 
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState<number | null>(null);
+  // §9.6: textarea vazio em toda task aberta é convite falso — sem nota, vira só um link
+  const [revealing, setRevealing] = useState(list.length > 0);
   const submit = async () => { const t = text.trim(); if (!t || busy) return; setBusy(true); try { await onAdd(t); setText(""); } finally { setBusy(false); } };
   const remove = async (i: number, at: string) => { if (del !== null || !confirm("Excluir?")) return; setDel(i); try { await onDelete(i, at); } finally { setDel(null); } };
+  if (!list.length && !revealing) {
+    return (
+      <button onClick={() => setRevealing(true)} className={cn("text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline", FOCUS)}>
+        + nota
+      </button>
+    );
+  }
   return (
     <div className="space-y-2">
       {list.map((c, i) => (
@@ -57,7 +68,7 @@ function Comments({ list, meName, onAdd, onDelete }: { list: Comment[]; meName: 
       ))}
       <div className="flex items-end gap-2">
         <textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit(); }} rows={2} placeholder="tua resposta / o que entendeu / generalização…" className="min-h-[40px] w-full resize-y rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary" />
-        <button onClick={submit} disabled={busy || !text.trim()} title="comentar (⌘/Ctrl+Enter)" className={`grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 ${FOCUS}`}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquarePlus className="h-4 w-4" />}</button>
+        <button onClick={submit} disabled={busy || !text.trim()} title="comentar (⌘/Ctrl+Enter)" className={`grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40 ${FOCUS}`}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquarePlus className="h-4 w-4" />}</button>
       </div>
     </div>
   );
@@ -161,10 +172,10 @@ export function TaskEditor({ trackId, task, onDone, onChanged }: { trackId: stri
         <Fld label="Resposta"><textarea value={f.a} onChange={set("a")} rows={2} className={inputCls} /></Fld>
       </div>
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <button onClick={save} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+        <button onClick={save} disabled={busy} className={`inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 ${FOCUS}`}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
         </button>
-        <button onClick={onDone} disabled={busy} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50">cancelar</button>
+        <button onClick={onDone} disabled={busy} className={`rounded-md border border-border px-3 py-1.5 text-sm transition-colors hover:bg-accent disabled:opacity-50 ${FOCUS}`}>cancelar</button>
         <button onClick={remove} disabled={busy} className={`ml-auto inline-flex items-center gap-1.5 rounded-md border border-destructive/40 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50 ${FOCUS}`}>
           <Trash2 className="h-4 w-4" /> remover task
         </button>
@@ -173,7 +184,7 @@ export function TaskEditor({ trackId, task, onDone, onChanged }: { trackId: stri
   );
 }
 
-function TaskRow({ trackId, task, meName, defaultOpen = false, onChanged }: { trackId: string; task: Task; meName: string; defaultOpen?: boolean; onChanged: () => void }) {
+function TaskRow({ trackId, task, meName, defaultOpen = false, pending = false, scrollTargetRef, onChanged }: { trackId: string; task: Task; meName: string; defaultOpen?: boolean; pending?: boolean; scrollTargetRef?: Ref<HTMLDivElement>; onChanged: () => void }) {
   const [open, setOpen] = useState(defaultOpen);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -195,12 +206,12 @@ function TaskRow({ trackId, task, meName, defaultOpen = false, onChanged }: { tr
   const stage = task.lesson?.stage ?? 0;
   const inProgress = !task.done && stage > 0 && stage < total; // único estado com selo — o "você parou aqui" da árvore
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div ref={scrollTargetRef} className={cn("rounded-lg border border-border bg-card", pending && "border-l-2 border-l-primary")}>
       <div className="flex items-center gap-2 p-2.5">
         <span aria-live="polite" className="sr-only">{announce}</span>
         <DoneBox done={task.done} busy={busy} onToggle={toggleDone} />
         <button onClick={goLesson} title="abrir a lição" className={`-mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 text-left transition-colors hover:bg-accent/60 ${FOCUS}`}>
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{task.id}</span>
+          <span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">{task.id}</span>
           {task.type === "practice" && <span className="shrink-0" title="prática"><FlaskConical className="h-3.5 w-3.5 text-muted-foreground" aria-label="prática" /></span>}
           <span className={cn("min-w-0 flex-1 truncate text-sm", task.done && "text-muted-foreground line-through")}>{task.title}</span>
           {inProgress && (
@@ -228,44 +239,45 @@ function TaskRow({ trackId, task, meName, defaultOpen = false, onChanged }: { tr
   );
 }
 
-function StoryBlock({ trackId, story, meName, defaultOpen, openTaskId, onChanged }: { trackId: string; story: Story; meName: string; defaultOpen: boolean; openTaskId?: string; onChanged: () => void }) {
+function StoryBlock({ trackId, story, meName, defaultOpen, pending = false, openTaskId, scrollTargetRef, onChanged }: { trackId: string; story: Story; meName: string; defaultOpen: boolean; pending?: boolean; openTaskId?: string; scrollTargetRef?: Ref<HTMLDivElement>; onChanged: () => void }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-lg border border-border bg-muted/30">
-      <button onClick={() => setOpen(!open)} className={`flex w-full items-center gap-2 rounded-lg p-2.5 text-left ${FOCUS}`}>
+    <div className={cn("rounded-lg border border-border bg-muted/30", pending && "border-l-2 border-l-primary")}>
+      <button onClick={() => setOpen(!open)} className={`flex w-full items-center gap-2 rounded-lg p-2.5 text-left transition-colors hover:bg-accent/40 ${FOCUS}`}>
         {story.progress.done === story.progress.total && story.progress.total > 0 && (
           <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-domain text-domain-foreground" title="concluída"><Check className="h-3 w-3" /></span>
         )}
-        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{story.id}</span>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{story.title}</span>
+        <span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">{story.id}</span>
+        {/* §9.7: story pesa como agrupador (semibold), task fica neutra — hierarquia por peso, não tamanho */}
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{story.title}</span>
         <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{story.progress.done}/{story.progress.total}</span>
         {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" />}
       </button>
-      {open && <div className="space-y-2 px-1.5 pb-1.5 sm:px-2 sm:pb-2">{story.tasks.map((t) => <TaskRow key={t.id} trackId={trackId} task={t} meName={meName} defaultOpen={t.id === openTaskId} onChanged={onChanged} />)}</div>}
+      {open && <div className="space-y-2 px-1.5 pb-1.5 sm:px-2 sm:pb-2">{story.tasks.map((t) => <TaskRow key={t.id} trackId={trackId} task={t} meName={meName} defaultOpen={t.id === openTaskId} pending={t.id === openTaskId} scrollTargetRef={t.id === openTaskId ? scrollTargetRef : undefined} onChanged={onChanged} />)}</div>}
     </div>
   );
 }
 
-function EpicCard({ trackId, epic, meName, defaultOpen, openStoryId, openTaskId, onChanged }: { trackId: string; epic: Epic; meName: string; defaultOpen: boolean; openStoryId?: string; openTaskId?: string; onChanged: () => void }) {
+function EpicCard({ trackId, epic, meName, defaultOpen, pending = false, openStoryId, openTaskId, scrollTargetRef, onChanged }: { trackId: string; epic: Epic; meName: string; defaultOpen: boolean; pending?: boolean; openStoryId?: string; openTaskId?: string; scrollTargetRef?: Ref<HTMLDivElement>; onChanged: () => void }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <Card className="overflow-hidden p-0">
-      <button onClick={() => setOpen(!open)} className={`flex w-full items-start gap-2.5 p-3 text-left ${FOCUS}`}>
+    <Card className={cn("overflow-hidden p-0", pending && "border-l-2 border-l-primary")}>
+      <button onClick={() => setOpen(!open)} className={`flex w-full items-start gap-2.5 p-3 text-left transition-colors hover:bg-accent/40 ${FOCUS}`}>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             {epic.progress.done === epic.progress.total && epic.progress.total > 0 && (
               <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-domain text-domain-foreground" title="concluído"><Check className="h-3 w-3" /></span>
             )}
-            <span className="font-mono text-xs text-muted-foreground">Epic {epic.id}</span>
+            <span className="font-mono text-xs tabular-nums text-muted-foreground">Epic {epic.id}</span>
             <span className="min-w-0 flex-1 truncate text-base font-semibold">{epic.title}</span>
             <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{epic.progress.done}/{epic.progress.total}</span>
             {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/70" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" />}
           </div>
-          {epic.goal && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{epic.goal}</p>}
-          <Bar p={epic.progress} className="mt-1.5" />
+          {/* §9.3: a barra do epic saiu — done/total mono basta, a barra "de verdade" é a do header do tema */}
+          {epic.goal && <p className={cn("mt-1 text-xs text-muted-foreground", open ? "leading-relaxed" : "truncate")}>{epic.goal}</p>}
         </div>
       </button>
-      {open && <div className="space-y-2 border-t border-border bg-background/40 p-2 sm:p-3">{epic.stories.map((s) => <StoryBlock key={s.id} trackId={trackId} story={s} meName={meName} defaultOpen={s.id === openStoryId} openTaskId={s.id === openStoryId ? openTaskId : undefined} onChanged={onChanged} />)}</div>}
+      {open && <div className="space-y-2 border-t border-border bg-background/40 p-2 sm:p-3">{epic.stories.map((s) => <StoryBlock key={s.id} trackId={trackId} story={s} meName={meName} defaultOpen={s.id === openStoryId} pending={s.id === openStoryId} openTaskId={s.id === openStoryId ? openTaskId : undefined} scrollTargetRef={s.id === openStoryId ? scrollTargetRef : undefined} onChanged={onChanged} />)}</div>}
     </Card>
   );
 }
@@ -275,6 +287,7 @@ function TargetControl({ track, onChange }: { track: TrackData; onChange: () => 
   // foco, uma vez só. Sem o parâmetro nada muda aqui.
   const [veioDoConvite] = useState(() => new URLSearchParams(window.location.search).has("prova"));
   const [editing, setEditing] = useState(veioDoConvite);
+  const [expanded, setExpanded] = useState(false); // §9.4 — toggle simples, sem persistência
   const [busy, setBusy] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
   const dataRef = useRef<HTMLInputElement>(null);
@@ -286,13 +299,22 @@ function TargetControl({ track, onChange }: { track: TrackData; onChange: () => 
   const save = async (date: string | null) => { setBusy(true); try { await setTrackTarget(track.id, date); onChange(); setEditing(false); } finally { setBusy(false); } };
   if (track.targetDate && !editing) {
     const dl = track.daysLeft ?? 0;
+    // §9.4: só o chip por padrão — meta e editar são leitura/ação secundária, ficam atrás de um toque
     return (
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
+      <div className="mt-2 text-xs">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className={cn("inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary transition-colors hover:bg-primary/15", FOCUS)}
+        >
           <CalendarClock className="h-3.5 w-3.5" />{dl < 0 ? "prova já passou" : dl === 0 ? "prova é hoje" : `prova em ${dl} dia${dl === 1 ? "" : "s"}`}
-        </span>
-        {track.dailyGoal ? <span className="text-muted-foreground">meta ~{track.dailyGoal}/dia pra dominar a tempo</span> : null}
-        <button onClick={() => setEditing(true)} className="text-muted-foreground underline-offset-2 hover:underline">editar</button>
+        </button>
+        {expanded && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {track.dailyGoal ? <span className="text-muted-foreground">meta ~{track.dailyGoal}/dia pra dominar a tempo</span> : null}
+            <button onClick={() => setEditing(true)} className={cn("text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline", FOCUS)}>editar</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -303,7 +325,7 @@ function TargetControl({ track, onChange }: { track: TrackData; onChange: () => 
         onChange={(e) => e.target.value && save(e.target.value)}
         className="rounded-md border border-border bg-background px-2 py-1 text-xs" />
       <span className="text-muted-foreground">data da prova — as revisões se ajustam a ela</span>
-      {track.targetDate && <button onClick={() => save(null)} className="text-destructive hover:underline">remover</button>}
+      {track.targetDate && <button onClick={() => save(null)} className={cn("text-destructive underline-offset-2 hover:underline", FOCUS)}>remover</button>}
     </div>
   );
 }
@@ -335,7 +357,7 @@ function AppendBlock({ trackId, onChanged }: { trackId: string; onChanged: () =>
           <p className="text-xs text-muted-foreground">Gere mais epics com o mesmo prompt (em “Novo tema” → prompt manual) e cole aqui — eles entram no fim da trilha.</p>
           <textarea value={jsonStr} onChange={(e) => setJsonStr(e.target.value)} rows={5} placeholder='{ "epics": [ ... ] }' className={`${inputCls} font-mono text-xs`} />
           {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
-          <button onClick={doAppend} disabled={busy || !jsonStr.trim()} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          <button onClick={doAppend} disabled={busy || !jsonStr.trim()} className={`inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 ${FOCUS}`}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />} Anexar
           </button>
         </div>
@@ -358,8 +380,8 @@ function RenameBlock({ track, onChanged, onClose }: { track: TrackData; onChange
       <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="título" />
       <input value={summary} onChange={(e) => setSummary(e.target.value)} className={inputCls} placeholder="resumo (opcional)" />
       <div className="flex gap-2">
-        <button onClick={save} disabled={busy || !title.trim()} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">salvar</button>
-        <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent">cancelar</button>
+        <button onClick={save} disabled={busy || !title.trim()} className={`rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 ${FOCUS}`}>salvar</button>
+        <button onClick={onClose} disabled={busy} className={`rounded-md border border-border px-3 py-1.5 text-sm transition-colors hover:bg-accent disabled:opacity-50 ${FOCUS}`}>cancelar</button>
       </div>
     </div>
   );
@@ -422,8 +444,20 @@ export function Track({ id, me }: { id: string; me: Me }) {
   const [renaming, setRenaming] = useState(false);
   const [picking, setPicking] = useState(false);
   const chipRef = useRef<HTMLButtonElement>(null);
+  const pendingRef = useRef<HTMLDivElement>(null);
   const changed = () => refetch(true);
   const closePicker = () => { setPicking(false); requestAnimationFrame(() => chipRef.current?.focus()); };
+  // §9.1: a retomada inteligente calcula certo o que abrir, mas sem rolar até lá o usuário não vê.
+  // Só quando a linha nasce fora da viewport, só uma vez por tema — refetch não re-rola.
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const el = pendingRef.current;
+      if (!el) return; // tema 100% concluído: nada a fazer
+      const r = el.getBoundingClientRect();
+      const fora = r.top < 0 || r.top > window.innerHeight - 80; // 80 ≈ folga da bottom tab bar mobile
+      if (fora) el.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "center" });
+    });
+  }, [data?.id]);
   if (loading && !data) return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20" />)}</div>;
   if (error) return <Card className="p-4 text-sm text-destructive">erro: {error}</Card>;
   if (!data) return null;
@@ -464,7 +498,7 @@ export function Track({ id, me }: { id: string; me: Me }) {
         <TargetControl track={data} onChange={changed} />
       </Card>
       {data.epics.map((e) => (
-        <EpicCard key={e.id} trackId={id} epic={e} meName={me.name} defaultOpen={e.id === firstPending?.e} openStoryId={e.id === firstPending?.e ? firstPending?.s : undefined} openTaskId={e.id === firstPending?.e ? firstPending?.t.id : undefined} onChanged={changed} />
+        <EpicCard key={e.id} trackId={id} epic={e} meName={me.name} defaultOpen={e.id === firstPending?.e} pending={e.id === firstPending?.e} openStoryId={e.id === firstPending?.e ? firstPending?.s : undefined} openTaskId={e.id === firstPending?.e ? firstPending?.t.id : undefined} scrollTargetRef={e.id === firstPending?.e ? pendingRef : undefined} onChanged={changed} />
       ))}
       <AppendBlock trackId={id} onChanged={changed} />
       {picking && <IconPicker track={data} onChanged={changed} onClose={closePicker} />}

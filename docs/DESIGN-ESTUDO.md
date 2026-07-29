@@ -3,6 +3,7 @@
 > Spec de design pronta pra implementação. Escopo: **apenas `web/src/screens/Track.tsx`**. Nenhuma mudança em tokens (`index.css`), API, rotas ou shell.
 > Contexto: a Track foi construída **antes** do redesign (DESIGN-HOME/REVISAR/SHELL-MOBILE) — ainda fala o dialeto antigo (`emerald-500`, `amber-500`, `blue-400`, `red-400`, emoji 💬, labels sem mono). O dono gosta bastante da tela; a reclamação concreta é **"todas as tasks vêm abertas"** (epics e stories nascem com `useState(true)` e a tela vira um paredão).
 > Referências: DESIGN-HOME §2 (tokens — a lei visual), `Home.tsx` e `Review.tsx` (vocabulário implementado), DESIGN-SHELL-MOBILE (a tela convive com a bottom tab bar em `<md`).
+> **29/07 — §9 acrescenta uma segunda auditoria** sobre a mesma tela já refinada por §1–8: enxugamento adicional (auto-scroll de retomada, acento no caminho pendente, header de epic mais leve, TargetControl colapsável, goal truncado, anotações sob demanda, hierarquia story/task, IDs mono ocultos no mobile). Mesmo escopo (`Track.tsx`), mesmas leis.
 
 ---
 
@@ -154,3 +155,143 @@ Todo o resto (Objetivo, Passos, Dica, Exemplo, esperado:, copy do TargetControl,
 - [ ] Labels de seção (Objetivo, Questão-modelo, Anotações, campos do editor) usam o eyebrow mono padrão; todo contador numérico é mono `tabular-nums`.
 - [ ] 390px: linha da task não estoura (label "revisar" oculto, dominada icon-only), último epic rola pra cima da tab bar, nada coberto.
 - [ ] Todas as funcionalidades respondem como antes: renomear, data da prova, done, editar, remover task, comentar/excluir comentário, anexar epics, revelar por task.
+
+---
+
+## 9. Enxugamento pós-auditoria (29/07)
+
+> Segunda passada, depois que o dono aprovou os achados de uma auditoria de UX sobre a tela já refinada pelo §1–8. Objetivo: menos peso visual por padrão, sem perder nenhuma função. Mesmas leis: zero cor hardcoded, zero re-layout de seções, `FOCUS`/`EYEBROW` reaproveitados.
+
+### 9.1 Auto-scroll até o ponto de retomada
+
+**Decisão (29/07):** ao montar `Track`, se existe `firstPending`, rolar até a `TaskRow` da própria task pendente (não até o epic nem até o header da story) — é o alvo mais específico e o mesmo nível que já ganha `defaultOpen` (peek aberto). Só dispara **se o elemento nasce fora da viewport**; e só uma vez, no mount.
+
+```tsx
+// Track.tsx — dentro de Track(), depois de calcular firstPending
+const pendingRef = useRef<HTMLDivElement>(null);
+useEffect(() => {
+  if (!firstPending) return; // tema 100% concluído: nada a fazer
+  requestAnimationFrame(() => {
+    const el = pendingRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const fora = r.top < 0 || r.top > window.innerHeight - 80; // 80 ≈ folga da bottom tab bar mobile
+    if (fora) el.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "center" });
+  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [data?.id]); // roda de novo só se trocar de tema, não a cada refetch
+```
+
+`pendingRef` é passado como prop (`scrollTargetRef`) só até o `TaskRow` cujo `task.id === firstPending?.t.id`, que o aplica na `div` raiz da linha. `reduced()` não existe em `Track.tsx` ainda — duplicar a mesma linha que já vive local em `Licao.tsx:29` (`window.matchMedia("(prefers-reduced-motion: reduce)").matches`); o repo não tem um `lib` compartilhado pra isso, então repetir é o padrão já estabelecido. **Justificativa:** rolar até o epic deixaria o usuário sem saber *qual* story/task olhar dentro dele; rolar até a task é o mesmo princípio do `markerRef` do `Licao.tsx:258` (retomada de passo) — reusar o idioma que a Lição já valida. O guard de viewport evita o salto brusco em temas curtos onde a task pendente já nasce visível (mesmo raciocínio do `reduced()` já usado em `Licao.tsx`/`NewTheme.tsx`).
+
+### 9.2 Acento visual no caminho pendente
+
+**Decisão (29/07):** `border-l-2 border-l-primary` substituindo a borda esquerda default em três níveis — `EpicCard`, `StoryBlock` e a `TaskRow` da task pendente — quando `id === firstPending?.{e,s,t.id}`. Sem tint de fundo, sem badge extra: uma borda é o menor sinal que ainda salta num scan vertical (o olho lê bordas esquerdas em lista antes de ler texto) e não compete com o badge âmbar de revisão (`recall`) nem com o pill `stage+1/total` que a task em progresso já tem — os três sinais convivem sem empilhar cor. **Justificativa:** `primary` é o token de "marca/atividade" (`DESIGN-HOME §1`); usar tint de fundo (`bg-primary/5`) foi descartado por brigar visualmente com o já-existente `bg-primary/10` do badge "stage" na `TaskRow` (dois primary-fills na mesma linha lê como ruído, não como sinal).
+
+```tsx
+// EpicCard / StoryBlock — className condicional na raiz
+className={cn("...", e.id === firstPendingEpicId && "border-l-2 border-l-primary")}
+// TaskRow raiz
+className={cn("rounded-lg border bg-card", task.id === firstPending?.t.id ? "border-l-2 border-l-primary border-border" : "border-border")}
+```
+
+### 9.3 Header do epic mais leve
+
+**Decisão (29/07):** a `Bar p={epic.progress}` sai do `EpicCard` inteiramente — o `done/total` mono que já está na linha do título basta, e o header do tema (`Track.tsx:458`) já tem a barra "de verdade" (progresso do tema todo). Layout final da linha do epic, sem mudança de ordem dos elementos que sobram: `[check se completo] Epic {id} · título · done/total mono · chevron`, com o `goal` (se existir) numa segunda linha truncada (§9.5). **Justificativa:** duas barras (tema + cada epic aberto) empilhadas é a mesma informação em duas resoluções — a do tema já responde "quanto falta"; a do epic só repetia o gesto visual sem acrescentar leitura que o `done/total` não desse em texto.
+
+### 9.4 TargetControl colapsa por padrão
+
+**Decisão (29/07):** com `targetDate` setado e fora do modo edição, o estado default mostra **só o chip** `prova em N dias` — ele vira `<button>` clicável (`aria-expanded`) que revela, numa segunda linha, a meta diária (se houver) e o link "editar". Fecha de novo ao tocar de novo (toggle simples, sem persistência — mesmo padrão do heatmap colapsável em `DESIGN-HOME §4.d`).
+
+```tsx
+function TargetControl({ track, onChange }: ...) {
+  const [expanded, setExpanded] = useState(false);
+  // ...
+  if (track.targetDate && !editing) {
+    const dl = track.daysLeft ?? 0;
+    return (
+      <div className="mt-2 text-xs">
+        <button onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}
+          className={cn("inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 font-medium text-primary transition-colors hover:bg-primary/15", FOCUS)}>
+          <CalendarClock className="h-3.5 w-3.5" />{dl < 0 ? "prova já passou" : dl === 0 ? "prova é hoje" : `prova em ${dl} dia${dl === 1 ? "" : "s"}`}
+        </button>
+        {expanded && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {track.dailyGoal ? <span className="text-muted-foreground">meta ~{track.dailyGoal}/dia pra dominar a tempo</span> : null}
+            <button onClick={() => setEditing(true)} className={cn("text-muted-foreground underline-offset-2 hover:underline", FOCUS)}>editar</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  // ... resto (modo edição / sem data) intocado
+}
+```
+
+`?prova=1` (o convite da Home, `DESIGN-ENGAJAMENTO §3.d`) continua indo direto pro modo edição (`veioDoConvite` já seta `editing=true`), sem passar pelo colapsado — o convite quer o input visível na hora, não um chip pra clicar de novo. **Justificativa:** o dono pediu 1 linha por padrão; meta+editar são ação/leitura secundária (editar é raro — mesma lógica já aplicada ao lápis de `TaskRow` no §4.5) e cabem atrás de um toque sem esconder a informação que importa todo dia (dias até a prova).
+
+### 9.5 `epic.goal` truncado no card fechado
+
+**Decisão (29/07):** `truncate` (1 linha, com `…`) quando `!open`; `leading-relaxed` (completo, sem limite) quando `open`. Sem tooltip novo — o `title` nativo do navegador já cobre o hover em desktop, e no fechado a informação central do card (id, título, contagem) não muda.
+
+```tsx
+{epic.goal && <p className={cn("mt-1 text-xs text-muted-foreground", open ? "leading-relaxed" : "truncate")}>{epic.goal}</p>}
+```
+
+**Justificativa:** consistente com §9.3 (header mais leve) — um goal de duas ou três linhas competindo com título+progresso no card fechado é o mesmo "paredão" que o §2 já corrigiu pra epics/stories; truncar é reversível com 1 clique (abrir o card), não perde informação.
+
+### 9.6 Anotações do peek: "+ nota" quando vazio
+
+**Decisão (29/07):** dentro de `Comments`, se `list.length === 0` e o usuário ainda não tocou em "+ nota" nesta sessão de peek aberto, renderiza só um link de texto — sem textarea, sem botão de enviar:
+
+```tsx
+function Comments({ list, meName, onAdd, onDelete }: ...) {
+  const [revealing, setRevealing] = useState(list.length > 0);
+  // ...
+  if (!list.length && !revealing) {
+    return (
+      <button onClick={() => setRevealing(true)} className={cn("text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline", FOCUS)}>
+        + nota
+      </button>
+    );
+  }
+  // ... markup atual (lista + textarea + botão), inalterado
+}
+```
+
+Com notas existentes, `Comments` nasce já revelado (`revealing` inicia `true`) e se comporta exatamente como hoje — nada muda pra quem já anota. **O CTA Estudar/Continuar sobe**: não é reordenação de seções (a ordem Objetivo → estado da lição/CTA → Anotações do `TaskPeek` já tinha o CTA acima das anotações, e continua) — é consequência direta de colapsar o textarea vazio: o peek comum (task sem nota ainda, a maioria) fica ~80px mais baixo, então o CTA passa a ser a última coisa visível antes do fim do card sem precisar rolar. **Justificativa:** um textarea vazio + botão desabilitado em toda task aberta é convite falso (a maioria das tasks nunca ganha nota) e empurra o CTA de estudo pra baixo do fold em telas menores — o link é affordance suficiente pra quem quer anotar.
+
+### 9.7 Hierarquia tipográfica story vs. task
+
+**Decisão (29/07):** peso, não tamanho — mantém as três linhas em `text-sm` (trocar tamanho quebraria o alinhamento vertical com os badges/ícones que já são `text-sm`/`text-xs` fixos), mas separa por peso: **Epic** `font-semibold` (já é `text-base`, maior nível) → **Story** sobe de `font-medium` pra **`font-semibold`** → **Task** continua sem peso (`font-normal`, herdado). O indent já existe (padding aninhado de `EpicCard`→`StoryBlock`→`TaskRow`, §4.8) e não precisa de reforço.
+
+```tsx
+// StoryBlock — título
+<span className="min-w-0 flex-1 truncate text-sm font-semibold">{story.title}</span>
+```
+
+**Justificativa:** com epic e story ambos `font-semibold` e só a task neutra, o escaneamento vertical lê "isto é um agrupador" (epic, story) vs. "isto é um item" (task) sem precisar comparar tamanhos — troca de tamanho de fonte em 3 níveis já foi tentada mentalmente e descartada porque `text-sm`→`text-xs` na story deixaria o `id` mono (que já é `text-[11px]`) maior que o próprio título, invertendo a hierarquia real.
+
+### 9.8 IDs mono ocultos no mobile
+
+**Decisão (29/07):** `hidden sm:inline` no `<span>` do `story.id` (`StoryBlock`) e no `<span>` do `task.id` (`TaskRow`) — ambos IDs compostos (`1.2`, `1.2.3`) que servem pra debug/referência, não pra leitura do dia a dia. O rótulo `Epic {epic.id}` do `EpicCard` **fica visível sempre** — é um único dígito e funciona como label da seção ("Epic 1"), não como ID técnico solto.
+
+```tsx
+// StoryBlock
+<span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">{story.id}</span>
+// TaskRow
+<span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground sm:inline">{task.id}</span>
+```
+
+**Justificativa:** em 390px a linha da task já era o ponto mais apertado da tela (`§6` do doc original); o ID composto é o token de menor valor informacional na linha (ninguém memoriza "1.2.3") e o primeiro a poder sumir sem perda de função — continua acessível em `title` via o próprio texto do botão se precisar (não há necessidade de duplicar em `title`, o dado não é crítico).
+
+### 9.9 Checklist de aceite — adendo (29/07)
+
+- [ ] Ao abrir um tema com task pendente fora da dobra, a tela rola sozinha até a linha dela (peek já aberto); se a task pendente já está visível no primeiro paint, **não** rola.
+- [ ] Epic, story e task do caminho de retomada mostram `border-l-2 border-l-primary`; nenhum outro epic/story/task ganha a borda.
+- [ ] `EpicCard` fechado não mostra barra de progresso própria — só `done/total` mono; a barra do header do tema continua.
+- [ ] `TargetControl` com prova marcada nasce mostrando só o chip; tocar revela meta+editar; `?prova=1` continua indo direto pro input de data, sem passar pelo chip.
+- [ ] `epic.goal` trunca em 1 linha no card fechado e mostra completo no aberto.
+- [ ] Task sem nota mostra só o link "+ nota" (sem textarea); tocar revela o campo; task com nota já nasce revelada como hoje.
+- [ ] Story e task têm o mesmo `text-sm`, mas story é `font-semibold` e task é `font-normal` — a diferença é perceptível num scan rápido.
+- [ ] Em `<sm` (mobile), o `id` mono de story e task some; o rótulo "Epic N" continua visível em qualquer largura.
