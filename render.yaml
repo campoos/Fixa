@@ -28,3 +28,34 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         value: mailto:contato@fixaestudos.com.br
+      # --- as quatro que morrem em silêncio se faltarem (auditoria 23/08) ---
+      # o app sobe e responde 200 sem nenhuma delas; o que some é um subsistema inteiro,
+      # sem erro no log e sem sintoma na home. Conferir no dashboard, não só aqui.
+      # sem ela GEN_ENABLED=false: some o "Gerar direto" do Novo tema (todo mundo cai no
+      # fluxo manual de copiar prompt → LLM externo → colar JSON) e o Tutor não corrige
+      - key: GEMINI_API_KEY
+        sync: false
+      # sem CRON_SECRET o /api/cron/reminders devolve 401 pra Action de lembretes —
+      # nenhum lembrete sai, nem e-mail nem push, mesmo com VAPID e Brevo configurados
+      - key: CRON_SECRET
+        sync: false
+      # emailEnabled() exige as DUAS: sem elas não sai lembrete nem reset de senha
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # sem ela BILLING_ENABLED=false e a web também não vende
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      # --- já setadas no dashboard, declaradas aqui só pra não sumirem num resync ---
+      # PUBLIC_URL liga o 301 do onrender pro domínio e monta os links dos e-mails
+      - key: PUBLIC_URL
+        sync: false
+      # as duas impressões digitais do assetlinks (upload + Play App Signing)
+      - key: ANDROID_CERT_FINGERPRINTS
+        sync: false
+      # o callGemini tenta 3x e, a partir da 2ª, cai pro fallback. Sem esta variável o
+      # array vira [GEMINI_MODEL] e as três tentativas batem no MESMO modelo — e o
+      # flash-latest 503 intermitente (medido 23/08). O lite responde em ~1s.
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-flash-lite-latest
