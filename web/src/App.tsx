@@ -329,6 +329,11 @@ function Login({ onLogin }: { onLogin: (me: Me) => void }) {
         const desempilhar = nivel();
         if (desempilhar > 0) window.history.go(-desempilhar);
         onLogin(me);
+        // conta nova vai direto pro Novo tema em vez da Home vazia: no teste fechado da Play,
+        // 7 de 12 se cadastraram e nunca criaram um tema — a tela de boas-vindas era um beco.
+        // Empilha (não substitui) pra Home continuar sendo a âncora do voltar (APP-MODE §4),
+        // e no setTimeout porque o history.go acima é assíncrono: navegar junto perde a corrida.
+        if (mode === "signup") setTimeout(() => navigate("/novo"), 0);
       }
     } catch (ex) {
       setErr(ex instanceof ApiError ? ex.message : "algo deu errado — tenta de novo");
