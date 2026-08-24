@@ -28,8 +28,11 @@ test("fail volta pra caixa 0 e revisa amanhã", () => {
 });
 
 test("clamp: revisão nunca cai depois da prova", () => {
-  assert.equal(clampNext("2026-08-30", "2026-08-15"), "2026-08-15");
-  assert.equal(clampNext("2026-08-01", "2026-08-15"), "2026-08-01");
+  // "hoje" explícito: sem ele o teste depende da data real e vira bomba-relógio — passou
+  // até 15/08/2026 e falhava desde 16/08, porque prova no passado não clampa (QA #2).
+  assert.equal(clampNext("2026-08-30", "2026-08-15", "2026-08-01"), "2026-08-15");
+  assert.equal(clampNext("2026-08-01", "2026-08-15", "2026-08-01"), "2026-08-01");
+  assert.equal(clampNext("2026-08-30", "2026-08-15", "2026-08-20"), "2026-08-30"); // prova já passou: ignora
   const rv = gradeEntry({ box: 6, last: "2026-07-01", next: "2026-07-11" }, "pass", "2026-07-11", "2026-07-20");
   assert.equal(rv.next, "2026-07-20"); // caixa 7 seria +30d → clampa na prova
 });
