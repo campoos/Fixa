@@ -10,6 +10,7 @@ import { REVIEW_LADDER, REVIEW_DOSE, spDay, addDays, daysBetween, isGraduated, s
 import { buildReminder, buildPush, pushCadence, emailEvent, daysInactive, buildOnboard } from "./reminders.js";
 import { emailEnabled, sendEmail, emailShell, emailButton } from "./email.js";
 import { pushEnabled, pushPublicKey, sendPush } from "./push.js";
+import { playEnabled, playPackage, getSubscription, acknowledge, readSubscription, decodeRtdn } from "./play-billing.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -55,6 +56,13 @@ const FOUNDER_SEATS = Number(process.env.FOUNDER_SEATS || 100);
 // vez, a conta fica Pro até a data (u.proUntil) e acaba — sem cobrança recorrente pra administrar.
 const MP_PRICE_YEAR = Number(process.env.MP_PRICE_YEAR || 149); // PRICING.md: R$ 149/ano
 const MP_PRICE_YEAR_FOUNDER = Number(process.env.MP_PRICE_YEAR_FOUNDER || 119); // 8 meses de fundador
+// catálogo da Play: estes ids precisam bater com o que existe em Monetizar → Produtos.
+// O preço NÃO mora aqui — quem cobra é o Google, e o valor vem do próprio Console. O que o
+// servidor decide é só QUAL oferta a pessoa pode usar (fundador ou não), via founderOpen().
+const PLAY_PRODUCT_ID = process.env.PLAY_PRODUCT_ID || "pro";
+const PLAY_PLAN_MES = process.env.PLAY_PLAN_MES || "mensal";
+const PLAY_PLAN_ANO = process.env.PLAY_PLAN_ANO || "anual";
+const PLAY_OFFER_FUNDADOR = process.env.PLAY_OFFER_FUNDADOR || "fundador";
 const PIX_DAYS_MONTH = 31;
 const PIX_DAYS_YEAR = 365;
 const BILLING_ENABLED = Boolean(MP_ACCESS_TOKEN);
@@ -173,6 +181,23 @@ function checkExpiry(u) {
   u.plan = "free";
   console.log(`[billing] ${u.email} → free (prazo do Pix venceu em ${u.proUntil})`);
   saveUsers();
+  return u;
+}
+// Play Billing: espelha no usuário o que a API do Google respondeu. Quem manda é sempre a
+// Play — o front só entrega um purchaseToken, que é ponteiro, não prova. O proUntil sai do
+// expiryTime da assinatura, então o checkExpiry acima já cuida do rebaixamento preguiçoso se
+// uma renovação não chegar por RTDN.
+function aplicarPlay(u, s, purchaseToken) {
+  u.playToken = purchaseToken;
+  u.playProduct = s.productId || u.playProduct || null;
+  if (s.ativa) {
+    u.plan = "pro";
+    if (s.expiraEm) u.proUntil = s.expiraEm;
+    if (s.offerId === PLAY_OFFER_FUNDADOR) u.founderSeat = true; // queima a vaga, igual ao Pix
+  } else {
+    u.plan = "free";
+    u.proUntil = null;
+  }
   return u;
 }
 // soma prazo a partir do que ainda resta (renovar antes de vencer não queima os dias que sobraram)
@@ -711,6 +736,27 @@ ${emailButton(link, "Criar nova senha")}
       }
       return json(res, 200, { ok: true }); // MP exige 200 sempre
     }
+    // RTDN da Play (push do Pub/Sub): renovação, cancelamento, expiração e estorno chegam aqui
+    // sem a pessoa abrir o app. O corpo é só um aviso e nada dele vira plano — a gente refaz a
+    // pergunta pra Play com o purchaseToken, então um POST forjado no máximo gasta uma consulta.
+    if (path === "/api/billing/play/rtdn" && req.method === "POST") {
+      try {
+        const n = decodeRtdn(await readBody(req));
+        if (n && playEnabled() && n.pacote === playPackage()) {
+          const u = Object.values(users).find((x) => x.playToken === n.purchaseToken);
+          if (u) {
+            const r = await getSubscription(n.purchaseToken);
+            if (r.ok) {
+              const antes = u.plan;
+              aplicarPlay(u, readSubscription(r.data), n.purchaseToken);
+              await saveUsers();
+              if (antes !== u.plan) console.log(`[play] rtdn tipo ${n.tipo}: ${u.email} ${antes} → ${u.plan}`);
+            }
+          }
+        }
+      } catch (e) { console.error("[play] rtdn:", e.message); }
+      return json(res, 200, { ok: true }); // Pub/Sub reentrega enquanto não receber 200
+    }
     // cron de lembretes (GitHub Action): ?key=CRON_SECRET&slot=manha|noite
     // v3 (DESIGN-PUSH.md): o push carrega o dia a dia e o e-mail só sai em evento pontual.
     // O slot da noite existe só pro push, e só pra quem ainda não abriu a fila hoje.
@@ -873,7 +919,7 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     }
     // price/founderLeft: a tela do Pro mostra o preço que o checkout vai cobrar de verdade,
     // e a promessa dos 100 primeiros some sozinha quando as vagas acabam
-    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me), price: priceFor(me), fullPrice: MP_PRICE, yearPrice: yearPriceFor(me), fullYearPrice: MP_PRICE_YEAR, founderLeft: Math.max(0, FOUNDER_SEATS - foundersUsed()), proUntil: me.proUntil || null, pushKey: pushPublicKey(), pushSubs: pushSubs(me).length, remindersOn: !me.remindersOff });
+    if (path === "/api/config") return json(res, 200, { genEnabled: GEN_ENABLED, billingEnabled: BILLING_ENABLED, plan: me.plan, freeLimit: FREE_THEME_LIMIT, themes: Object.keys(ud.tracks).length, gen: genUsage(me), tutor: tutorUsage(me), price: priceFor(me), fullPrice: MP_PRICE, yearPrice: yearPriceFor(me), fullYearPrice: MP_PRICE_YEAR, founderLeft: Math.max(0, FOUNDER_SEATS - foundersUsed()), proUntil: me.proUntil || null, pushKey: pushPublicKey(), pushSubs: pushSubs(me).length, remindersOn: !me.remindersOff, play: { enabled: playEnabled(), produto: PLAY_PRODUCT_ID, mes: PLAY_PLAN_MES, ano: PLAY_PLAN_ANO, oferta: founderOpen(me) ? PLAY_OFFER_FUNDADOR : null } });
     // geração direta: monta o prompt, chama o Gemini, valida e importa — 1 clique
     // free: 1 degustação lifetime · pro: fair use 30/mês + máx 10/dia (PRICING.md)
     // ---- push: inscrição do aparelho e chave do interruptor de lembretes ----
@@ -1008,6 +1054,30 @@ ${emailButton(`${BASE_URL}/revisar`, "Revisar agora")}
     if (path === "/api/review") return json(res, 200, globalReview(ud));
     if (path === "/api/stats") return json(res, 200, computeStats(ud));
     // billing: cria a assinatura no Mercado Pago e devolve a URL de checkout
+    // Play Billing: o app faz o checkout nativo (Digital Goods + PaymentRequest) e manda pra cá
+    // só o purchaseToken. O estado do plano nasce da resposta da Play, nunca do cliente.
+    if (path === "/api/billing/play/verify" && req.method === "POST") {
+      if (!playEnabled()) return json(res, 400, { error: "compra pelo app ainda não está aberta" });
+      const { purchaseToken } = (await readBody(req)) || {};
+      if (!purchaseToken) return json(res, 400, { error: "faltou o token da compra" });
+      const r = await getSubscription(String(purchaseToken));
+      if (!r.ok) return json(res, 502, { error: "não deu pra confirmar a compra — tenta de novo em instantes" });
+      const s = readSubscription(r.data);
+      // o obfuscatedAccountId volta intacto do PaymentRequest: é ele que impede o token de
+      // compra de uma conta virar Pro em outra
+      if (s.uid && s.uid !== me.id) return json(res, 403, { error: "esta compra pertence a outra conta" });
+      // o obfuscatedAccountId nem sempre chega pela ponte do TWA, então a amarra que sempre
+      // vale é esta: um purchaseToken pertence a uma conta só, a primeira que o apresentou.
+      // Sem isso, o mesmo comprovante viraria Pro em quantas contas quisessem.
+      const dono = Object.values(users).find((x) => x.playToken === String(purchaseToken) && x.id !== me.id);
+      if (dono) return json(res, 403, { error: "esta compra já está vinculada a outra conta" });
+      aplicarPlay(me, s, String(purchaseToken));
+      // sem confirmação em 3 dias o Google estorna a compra sozinho
+      if (s.ativa && s.precisaConfirmar && s.productId) await acknowledge(s.productId, String(purchaseToken));
+      await saveUsers();
+      console.log(`[play] ${me.email} → ${me.plan} (${s.state}${s.offerId ? `, oferta ${s.offerId}` : ""})`);
+      return json(res, 200, { ok: true, plan: me.plan, proUntil: me.proUntil || null });
+    }
     if (path === "/api/billing/checkout" && req.method === "POST") {
       if (!BILLING_ENABLED) return json(res, 400, { error: "assinatura ainda não está aberta" });
       if (me.plan === "pro") return json(res, 400, { error: "sua conta já é Pro" });

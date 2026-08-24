@@ -59,3 +59,8 @@ services:
       # flash-latest 503 intermitente (medido 23/08). O lite responde em ~1s.
       - key: GEMINI_FALLBACK_MODEL
         value: gemini-flash-lite-latest
+      # JSON inteiro da service account (Google Cloud → IAM → contas de serviço), numa linha.
+      # É o portão do Play Billing: sem ela playEnabled()=false, o /api/billing/play/verify
+      # recusa e o CTA do app não aparece — o resto do produto roda igual.
+      - key: PLAY_SERVICE_ACCOUNT_JSON
+        sync: false

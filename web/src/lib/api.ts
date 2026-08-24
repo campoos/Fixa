@@ -76,6 +76,8 @@ export const logout = () => api.post("/api/logout");
 export const deleteAccount = (pass: string) => api.post("/api/account/delete", { pass });
 export const forgotPass = (email: string) => api.post<{ ok: true }>("/api/forgot", { email });
 export const resetPass = (token: string, pass: string) => api.post<Me>("/api/reset", { token, pass });
+// o purchaseToken sozinho não vale nada: quem confirma na Play Developer API é o servidor
+export const playVerify = (purchaseToken: string) => api.post<{ ok: true; plan: "free" | "pro"; proUntil: string | null }>("/api/billing/play/verify", { purchaseToken });
 export const billingCheckout = () => api.post<{ ok: true; url: string }>("/api/billing/checkout");
 // Pix: compra avulsa de prazo (1 mês ou 1 ano) — o retorno é o checkout hospedado do Mercado Pago
 export const billingPix = (plano: "mes" | "ano") => api.post<{ ok: true; url: string; valor: number; dias: number }>("/api/billing/pix", { plano });
@@ -103,7 +105,10 @@ export const appendTrack = (id: string, jsonStr: string) => {
 export interface GenUsage { used: number; limit: number; dayUsed?: number; dayLimit?: number }
 // tutor: uso das correções do Tutor — free: lifetime (degustação); pro: no mês
 export interface TutorUsage { used: number; limit: number }
-export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage; price: number; fullPrice: number; yearPrice: number; fullYearPrice: number; founderLeft: number; proUntil: string | null; pushKey: string; pushSubs: number; remindersOn: boolean }
+export interface Config { genEnabled: boolean; billingEnabled: boolean; plan: "free" | "pro"; freeLimit: number; themes: number; gen: GenUsage; tutor: TutorUsage; price: number; fullPrice: number; yearPrice: number; fullYearPrice: number; founderLeft: number; proUntil: string | null; pushKey: string; pushSubs: number; remindersOn: boolean; play: PlayConfig }
+// catálogo da Play, pra tela Plano saber o que comprar dentro do app. `oferta` já vem
+// resolvida pelo servidor (null = as vagas de fundador acabaram, vale o preço do base plan).
+export interface PlayConfig { enabled: boolean; produto: string; mes: string; ano: string; oferta: string | null }
 export const getConfig = () => api.get<Config>("/api/config");
 // lembretes (DESIGN-PUSH.md): a inscrição do aparelho e o interruptor geral dos dois canais
 export const pushSubscribe = (endpoint: string) => api.post<{ ok: true; subs: number }>("/api/push/subscribe", { endpoint });

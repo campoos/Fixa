@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, Crown, Loader2 } from "lucide-react";
-import { ApiError, billingCheckout, billingPix, getConfig, joinWaitlist, type Config, type Me } from "@/lib/api";
+import { ApiError, billingCheckout, billingPix, getConfig, joinWaitlist, playVerify, type Config, type Me } from "@/lib/api";
 import { isAppMode } from "@/lib/app-mode";
+import { comprar, compraPendente, precoDoPlano, servicoPlay, type ItemPlay } from "@/lib/play-billing";
 import { useApi } from "@/lib/useApi";
 import { FOCUS } from "@/App";
 import { Card } from "@/components/ui/card";
@@ -246,6 +247,78 @@ function UsageMeters({ cfg }: { cfg: Config }) {
   );
 }
 
+/* ── compra dentro do app, pelo Play Billing (PLAY-STORE.md §6) ──
+   Enquanto o serviço de Digital Goods não existe — navegador, PWA, ou app anterior ao
+   playBilling — este componente devolve o bloco informativo de sempre, e a tela continua
+   sendo exatamente a que a spec §3.2 descreve. O CTA só nasce quando há produto de verdade
+   no catálogo da Play, e o preço exibido é o que a Play devolve, nunca o nosso. */
+function PlayCta({ cfg, onPro }: { cfg: Config; onPro: () => void }) {
+  const [item, setItem] = useState<ItemPlay | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const svc = await servicoPlay();
+      if (!svc || !cfg.play.enabled) return;
+      const preco = await precoDoPlano(svc, cfg.play.produto);
+      if (vivo) setItem(preco);
+      // compra que ficou pendurada (app fechou entre pagar e confirmar): resgata sozinha,
+      // senão a pessoa pagou e continua free
+      const pendente = await compraPendente(svc, cfg.play.produto);
+      if (pendente) { try { await playVerify(pendente); if (vivo) onPro(); } catch { /* tenta na próxima */ } }
+    })();
+    return () => { vivo = false; };
+  }, [cfg.play.enabled, cfg.play.produto, onPro]);
+
+  const assinar = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const token = await comprar(cfg.play.produto, cfg.play.oferta ?? cfg.play.mes);
+      if (!token) return;                       // fechou o checkout: desistência, não erro
+      await playVerify(token);
+      onPro();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "não deu pra concluir a compra — tenta de novo");
+    } finally { setBusy(false); }
+  };
+
+  // sem serviço ou sem produto publicado: a tela de sempre, sem preço e sem CTA
+  if (!item) {
+    return (
+      <div className="mt-4 rounded-xl border border-border p-4">
+        <p className="text-sm font-semibold">Fixa Pro</p>
+        <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+          Temas ilimitados, geração por IA em 1 clique e correção do Tutor. Disponível para contas Pro.
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">A assinatura é administrada fora do aplicativo.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-primary/50 p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-semibold">Fixa Pro</p>
+        <p className="font-mono text-[13px] tabular-nums text-foreground">{item.price.value} {item.price.currency}/mês</p>
+      </div>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+        Temas ilimitados, geração por IA em 1 clique e correção do Tutor.
+      </p>
+      <button
+        onClick={assinar}
+        disabled={busy}
+        className={`mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 ${FOCUS}`}
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crown className="h-4 w-4" />} Assinar o Pro
+      </button>
+      {err && <p className="mt-2 text-xs text-recall">{err}</p>}
+      <p className="mt-2 text-xs text-muted-foreground">Cobrança e cancelamento pelo Google Play.</p>
+    </div>
+  );
+}
+
 function ProAppScreen({ me, cfg }: { me: Me; cfg: Config }) {
   const isPro = me.plan === "pro";
   const temasNoTeto = !isPro && cfg.themes >= cfg.freeLimit;
@@ -285,13 +358,7 @@ function ProAppScreen({ me, cfg }: { me: Me; cfg: Config }) {
               )}
               <Features items={FREE_FEATURES} />
             </Card>
-            <div className="mt-4 rounded-xl border border-border p-4">
-              <p className="text-sm font-semibold">Fixa Pro</p>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-                Temas ilimitados, geração por IA em 1 clique e correção do Tutor. Disponível para contas Pro.
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">A assinatura é administrada fora do aplicativo.</p>
-            </div>
+            <PlayCta cfg={cfg} onPro={() => window.location.reload()} />
           </>
         )}
       </div>
