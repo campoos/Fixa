@@ -55,10 +55,10 @@ android {
     namespace "br.com.fixaestudos.app"
     defaultConfig {
         applicationId "br.com.fixaestudos.app"
-        minSdkVersion 21
+        minSdkVersion 23
         targetSdkVersion 36
-        versionCode 4
-        versionName "1.0.1"
+        versionCode 6
+        versionName "1.1.0"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -208,6 +208,8 @@ repositories {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     
-        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
+        implementation 'com.google.androidbrowserhelper:billing:1.1.0'
+    
+        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.0-alpha02'
     
 }
