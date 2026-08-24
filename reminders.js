@@ -175,3 +175,39 @@ export function daysInactive(ud, createdAt, today = spDay()) {
   const last = lastActiveDay(ud) ?? (createdAt || "").slice(0, 10) ?? today;
   return Math.max(0, daysBetween(last, today));
 }
+
+// ---- ativação: quem se cadastrou e nunca começou ----
+// Todo o resto deste módulo pressupõe fila de revisão vencendo, e fila só nasce de tarefa
+// concluída. Quem parou antes disso não era alcançado por nada — no teste fechado da Play,
+// 10 dos 12 testadores. São dois toques e para: D+1, enquanto a intenção ainda é fresca, e
+// D+3. Quem não voltou em três dias não volta por insistência, volta por produto melhor.
+const ONBOARD = {
+  "sem-tema": {
+    d1: {
+      subject: "Seu primeiro tema leva um minuto",
+      title: "Falta escolher o que estudar",
+      bodyP: "Você criou a conta e parou antes do primeiro tema. Descreva o assunto e, se tiver, a data da prova — a trilha sai pronta, dividida em tarefas curtas na ordem certa.",
+    },
+    d3: {
+      subject: "Ainda dá tempo de começar",
+      title: "Sua conta continua vazia",
+      bodyP: "Nada foi criado por aqui ainda. Se travou em alguma coisa, a página de Ajuda explica o método em dois minutos. E se foi só falta de tempo: criar o primeiro tema leva um minuto.",
+    },
+  },
+  "sem-estudo": {
+    d1: {
+      subject: "Sua trilha está pronta — falta a primeira tarefa",
+      title: "A trilha está montada",
+      bodyP: "Você montou o tema mas ainda não abriu a primeira tarefa. É dela que nasce a primeira revisão — e é a revisão no intervalo certo que faz o conteúdo grudar.",
+    },
+    d3: {
+      subject: "A primeira tarefa continua te esperando",
+      title: "Nenhuma tarefa concluída ainda",
+      bodyP: "A trilha está lá, intacta. Uma tarefa só já coloca a revisão espaçada pra rodar: o Fixa devolve o conteúdo em 1, 2, 4, 7, 15 e 30 dias, sem você precisar lembrar de nada.",
+    },
+  },
+};
+
+export function buildOnboard({ variante, marco }) {
+  return ONBOARD[variante]?.[marco] || null;
+}

@@ -7,7 +7,7 @@ import { validateTrack, trackCounts } from "./study-schema.js";
 import { buildPrompt } from "./prompt-template.js";
 import { buildTutorPrompt } from "./prompt-tutor.js";
 import { REVIEW_LADDER, REVIEW_DOSE, spDay, addDays, daysBetween, isGraduated, seedEntry, gradeEntry, planSession } from "./review-engine.js";
-import { buildReminder, buildPush, pushCadence, emailEvent, daysInactive } from "./reminders.js";
+import { buildReminder, buildPush, pushCadence, emailEvent, daysInactive, buildOnboard } from "./reminders.js";
 import { emailEnabled, sendEmail, emailShell, emailButton } from "./email.js";
 import { pushEnabled, pushPublicKey, sendPush } from "./push.js";
 
@@ -722,6 +722,41 @@ ${emailButton(link, "Criar nova senha")}
       for (const u of Object.values(users)) {
         if (u.remindersOff) { skipped++; continue; } // soberano sobre os dois canais
         const ud = await udata(u.id);
+
+        // ---- ativação: quem se cadastrou e nunca começou ----
+        // Tudo daqui pra baixo depende de fila vencendo, e fila só nasce de tarefa concluída:
+        // quem parou antes disso era invisível pros dois canais ao mesmo tempo (no teste
+        // fechado da Play, 10 dos 12 testadores). Dois toques, D+1 e D+3, e para. Só e-mail:
+        // sem passar pelo app não existe inscrição de push pra alcançar essa pessoa.
+        const semTema = !Object.keys(ud.tracks || {}).length;
+        const semEstudo = !semTema && !Object.keys(ud.activity || {}).length;
+        if (semTema || semEstudo) {
+          const marco = { 1: "d1", 3: "d3" }[daysBetween(String(u.createdAt || ymd).slice(0, 10), ymd)];
+          if (slot === "manha" && marco && emailEnabled() && !(u.onboardSent || {})[marco]) {
+            const m = buildOnboard({ variante: semTema ? "sem-tema" : "sem-estudo", marco });
+            const alvo = semTema ? "/novo" : "/";
+            const offLink = `${BASE_URL}/api/reminders/off?u=${u.id}&sig=${signUid(u.id)}`;
+            const r = await sendEmail({
+              to: u.email,
+              subject: m.subject,
+              html: emailShell({
+                preheader: "Começar leva um minuto — e é esse minuto que decide se o resto acontece.",
+                eyebrow: "primeiros passos",
+                title: m.title,
+                bodyHtml: `<p style="margin:0;font-size:14px;line-height:1.65;color:#5c5480;">${m.bodyP}</p>
+${emailButton(`${BASE_URL}${alvo}`, semTema ? "Criar meu primeiro tema" : "Abrir minha trilha")}
+<div style="border-top:1px solid #eeeaf5;padding-top:14px;">
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#8b83ab;">Não quer mais estes e-mails? <a href="${offLink}" style="color:#8b83ab;text-decoration:underline;">Parar de receber lembretes</a></p>
+</div>`,
+                footnoteHtml: "Você recebeu este e-mail porque criou uma conta no Fixa.",
+              }),
+            });
+            if (r.ok) { u.onboardSent = { ...(u.onboardSent || {}), [marco]: true }; await saveUsers(); sent++; }
+            else skipped++;
+          }
+          continue; // sem tema ou sem estudo não há fila: nada mais nesta conta hoje
+        }
+
         const gr = globalReview(ud);
         const due = gr.due.length;
         if (!due) continue;

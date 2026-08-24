@@ -1,7 +1,7 @@
 // Testes dos lembretes v2 (DESIGN-LEMBRETES-V2): node --test test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickVariant, reminderCadence, lastActiveDay, buildReminder, daysInactive, rev } from "../reminders.js";
+import { pickVariant, reminderCadence, lastActiveDay, buildReminder, daysInactive, rev, buildOnboard } from "../reminders.js";
 
 const POOL = ["a", "b", "c", "d"];
 
@@ -69,4 +69,33 @@ test("singular: n=1 vira '1 revisão' em todas as famílias", () => {
   }
   const d = buildReminder({ cadence: "daily", mode: "normal", n: 1, dose: 1, rest: 0, daysLeft: null, streak: 0, userId: "u_s", ymd: "2026-07-14" });
   assert.ok(!d.subject.includes("1 revisões"));
+});
+
+// ---- ativação (quem se cadastrou e nunca começou) ----
+import { daysBetween } from "../review-engine.js";
+
+test("ativação: as 4 combinações têm copy completa e distinta", () => {
+  const combos = [["sem-tema", "d1"], ["sem-tema", "d3"], ["sem-estudo", "d1"], ["sem-estudo", "d3"]];
+  const assuntos = new Set();
+  for (const [variante, marco] of combos) {
+    const m = buildOnboard({ variante, marco });
+    assert.ok(m, `${variante}/${marco} existe`);
+    for (const campo of ["subject", "title", "bodyP"]) assert.ok(m[campo]?.trim(), `${variante}/${marco}.${campo}`);
+    assuntos.add(m.subject);
+  }
+  assert.equal(assuntos.size, 4, "cada toque tem assunto próprio — repetido vira spam");
+});
+
+test("ativação: variante ou marco desconhecido não inventa e-mail", () => {
+  assert.equal(buildOnboard({ variante: "sem-tema", marco: "d7" }), null);
+  assert.equal(buildOnboard({ variante: "ativo", marco: "d1" }), null);
+  assert.equal(buildOnboard({ variante: undefined, marco: undefined }), null);
+});
+
+test("ativação: só D+1 e D+3 disparam — o resto é silêncio", () => {
+  const marcoDe = (cadastro, hoje) => ({ 1: "d1", 3: "d3" })[daysBetween(cadastro, hoje)];
+  assert.equal(marcoDe("2026-08-20", "2026-08-21"), "d1");
+  assert.equal(marcoDe("2026-08-20", "2026-08-23"), "d3");
+  for (const hoje of ["2026-08-20", "2026-08-22", "2026-08-24", "2026-09-20"])
+    assert.equal(marcoDe("2026-08-20", hoje), undefined, `${hoje} não dispara`);
 });
